@@ -1,0 +1,30 @@
+node_modules/
+.env
+.env.local
+
+# Run outputs: transcripts, manifests, cost reports.
+runs/
+
+# G16: the held-out private scenario pool must never enter version control.
+# Publishing it would let a contestant train or hand-tune against the exact
+# tasks it is scored on, which destroys the benchmark's discriminative power.
+# Keep it local (or in a separate access-controlled store) forever.
+private-pool/
+
+# Python (stats-bridge)
+__pycache__/
+*.pyc
+.venv/
+stats-bridge/.venv/
+
+# Editors / OS
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Build / tooling caches
+dist/
+coverage/
+*.tsbuildinfo
+.eslintcache
