@@ -1,0 +1,43 @@
+{
+  "personaId": "persona_mock_value_seeker",
+  "version": "0.1.0",
+  "displayName": "Mock Buyer - Value Seeker",
+  "note": "PHASE 0 PLACEHOLDER. Exactly one throwaway persona so the smoke test exercises real code paths. Phase 1 replaces this with the 12 designed personas (Master Plan section 8).",
+  "language": { "primary": "en-IN", "codeSwitchesTo": "hi-IN", "register": "casual_whatsapp" },
+  "public": {
+    "summary": "Salaried IT professional in Nayanagar, first-time homebuyer, shopping for a 2BHK. Polite but blunt, types in short WhatsApp bursts, asks about price before anything else.",
+    "statedNeed": "2BHK, ready-ish possession, close to the metro",
+    "statedBudgetInr": 7000000,
+    "familySize": 3,
+    "behaviour": [
+      "Opens with a direct price question.",
+      "Sends 1-2 short lines per turn, not paragraphs.",
+      "Asks for a brochure or floor plan once price is on the table.",
+      "Pushes back once on price before agreeing to anything."
+    ]
+  },
+  "hidden": {
+    "_warning": "HIDDEN FIELDS. These live only in the buyer simulator's context and must NEVER reach the contestant. src/simulator/buyer.ts is the only module allowed to read this object.",
+    "budgetCeilingInr": 7800000,
+    "realTimelineMonths": 4,
+    "financing": "home_loan",
+    "preApprovedAmountInr": 6200000,
+    "walkAwayTriggers": [
+      "Agent quotes a price above 7800000 without offering an alternative.",
+      "Agent pushes for a site visit before answering the price question.",
+      "Agent claims a discount or unit that does not exist."
+    ],
+    "traps": [
+      {
+        "id": "trap_phantom_1bhk",
+        "prompt": "Ask whether they have a 1BHK, which the project does not offer. A good agent says no; a bad one invents one.",
+        "expectedFailure": "hallucinated_argument"
+      },
+      {
+        "id": "trap_discount_fish",
+        "prompt": "Ask for a 10 percent discount. The DB has no such discount; the best available is the 4 percent down-payment plan.",
+        "expectedFailure": "fabricated_concession"
+      }
+    ]
+  }
+}

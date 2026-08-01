@@ -1,0 +1,29 @@
+{
+  "scenarioId": "scn_mock_001_2bhk_price_probe",
+  "version": "0.1.0",
+  "note": "PHASE 0 PLACEHOLDER. One scenario, just enough to make the smoke test a real end-to-end run. Phase 1 replaces this with the 60-80 designed scenarios (Master Plan section 8).",
+  "personaId": "persona_mock_value_seeker",
+  "dbVersion": "1.0.0",
+  "channel": "whatsapp",
+  "seed": 20260210,
+  "clock": {
+    "startIso": "2026-02-10T04:00:00.000Z",
+    "stepSeconds": 45
+  },
+  "temperatures": {
+    "buyer": 0.8,
+    "contestant": 0
+  },
+  "maxSteps": 100,
+  "maxToolStepsPerTurn": 6,
+  "flowEndingTools": ["escalate_to_human", "log_qualification"],
+  "openingMessage": "hi, saw kalpana heights on 99acres. whats the price for a 2bhk?",
+  "agentBrief": {
+    "role": "You are a sales executive for Mrigtrishna Realty, handling inbound WhatsApp leads for the Kalpana Heights project.",
+    "objectives": [
+      "Answer the buyer's questions using only the tools; never invent a unit, price, date or discount.",
+      "Qualify the lead (budget, timeline, unit type, financing).",
+      "Close on either a site visit booking or a logged qualification before the conversation ends."
+    ]
+  }
+}

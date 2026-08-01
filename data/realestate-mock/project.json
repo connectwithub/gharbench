@@ -1,0 +1,212 @@
+{
+  "dbVersion": "1.0.0",
+  "disclaimer": "ENTIRELY FICTIONAL TEST DATA. 'Kalpana Heights' (kalpana = imagination), 'Mrigtrishna Realty' (mrigtrishna = mirage) and 'Nayanagar' do not exist. The RERA id is a placeholder, not a registration. All URLs use the reserved .invalid TLD and resolve to nothing. Prices, units and slots are invented for the Phase 0 smoke test only.",
+  "project": {
+    "id": "proj_kalpana_heights",
+    "name": "Kalpana Heights",
+    "developer": "Mrigtrishna Realty Pvt Ltd",
+    "city": "Nayanagar",
+    "state": "Maharashtra",
+    "locality": "Sector 7, Chitralekha Road",
+    "reraId": "P00000000000000-FICTIONAL",
+    "status": "under_construction",
+    "possessionQuarter": "Q4-2027",
+    "towers": ["A", "B"],
+    "totalUnits": 6,
+    "priceRangeInr": { "min": 6850000, "max": 14200000 },
+    "maintenancePerSqftPerMonthInr": 4.5,
+    "amenities": [
+      "clubhouse",
+      "gymnasium",
+      "kids_play_area",
+      "rooftop_deck",
+      "covered_parking",
+      "rainwater_harvesting",
+      "power_backup_100pct"
+    ],
+    "nearby": [
+      { "name": "Nayanagar Metro (Line 3)", "kind": "transit", "distanceKm": 1.2 },
+      { "name": "Chitralekha Public School", "kind": "school", "distanceKm": 0.8 },
+      { "name": "Sector 9 Multispeciality Hospital", "kind": "hospital", "distanceKm": 2.4 },
+      { "name": "Vistaar Mall", "kind": "retail", "distanceKm": 3.1 }
+    ]
+  },
+  "paymentPlans": [
+    {
+      "id": "plan_clp",
+      "name": "Construction-Linked Plan",
+      "bookingPercent": 10,
+      "discountPercent": 0,
+      "milestones": [
+        { "label": "on_booking", "percent": 10 },
+        { "label": "on_foundation", "percent": 20 },
+        { "label": "on_10th_slab", "percent": 30 },
+        { "label": "on_finishing", "percent": 30 },
+        { "label": "on_possession", "percent": 10 }
+      ]
+    },
+    {
+      "id": "plan_dp",
+      "name": "Down Payment Plan",
+      "bookingPercent": 10,
+      "discountPercent": 4,
+      "milestones": [
+        { "label": "on_booking", "percent": 10 },
+        { "label": "within_45_days", "percent": 85 },
+        { "label": "on_possession", "percent": 5 }
+      ]
+    }
+  ],
+  "units": [
+    {
+      "id": "unit_A_0402",
+      "tower": "A",
+      "floor": 4,
+      "unitType": "2BHK",
+      "carpetAreaSqft": 645,
+      "facing": "east",
+      "priceInr": 6850000,
+      "status": "available"
+    },
+    {
+      "id": "unit_A_0703",
+      "tower": "A",
+      "floor": 7,
+      "unitType": "2BHK",
+      "carpetAreaSqft": 712,
+      "facing": "north_east",
+      "priceInr": 7450000,
+      "status": "available"
+    },
+    {
+      "id": "unit_A_1101",
+      "tower": "A",
+      "floor": 11,
+      "unitType": "3BHK",
+      "carpetAreaSqft": 985,
+      "facing": "west",
+      "priceInr": 10250000,
+      "status": "available"
+    },
+    {
+      "id": "unit_B_0205",
+      "tower": "B",
+      "floor": 2,
+      "unitType": "2BHK",
+      "carpetAreaSqft": 640,
+      "facing": "south",
+      "priceInr": 6600000,
+      "status": "sold"
+    },
+    {
+      "id": "unit_B_0902",
+      "tower": "B",
+      "floor": 9,
+      "unitType": "3BHK",
+      "carpetAreaSqft": 1010,
+      "facing": "east",
+      "priceInr": 10800000,
+      "status": "available"
+    },
+    {
+      "id": "unit_B_1401",
+      "tower": "B",
+      "floor": 14,
+      "unitType": "4BHK",
+      "carpetAreaSqft": 1420,
+      "facing": "north_west",
+      "priceInr": 14200000,
+      "status": "blocked"
+    }
+  ],
+  "assets": [
+    {
+      "id": "asset_brochure_v3",
+      "kind": "brochure",
+      "name": "Kalpana Heights - Project Brochure (v3)",
+      "url": "https://cdn.kalpana-heights.invalid/brochure-v3.pdf",
+      "sizeKb": 4820
+    },
+    {
+      "id": "asset_floorplan_2bhk",
+      "kind": "floor_plan",
+      "name": "2BHK Floor Plan (Tower A)",
+      "url": "https://cdn.kalpana-heights.invalid/floorplan-2bhk.pdf",
+      "sizeKb": 610
+    },
+    {
+      "id": "asset_floorplan_3bhk",
+      "kind": "floor_plan",
+      "name": "3BHK Floor Plan (Towers A and B)",
+      "url": "https://cdn.kalpana-heights.invalid/floorplan-3bhk.pdf",
+      "sizeKb": 655
+    },
+    {
+      "id": "asset_price_sheet_feb",
+      "kind": "price_sheet",
+      "name": "Price Sheet - February 2026",
+      "url": "https://cdn.kalpana-heights.invalid/price-sheet-2026-02.pdf",
+      "sizeKb": 240
+    },
+    {
+      "id": "asset_walkthrough_video",
+      "kind": "video",
+      "name": "Sample Flat Walkthrough (3 min)",
+      "url": "https://cdn.kalpana-heights.invalid/walkthrough.mp4",
+      "sizeKb": 38400
+    }
+  ],
+  "siteVisitSlots": [
+    {
+      "id": "slot_2026_02_14_1100",
+      "date": "2026-02-14",
+      "time": "11:00",
+      "mode": "in_person",
+      "capacity": 4,
+      "booked": 1
+    },
+    {
+      "id": "slot_2026_02_14_1600",
+      "date": "2026-02-14",
+      "time": "16:00",
+      "mode": "in_person",
+      "capacity": 4,
+      "booked": 4
+    },
+    {
+      "id": "slot_2026_02_15_1030",
+      "date": "2026-02-15",
+      "time": "10:30",
+      "mode": "in_person",
+      "capacity": 6,
+      "booked": 2
+    },
+    {
+      "id": "slot_2026_02_15_1700",
+      "date": "2026-02-15",
+      "time": "17:00",
+      "mode": "in_person",
+      "capacity": 6,
+      "booked": 0
+    },
+    {
+      "id": "slot_2026_02_16_1800",
+      "date": "2026-02-16",
+      "time": "18:00",
+      "mode": "virtual",
+      "capacity": 10,
+      "booked": 2
+    },
+    {
+      "id": "slot_2026_02_21_1100",
+      "date": "2026-02-21",
+      "time": "11:00",
+      "mode": "in_person",
+      "capacity": 4,
+      "booked": 0
+    }
+  ],
+  "bookings": [],
+  "escalations": [],
+  "qualifications": []
+}
