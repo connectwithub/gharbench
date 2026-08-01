@@ -32,10 +32,7 @@ import {
 export type ToolKind = 'READ' | 'WRITE';
 
 export type ToolErrorCode =
-  | 'schema_violation'
-  | 'hallucinated_argument'
-  | 'unavailable'
-  | 'unknown_tool';
+  'schema_violation' | 'hallucinated_argument' | 'unavailable' | 'unknown_tool';
 
 export interface ToolError {
   code: ToolErrorCode;
@@ -43,9 +40,7 @@ export interface ToolError {
   details?: Record<string, unknown>;
 }
 
-export type ToolOutcome =
-  | { ok: true; result: unknown }
-  | { ok: false; error: ToolError };
+export type ToolOutcome = { ok: true; result: unknown } | { ok: false; error: ToolError };
 
 export interface ToolContext {
   db: RealEstateDb;
@@ -74,15 +69,7 @@ const PHONE = z
 export const fetchProjectInfoSchema = z.strictObject({
   sections: z
     .array(
-      z.enum([
-        'overview',
-        'units',
-        'amenities',
-        'payment_plans',
-        'possession',
-        'nearby',
-        'rera',
-      ]),
+      z.enum(['overview', 'units', 'amenities', 'payment_plans', 'possession', 'nearby', 'rera']),
     )
     .min(1)
     .optional()
@@ -148,7 +135,8 @@ export const logQualificationSchema = z.strictObject({
 // Stable ordering helpers
 // ---------------------------------------------------------------------------
 
-const byId = <T extends { id: string }>(a: T, b: T): number => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+const byId = <T extends { id: string }>(a: T, b: T): number =>
+  a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 const sortedById = <T extends { id: string }>(items: readonly T[]): T[] => [...items].sort(byId);
 
 const publicUnit = (u: Unit) => ({
@@ -469,8 +457,7 @@ export const TOOL_SPECS = [
     name: 'escalate_to_human',
     kind: 'WRITE',
     flowEnding: true,
-    description:
-      'Hand the conversation to a human sales manager. Ends the automated conversation.',
+    description: 'Hand the conversation to a human sales manager. Ends the automated conversation.',
     schema: escalateToHumanSchema,
     run: escalateToHuman as ToolSpec['run'],
   },

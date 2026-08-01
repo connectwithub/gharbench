@@ -8,11 +8,7 @@
  * transcript rather than only being reachable via a live model.
  */
 
-import type {
-  Contestant,
-  ContestantTurnInput,
-  ContestantTurnOutput,
-} from './types.js';
+import type { Contestant, ContestantTurnInput, ContestantTurnOutput } from './types.js';
 
 export interface FakeContestantOptions {
   script: readonly ContestantTurnOutput[];
@@ -51,7 +47,11 @@ export function mockAgentScript(): ContestantTurnOutput[] {
     // --- buyer turn 1: "what's the price for a 2bhk?"
     {
       toolCalls: [
-        { id: 'call_avail_2bhk', name: 'check_availability', args: { target: 'units', unitType: '2BHK' } },
+        {
+          id: 'call_avail_2bhk',
+          name: 'check_availability',
+          args: { target: 'units', unitType: '2BHK' },
+        },
       ],
     },
     {

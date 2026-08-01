@@ -50,10 +50,13 @@ export interface PersonaCard {
  * Fixed guardrail preamble. Stable across every scenario, so it sits at the
  * front of the prompt and is the first thing the provider caches.
  *
- * TODO(attribution): in Phase 1 this text is to be replaced verbatim with the
- * tau^2-bench user-simulator guidelines (sierra-research/tau2-bench, tag
- * >= v1.0.1), attributed to Yao et al. (arXiv:2406.12045) and Barres et al.
- * (arXiv:2506.07982). See docs/tau2-attribution/ and src/engine/tokens.ts.
+ * TODO(attribution, Phase 1): replace or merge this with the tau^2-bench
+ * user-simulator guidelines, already vendored verbatim at tag v1.0.1 in
+ * docs/tau2-attribution/simulation_guidelines.md (MIT, Copyright (c) 2025
+ * Sierra Research). Cite Yao et al. (arXiv:2406.12045) and Barres et al.
+ * (arXiv:2506.07982). The text below is GharBench-authored in the meantime
+ * because upstream's wording addresses a customer-service caller, not a
+ * WhatsApp property buyer; the termination-token protocol is upstream's.
  */
 export const BUYER_GUARDRAILS = `You are role-playing a prospective home buyer messaging a real-estate sales agent on WhatsApp.
 

@@ -111,9 +111,7 @@ export class ProviderModelContestant implements Contestant {
       stopWhen: stepCountIs(1),
       maxOutputTokens: options.maxOutputTokens ?? 800,
       maxRetries: 2,
-      ...(allowSampling
-        ? { temperature, seed: options.seed ?? options.scenario.seed }
-        : {}),
+      ...(allowSampling ? { temperature, seed: options.seed ?? options.scenario.seed } : {}),
       ...(this.#resolved.spec.supportsExplicitCaching
         ? { providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } } }
         : {}),

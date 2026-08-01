@@ -5,13 +5,17 @@
  * from the logged surface text (a human reading the transcript should see a
  * natural conversation) but recorded as the structured termination reason.
  *
- * TODO(attribution): the buyer-simulator *guidelines text* that instructs a
- * model when to emit these tokens is to be lifted verbatim from
- * sierra-research/tau2-bench (pin a tag >= v1.0.1) in Phase 1, with attribution
- * to Yao et al. (arXiv:2406.12045) and Barres et al. (arXiv:2506.07982).
- * If a vendored copy exists it lives under docs/tau2-attribution/. The token
- * strings and the orchestrator below are a clean-room reimplementation of the
- * tau^2-bench half-duplex pattern, not a copy of its code.
+ * Attribution: these token strings and their semantics come from
+ * sierra-research/tau2-bench, vendored at tag v1.0.1 under
+ * docs/tau2-attribution/ (MIT, Copyright (c) 2025 Sierra Research). Cite Yao et
+ * al. (arXiv:2406.12045) and Barres et al. (arXiv:2506.07982).
+ *
+ * TODO(attribution, Phase 1): swap the GharBench-authored guardrail preamble in
+ * src/simulator/buyer.ts for the vendored `simulation_guidelines.md` text, so
+ * the buyer's core instructions match the published benchmark verbatim.
+ *
+ * The scanner below and the orchestrator are a clean-room reimplementation of
+ * the tau^2-bench half-duplex pattern, not a translation of its code.
  */
 
 export const TERMINATION_TOKENS = ['###STOP###', '###TRANSFER###', '###OUT-OF-SCOPE###'] as const;

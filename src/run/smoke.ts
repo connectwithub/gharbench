@@ -17,8 +17,20 @@ import { pathToFileURL } from 'node:url';
 import { z } from 'zod';
 
 import { FakeContestant, mockAgentScript } from '../contestants/fake.js';
-import { Orchestrator, createEnvironment, type ConversationRecord, type ScenarioConfig } from '../engine/orchestrator.js';
-import { SimClock, canonicalJson, hashDb, loadGoldDb, resetDb, type RealEstateDb } from '../env/db.js';
+import {
+  Orchestrator,
+  createEnvironment,
+  type ConversationRecord,
+  type ScenarioConfig,
+} from '../engine/orchestrator.js';
+import {
+  SimClock,
+  canonicalJson,
+  hashDb,
+  loadGoldDb,
+  resetDb,
+  type RealEstateDb,
+} from '../env/db.js';
 import {
   collectGitInfo,
   collectPackageVersions,
@@ -196,7 +208,11 @@ async function main(): Promise<void> {
       { name: 'buyer.system', sha256: sha256(buyerPrompt) },
       { name: 'contestant.system', sha256: sha256(agentPrompt) },
     ],
-    db: { version: fixtures.gold.dbVersion, goldHash: fixtures.goldHash, path: 'data/realestate-mock/project.json' },
+    db: {
+      version: fixtures.gold.dbVersion,
+      goldHash: fixtures.goldHash,
+      path: 'data/realestate-mock/project.json',
+    },
     scenarios: [
       {
         scenarioId: fixtures.scenario.scenarioId,
@@ -207,7 +223,9 @@ async function main(): Promise<void> {
         runs,
       },
     ],
-    contestants: [{ id: trials[0]!.record.contestantId, version: trials[0]!.record.contestantVersion }],
+    contestants: [
+      { id: trials[0]!.record.contestantId, version: trials[0]!.record.contestantVersion },
+    ],
     buyers: [{ id: trials[0]!.record.buyerId, version: trials[0]!.record.buyerVersion }],
     artefacts: { transcripts: transcripts.path, costs: costsPath },
     notes: [
@@ -231,15 +249,19 @@ async function main(): Promise<void> {
   console.log(`messages          ${first.record.messages.length}`);
   console.log(`db hash start     ${first.record.dbHashStart}`);
   console.log(`db hash end       ${first.record.dbHashEnd}`);
-  console.log(`db mutated        ${first.record.dbHashStart !== first.record.dbHashEnd ? 'yes' : 'no'}`);
+  console.log(
+    `db mutated        ${first.record.dbHashStart !== first.record.dbHashEnd ? 'yes' : 'no'}`,
+  );
   console.log(`bookings created  ${first.db.bookings.length}`);
-  console.log(`tool events       ${Object.entries(events).map(([k, v]) => `${k}=${v}`).join(' ')}`);
+  console.log(
+    `tool events       ${Object.entries(events)
+      .map(([k, v]) => `${k}=${v}`)
+      .join(' ')}`,
+  );
   console.log(
     `determinism       ${deterministic ? 'PASS' : 'FAIL'} (${fingerprints.length} identical transcripts, ${endHashes.length} distinct end hash)`,
   );
-  console.log(
-    `pass^k            ${curve.map((c) => `k=${c.k}:${c.value.toFixed(3)}`).join('  ')}`,
-  );
+  console.log(`pass^k            ${curve.map((c) => `k=${c.k}:${c.value.toFixed(3)}`).join('  ')}`);
   console.log(
     `cost              ${costSummary.calls} model calls, $${costSummary.totalUsd.toFixed(4)}`,
   );

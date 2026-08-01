@@ -1,0 +1,74 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: typecheck + test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Test
+        run: pnpm test
+
+      # The offline smoke is the G1 gate. It needs no API key and costs
+      # nothing, so it runs on every commit: if the engine stops being wired
+      # end to end, CI says so before anyone spends money finding out.
+      - name: Offline smoke (Gate G1)
+        run: pnpm smoke
+
+  stats:
+    name: stats-bridge golden vectors
+    runs-on: ubuntu-latest
+    # Optional: needs a Python toolchain, so it is a separate job. A failure
+    # here means a stats dependency changed its semantics.
+    continue-on-error: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install node deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Install python deps
+        run: |
+          python -m venv stats-bridge/.venv
+          stats-bridge/.venv/bin/pip install --upgrade pip
+          stats-bridge/.venv/bin/pip install -r stats-bridge/requirements.txt
+
+      - name: Golden vectors
+        run: pnpm stats:test

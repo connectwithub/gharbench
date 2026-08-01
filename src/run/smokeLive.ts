@@ -19,7 +19,11 @@ import { pathToFileURL } from 'node:url';
 import { generateText } from 'ai';
 
 import { ProviderModelContestant } from '../contestants/providerModel.js';
-import { Orchestrator, createEnvironment, type ConversationRecord } from '../engine/orchestrator.js';
+import {
+  Orchestrator,
+  createEnvironment,
+  type ConversationRecord,
+} from '../engine/orchestrator.js';
 import { SimClock, resetDb, sha256 } from '../env/db.js';
 import {
   collectGitInfo,

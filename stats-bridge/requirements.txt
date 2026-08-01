@@ -1,0 +1,6 @@
+# Reference statistics packages. Pinned so an agreement number is reproducible
+# across machines; bump deliberately and re-run `pnpm stats:test` afterwards.
+krippendorff==0.8.2
+numpy==2.5.1
+scipy==1.18.0
+statsmodels==0.14.6

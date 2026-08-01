@@ -1,0 +1,12 @@
+node_modules/
+runs/
+private-pool/
+stats-bridge/.venv/
+pnpm-lock.yaml
+
+# The originating spec, kept exactly as it was handed over.
+GharBench_Phase0_Setup_Prompt.md
+
+# Vendored verbatim under an upstream licence; reformatting would break the
+# integrity hashes recorded in docs/tau2-attribution/README.md.
+docs/tau2-attribution/

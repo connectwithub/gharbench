@@ -200,8 +200,7 @@ export function resolveModel(ref: string, env: NodeJS.ProcessEnv = process.env):
  * (HTTP 400). Callers ask before setting them rather than discovering it at
  * request time, because a sweep that dies on turn one wastes the whole run.
  */
-const REJECTS_SAMPLING_PARAMS =
-  /^claude-(fable-5|mythos-5|opus-5|opus-4-8|opus-4-7|sonnet-5)(-|$)/;
+const REJECTS_SAMPLING_PARAMS = /^claude-(fable-5|mythos-5|opus-5|opus-4-8|opus-4-7|sonnet-5)(-|$)/;
 
 export function supportsSamplingParams(ref: string): boolean {
   const { provider, modelId } = parseModelRef(ref);

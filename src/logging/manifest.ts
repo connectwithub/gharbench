@@ -66,7 +66,11 @@ export interface RunManifest {
 export function collectGitInfo(cwd: string = process.cwd()): GitInfo {
   const run = (args: string[]): string | null => {
     try {
-      return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+      return execFileSync('git', args, {
+        cwd,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim();
     } catch {
       return null;
     }
@@ -118,6 +122,9 @@ export function writeManifest(runDir: string, manifest: RunManifest): string {
  * simulation, and must sort chronologically in a directory listing.
  */
 export function makeRunId(prefix: string, now: Date = new Date()): string {
-  const stamp = now.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+  const stamp = now
+    .toISOString()
+    .replace(/[-:]/g, '')
+    .replace(/\.\d{3}Z$/, 'Z');
   return `${stamp}-${prefix}`;
 }

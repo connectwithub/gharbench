@@ -19,12 +19,7 @@ import {
   type ToolOutcome,
 } from '../env/tools.js';
 import { hashDb, type RealEstateDb, type SimClock } from '../env/db.js';
-import type {
-  ChatMessage,
-  Contestant,
-  ToolCall,
-  ToolResult,
-} from '../contestants/types.js';
+import type { ChatMessage, Contestant, ToolCall, ToolResult } from '../contestants/types.js';
 import type { Buyer } from '../simulator/buyer.js';
 import { scanTerminationTokens, type TerminationToken } from './tokens.js';
 import type { CostMeter, CostSummary } from '../telemetry/cost.js';
@@ -206,7 +201,12 @@ export class Orchestrator {
             const resultTs = clock.tick();
 
             if (outcome.ok) {
-              results.push({ toolCallId: call.id, name: call.name, ok: true, result: outcome.result });
+              results.push({
+                toolCallId: call.id,
+                name: call.name,
+                ok: true,
+                result: outcome.result,
+              });
               toolEvents.push({
                 type: 'result',
                 ts: resultTs,
@@ -218,7 +218,12 @@ export class Orchestrator {
                 flowEndingHit = { tool: call.name, toolCallId: call.id };
               }
             } else {
-              results.push({ toolCallId: call.id, name: call.name, ok: false, error: outcome.error });
+              results.push({
+                toolCallId: call.id,
+                name: call.name,
+                ok: false,
+                error: outcome.error,
+              });
               toolEvents.push({
                 type: outcome.error.code,
                 ts: resultTs,
@@ -301,7 +306,10 @@ export class Orchestrator {
   #stampCallIds(calls: readonly ToolCall[]): ToolCall[] {
     return calls.map((call) => {
       this.#toolCallSeq += 1;
-      const id = call.id && call.id.length > 0 ? call.id : `tc_${String(this.#toolCallSeq).padStart(4, '0')}`;
+      const id =
+        call.id && call.id.length > 0
+          ? call.id
+          : `tc_${String(this.#toolCallSeq).padStart(4, '0')}`;
       return { id, name: call.name, args: call.args };
     });
   }
