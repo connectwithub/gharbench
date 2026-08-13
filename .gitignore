@@ -36,3 +36,9 @@ coverage/
 # measuring sales capability. Re-create it locally with the endpoints in
 # docs/claude-project/README.md.
 docs/claude-project/
+
+# Private half of the decision log (docs/decisions/ is the public half).
+# Holds decisions a contestant could tune against: persona hidden fields,
+# scenario taxonomy, trap construction, rubric internals, scoring thresholds,
+# calibration composition, funding strategy. Same G16 reasoning as private-pool/.
+docs/decisions-private/

@@ -10,7 +10,7 @@ reproducible by construction offline.
 
 > **Status: Phase 0 complete. Gate G1 met.**
 > The engine is wired end to end and provable by a $0 offline run. The
-> benchmark *content* - 12 personas, 60-80 scenarios, the programmatic checks
+> benchmark _content_ - 12 personas, 60-80 scenarios, the programmatic checks
 > and the judge panel - is Phase 1 onward and **does not exist yet**. See
 > [Roadmap](#roadmap).
 
@@ -136,7 +136,7 @@ flowchart LR
     ERR -->|no| NEXT([next turn])
 ```
 
-A *failed* flow-ending tool call does not end the conversation - that is tested.
+A _failed_ flow-ending tool call does not end the conversation - that is tested.
 A contestant crash is captured as `{ kind: 'error' }` so a broken run still
 produces a complete, writable record.
 
@@ -144,14 +144,14 @@ produces a complete, writable record.
 
 ## The six tools
 
-| tool | kind | flow-ending |
-| ---- | ---- | ----------- |
-| `fetch_project_info` | READ | |
-| `send_asset` | READ | |
-| `check_availability` | READ | |
-| `schedule_site_visit` | WRITE | |
-| `escalate_to_human` | WRITE | yes |
-| `log_qualification` | WRITE | yes |
+| tool                  | kind  | flow-ending |
+| --------------------- | ----- | ----------- |
+| `fetch_project_info`  | READ  |             |
+| `send_asset`          | READ  |             |
+| `check_availability`  | READ  |             |
+| `schedule_site_visit` | WRITE |             |
+| `escalate_to_human`   | WRITE | yes         |
+| `log_qualification`   | WRITE | yes         |
 
 Schemas are `z.strictObject`, so an invented parameter surfaces as a
 `schema_violation` instead of being silently dropped.
@@ -161,12 +161,12 @@ Schemas are `z.strictObject`, so an invented parameter surfaces as a
 A bad tool call never throws. It returns a structured error whose `code` is
 exactly the event the evaluation layer will consume:
 
-| code | meaning |
-| ---- | ------- |
-| `schema_violation` | args failed the schema - wrong type, unknown key, bad phone format |
-| `hallucinated_argument` | well-formed args naming something not in the DB |
-| `unavailable` | valid, real args, but the world said no. **A legitimate business outcome, not a defect.** |
-| `unknown_tool` | a tool name that does not exist |
+| code                    | meaning                                                                                   |
+| ----------------------- | ----------------------------------------------------------------------------------------- |
+| `schema_violation`      | args failed the schema - wrong type, unknown key, bad phone format                        |
+| `hallucinated_argument` | well-formed args naming something not in the DB                                           |
+| `unavailable`           | valid, real args, but the world said no. **A legitimate business outcome, not a defect.** |
+| `unknown_tool`          | a tool name that does not exist                                                           |
 
 ---
 
@@ -201,14 +201,14 @@ So no timestamps, UUIDs or turn counters ever go in a system prompt.
 `pnpm smoke:live` **proves** this rather than asserting it: it makes
 byte-identical calls and reports the second call's cache-read tokens. Measured:
 
-| provider | regime | result |
-| -------- | ------ | ------ |
+| provider                     | regime              | result                                       |
+| ---------------------------- | ------------------- | -------------------------------------------- |
 | `anthropic/claude-haiku-4-5` | explicit breakpoint | call 1 wrote 33,337 / call 2 read **33,337** |
-| `openai/gpt-4.1-mini` | automatic | call 2 read **30,464** |
-| `google/gemini-2.5-flash` | automatic | call 3 read **34,789** |
+| `openai/gpt-4.1-mini`        | automatic           | call 2 read **30,464**                       |
+| `google/gemini-2.5-flash`    | automatic           | call 3 read **34,789**                       |
 
 That check earned its keep immediately: OpenAI requests were being routed to
-different backends and caching *nothing* until a stable `promptCacheKey` was
+different backends and caching _nothing_ until a stable `promptCacheKey` was
 added. Contestant cache hits went from 1/19 calls to 10/19. Without the probe,
 every sweep would have paid list price while believing the cache lever was
 engaged.
@@ -234,7 +234,7 @@ data/           tiny, obviously-fictional mock project
 
 ## Roadmap
 
-Phase 0 is the engine. Everything that makes it a *benchmark* is ahead:
+Phase 0 is the engine. Everything that makes it a _benchmark_ is ahead:
 
 - [x] **Phase 0** - TS engine scaffold, orchestrator, tools, telemetry, G1
 - [ ] **Phase 1** - the real document set, 12 buyer personas, 60-80 scenarios
@@ -257,5 +257,5 @@ translated.
 
 Work that reports pass^k or uses these tokens should cite:
 
-- Yao et al., *tau-bench* - [arXiv:2406.12045](https://arxiv.org/abs/2406.12045)
-- Barres et al., *tau2-bench* - [arXiv:2506.07982](https://arxiv.org/abs/2506.07982)
+- Yao et al., _tau-bench_ - [arXiv:2406.12045](https://arxiv.org/abs/2406.12045)
+- Barres et al., _tau2-bench_ - [arXiv:2506.07982](https://arxiv.org/abs/2506.07982)

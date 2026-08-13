@@ -22,7 +22,8 @@
     "smoke:live": "tsx src/run/smokeLive.ts",
     "stats:test": "vitest run --config vitest.stats.config.ts",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "decisions:index": "node scripts/decisions-index.mjs docs/decisions && node scripts/decisions-index.mjs docs/decisions-private"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "3.0.104",

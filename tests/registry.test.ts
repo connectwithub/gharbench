@@ -79,9 +79,10 @@ describe('cacheCallOptions', () => {
 
   it('sends nothing to OpenAI-compatible endpoints, which reject unknown fields', () => {
     for (const id of ['openrouter', 'groq', 'deepseek']) {
-      expect(cacheCallOptions(getProvider(id), 'k'), `${id} must not be sent cache options`).toEqual(
-        {},
-      );
+      expect(
+        cacheCallOptions(getProvider(id), 'k'),
+        `${id} must not be sent cache options`,
+      ).toEqual({});
     }
   });
 

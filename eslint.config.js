@@ -18,6 +18,15 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   prettier,
   {
+    // Plain-JS maintenance scripts. The TS config turns `no-undef` off because
+    // the compiler already catches it; .mjs files get no such backstop, so the
+    // Node globals have to be declared.
+    files: ['scripts/**/*.mjs'],
+    languageOptions: {
+      globals: { console: 'readonly', process: 'readonly' },
+    },
+  },
+  {
     rules: {
       '@typescript-eslint/no-unused-vars': [
         'error',
