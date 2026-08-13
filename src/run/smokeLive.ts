@@ -247,6 +247,18 @@ async function main(): Promise<void> {
     clock,
   });
 
+  for (const ref of [contestantRef, buyerRef]) {
+    if (ref.pinned && ref.modelId !== ref.requestedModelId) {
+      console.log(`pinned ${ref.requestedRef} -> ${ref.modelId}`);
+    } else if (!ref.pinned) {
+      console.warn(
+        `warning: "${ref.requestedRef}" is not version-pinned - no dated snapshot is published for it.\n` +
+          '  A provider can repoint a floating alias with no signal, and no provider honours `seed`,\n' +
+          '  so a scored run using this cannot be shown to have used one model throughout.',
+      );
+    }
+  }
+
   console.log(`\nRunning live smoke: contestant=${contestantRef.ref} buyer=${buyerRef.ref}`);
 
   const orchestrator = new Orchestrator({
@@ -301,6 +313,8 @@ async function main(): Promise<void> {
         provider: buyerRef.provider,
         modelId: buyerRef.modelId,
         endpoint: providerEndpoint(buyerRef.provider),
+        requestedRef: buyerRef.requestedRef,
+        versionPinned: buyerRef.pinned,
       },
       {
         role: 'contestant',
@@ -308,6 +322,8 @@ async function main(): Promise<void> {
         provider: contestantRef.provider,
         modelId: contestantRef.modelId,
         endpoint: providerEndpoint(contestantRef.provider),
+        requestedRef: contestantRef.requestedRef,
+        versionPinned: contestantRef.pinned,
       },
     ],
     prompts: [

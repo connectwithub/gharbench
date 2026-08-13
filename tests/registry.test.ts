@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
+import { priceFor } from '../src/telemetry/prices.js';
 import {
   MAX_PROMPT_CACHE_KEY_LENGTH,
+  MODEL_PINS,
   PROVIDERS,
+  aliasForSnapshot,
   cacheCallOptions,
   getProvider,
   hasCredentials,
@@ -111,6 +114,62 @@ describe('cacheCallOptions', () => {
     const a = cacheCallOptions(getProvider('openai'), 'hash-1');
     const b = cacheCallOptions(getProvider('openai'), 'hash-1');
     expect(a).toEqual(b);
+  });
+});
+
+describe('model version pinning', () => {
+  it('pins a floating alias to its dated snapshot', () => {
+    const ref = parseModelRef('openai/gpt-4.1-mini');
+    expect(ref.modelId).toBe('gpt-4.1-mini-2025-04-14');
+    expect(ref.requestedModelId).toBe('gpt-4.1-mini');
+    expect(ref.requestedRef).toBe('openai/gpt-4.1-mini');
+    expect(ref.pinned).toBe(true);
+  });
+
+  it('accepts an already-dated snapshot unchanged', () => {
+    const ref = parseModelRef('anthropic/claude-haiku-4-5-20251001');
+    expect(ref.modelId).toBe('claude-haiku-4-5-20251001');
+    expect(ref.pinned).toBe(true);
+  });
+
+  it('marks an id with no published snapshot as unpinned rather than guessing', () => {
+    // Google publishes no dated GA snapshot for gemini-2.5-flash; the -preview-
+    // ids are different models, not pins. Inventing one would be a false
+    // reproducibility claim.
+    const ref = parseModelRef('google/gemini-2.5-flash');
+    expect(ref.modelId).toBe('gemini-2.5-flash');
+    expect(ref.pinned).toBe(false);
+  });
+
+  it('does not pin through an OpenAI-compatible gateway', () => {
+    // OpenRouter routes by its own rules, so substituting an id would imply a
+    // guarantee we cannot make.
+    const ref = parseModelRef('openrouter/openai/gpt-4.1-mini');
+    expect(ref.modelId).toBe('openai/gpt-4.1-mini');
+    expect(ref.pinned).toBe(false);
+  });
+
+  it('only ever pins to a dated id that extends its own alias', () => {
+    for (const [alias, snapshot] of Object.entries(MODEL_PINS)) {
+      expect(snapshot.startsWith(alias), `${snapshot} is not a snapshot of ${alias}`).toBe(true);
+      expect(snapshot, `${snapshot} carries no date`).toMatch(/\d{4}-?\d{2}-?\d{2}$/);
+    }
+  });
+
+  it('round-trips snapshot back to alias', () => {
+    for (const [alias, snapshot] of Object.entries(MODEL_PINS)) {
+      expect(aliasForSnapshot(snapshot)).toBe(alias);
+    }
+    expect(aliasForSnapshot('gpt-4.1-mini')).toBeUndefined();
+  });
+
+  it('prices a pinned snapshot at its alias rate rather than counting it unpriced', () => {
+    // Regression: pinning sends `gpt-4.1-mini-2025-04-14`, but the price table
+    // is keyed on the alias. Without the reverse lookup every pinned call would
+    // silently become an unpriced call.
+    expect(priceFor('gpt-4.1-mini-2025-04-14')).toEqual(priceFor('gpt-4.1-mini'));
+    expect(priceFor('claude-haiku-4-5-20251001')).toEqual(priceFor('claude-haiku-4-5'));
+    expect(priceFor('some-model-nobody-has-priced')).toBeUndefined();
   });
 });
 

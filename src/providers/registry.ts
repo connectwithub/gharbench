@@ -207,11 +207,96 @@ export function cacheCallOptions(spec: ProviderSpec, routingKey: string): CacheC
 /** OpenAI rejects a `prompt_cache_key` longer than this. */
 export const MAX_PROMPT_CACHE_KEY_LENGTH = 64;
 
+/**
+ * Floating alias -> dated snapshot.
+ *
+ * A provider can repoint an alias like `gpt-4.1-mini` at a new model with no
+ * announcement and no signal in the response. Because no provider honours
+ * `seed` (ADR-0006), that silent swap is the most likely way a scored run gets
+ * invalidated without anyone noticing: the manifest still records
+ * `gpt-4.1-mini`, the numbers still look plausible, and half the sweep ran
+ * against a different model from the other half.
+ *
+ * Every entry below is copied from the installed provider SDK's own model-id
+ * union, not from memory. An alias with no verified dated snapshot is
+ * deliberately absent rather than guessed - the same discipline the price
+ * table applies to dollars. Notably absent:
+ *
+ * - `gemini-2.5-flash` - Google publishes no dated GA snapshot for it. The
+ *   `-preview-` ids in the SDK union are different models, not pins.
+ * - `claude-opus-5`, `claude-sonnet-5`, `claude-fable-5` - no dated variant
+ *   declared yet.
+ *
+ * Re-check at freeze, alongside the price table.
+ */
+export const MODEL_PINS: Readonly<Record<string, string>> = {
+  // OpenAI - @ai-sdk/openai OpenAIResponsesModelId
+  'gpt-4.1': 'gpt-4.1-2025-04-14',
+  'gpt-4.1-mini': 'gpt-4.1-mini-2025-04-14',
+  'gpt-4.1-nano': 'gpt-4.1-nano-2025-04-14',
+  'gpt-5': 'gpt-5-2025-08-07',
+  'gpt-5-mini': 'gpt-5-mini-2025-08-07',
+  'gpt-5-nano': 'gpt-5-nano-2025-08-07',
+  'gpt-5.1': 'gpt-5.1-2025-11-13',
+  'gpt-5.2': 'gpt-5.2-2025-12-11',
+  // Anthropic - @ai-sdk/anthropic AnthropicMessagesModelId
+  'claude-haiku-4-5': 'claude-haiku-4-5-20251001',
+  'claude-sonnet-4-5': 'claude-sonnet-4-5-20250929',
+  'claude-opus-4-5': 'claude-opus-4-5-20251101',
+  'claude-opus-4-1': 'claude-opus-4-1-20250805',
+};
+
+const SNAPSHOT_TO_ALIAS: Readonly<Record<string, string>> = Object.fromEntries(
+  Object.entries(MODEL_PINS).map(([alias, snapshot]) => [snapshot, alias]),
+);
+
+/** Resolve a floating alias to its dated snapshot. Unknown ids pass through. */
+export function pinModelId(modelId: string): { modelId: string; pinned: boolean } {
+  const snapshot = MODEL_PINS[modelId];
+  if (snapshot) return { modelId: snapshot, pinned: true };
+  // Already a dated snapshot we know about.
+  if (SNAPSHOT_TO_ALIAS[modelId]) return { modelId, pinned: true };
+  return { modelId, pinned: false };
+}
+
+/**
+ * Dated snapshot -> the alias it pins. Lets the price table stay keyed on
+ * readable ids instead of duplicating every row per snapshot.
+ */
+export function aliasForSnapshot(modelId: string): string | undefined {
+  return SNAPSHOT_TO_ALIAS[modelId];
+}
+
 export interface ModelRef {
   provider: string;
+  /** The id actually sent to the provider - pinned to a dated snapshot when one exists. */
   modelId: string;
   /** Canonical `provider/modelId` form, used as the manifest key. */
   ref: string;
+  /** What the caller asked for, before pinning. Recorded so a run says both. */
+  requestedModelId: string;
+  requestedRef: string;
+  /** False means no dated snapshot is published for this id - the run is not version-pinned. */
+  pinned: boolean;
+}
+
+function buildModelRef(provider: string, requestedModelId: string): ModelRef {
+  // Only the three direct providers. An OpenAI-compatible gateway routes by its
+  // own rules, so substituting an id there would imply a guarantee we cannot make.
+  const kind = PROVIDERS[provider]?.kind;
+  const direct = kind === 'anthropic' || kind === 'openai' || kind === 'google';
+  const { modelId, pinned } = direct
+    ? pinModelId(requestedModelId)
+    : { modelId: requestedModelId, pinned: false };
+
+  return {
+    provider,
+    modelId,
+    ref: `${provider}/${modelId}`,
+    requestedModelId,
+    requestedRef: `${provider}/${requestedModelId}`,
+    pinned,
+  };
 }
 
 /** Infer the provider for a bare model id. Returns null when ambiguous. */
@@ -231,7 +316,7 @@ export function parseModelRef(ref: string): ModelRef {
         `Cannot infer a provider for bare model id "${ref}". Use "provider/model", e.g. "groq/${ref}". Known providers: ${Object.keys(PROVIDERS).sort().join(', ')}`,
       );
     }
-    return { provider, modelId: ref, ref: `${provider}/${ref}` };
+    return buildModelRef(provider, ref);
   }
 
   const provider = ref.slice(0, slash);
@@ -245,7 +330,7 @@ export function parseModelRef(ref: string): ModelRef {
     throw new Error(`Model ref "${ref}" has an empty model id.`);
   }
   // OpenRouter model ids legitimately contain a slash (`vendor/model`).
-  return { provider, modelId, ref: `${provider}/${modelId}` };
+  return buildModelRef(provider, modelId);
 }
 
 export function getProvider(providerId: string): ProviderSpec {

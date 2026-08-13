@@ -15,6 +15,8 @@
  * cost report counts it under `unpricedCalls` rather than quietly reporting $0.
  */
 
+import { aliasForSnapshot } from '../providers/registry.js';
+
 export interface ModelPrice {
   inputPerMTok: number;
   outputPerMTok: number;
@@ -103,8 +105,18 @@ export const PRICES: Readonly<Record<string, ModelPrice>> = {
   },
 };
 
+/**
+ * Price for a model id, accepting either a floating alias or the dated snapshot
+ * it pins to. Runs send the snapshot (see MODEL_PINS), but pricing is the same
+ * model, so the table stays keyed on the readable alias rather than duplicating
+ * every row. A snapshot with no alias still misses, which is correct - an
+ * unknown model must increment `unpricedCalls`, never quietly cost $0.
+ */
 export function priceFor(modelId: string): ModelPrice | undefined {
-  return PRICES[modelId];
+  const direct = PRICES[modelId];
+  if (direct) return direct;
+  const alias = aliasForSnapshot(modelId);
+  return alias ? PRICES[alias] : undefined;
 }
 
 export interface TokenUsage {
@@ -125,7 +137,7 @@ export interface PricedUsage {
  * writes are billed at their own rates and must not be double counted.
  */
 export function estimateCostUsd(modelId: string, usage: TokenUsage): PricedUsage {
-  const price = PRICES[modelId];
+  const price = priceFor(modelId);
   if (!price) return { usd: null, priced: false, confidence: 'unknown' };
 
   const perMTok = (tokens: number, rate: number | undefined, fallback: number): number =>

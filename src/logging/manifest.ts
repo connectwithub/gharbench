@@ -24,10 +24,19 @@ export interface GitInfo {
 
 export interface ModelEntry {
   role: 'buyer' | 'contestant' | 'judge';
+  /** The id actually sent - a dated snapshot wherever one is published. */
   ref: string;
   provider: string;
   modelId: string;
   endpoint: string;
+  /** What the caller asked for. Differs from `ref` when a floating alias was pinned. */
+  requestedRef: string;
+  /**
+   * False means the provider publishes no dated snapshot for this id, so the
+   * run cannot be shown to have used a single model version throughout. A
+   * result claiming reproducibility needs this true for every model.
+   */
+  versionPinned: boolean;
 }
 
 export interface PromptEntry {

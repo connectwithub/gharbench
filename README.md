@@ -29,7 +29,7 @@ tools, logging and telemetry, three times, and fails the build if the three
 transcripts are not byte-identical.
 
 ```sh
-pnpm test        # 108 unit tests
+pnpm test        # 115 unit tests
 pnpm typecheck
 pnpm lint
 ```
@@ -186,6 +186,22 @@ and Google all report `seed` as unsupported and sample freely. Only the offline
 harness is byte-reproducible. Live reproducibility rests on the pinned model
 version, the recorded prompt hashes and the gold-DB hash.
 
+Model **version** pinning is therefore load-bearing rather than cosmetic. A
+floating alias like `gpt-4.1-mini` is a pointer a provider can repoint with no
+announcement, so the harness resolves aliases to dated snapshots before the call
+and records both:
+
+```
+pinned openai/gpt-4.1-mini -> gpt-4.1-mini-2025-04-14
+```
+
+Every pin is copied from the provider SDK's own model-id union. An alias with no
+published dated snapshot is left alone and the run warns that it is not
+version-pinned - `gemini-2.5-flash` is currently the gap, because Google
+publishes no dated GA snapshot for it and inventing one would be a false
+reproducibility claim. Each manifest entry carries `versionPinned`, so a result
+states plainly whether it can be reproduced.
+
 ### Cache-first prompt layout
 
 Every prompt is assembled stable-prefix-first, variable-content-last:
@@ -241,6 +257,15 @@ Phase 0 is the engine. Everything that makes it a _benchmark_ is ahead:
 - [ ] **Phase 2** - Layer-1 deterministic programmatic checks
 - [ ] **Phase 3+** - buyer-simulator validation, judge panel, calibration,
       composite scoring, the scored run and the paper
+
+---
+
+## Licence
+
+[MIT](LICENSE), (c) 2026 Udbhav Bharti.
+
+`docs/tau2-attribution/` is vendored verbatim from tau2-bench and is covered by
+its own upstream MIT licence, included in that directory.
 
 ---
 
