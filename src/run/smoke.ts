@@ -281,7 +281,17 @@ async function main(): Promise<void> {
     process.exitCode = 1;
     return;
   }
-  console.log('\nG1 PASSED.');
+  // G1 has two clauses (Master Plan §8): an end-to-end mock conversation with
+  // full logging, AND a repeated call that demonstrably bills cached input.
+  // This run is offline and makes zero model calls, so it can only ever prove
+  // the first. Saying "G1 PASSED" here would green-light Phase 1 authoring on
+  // half a gate; the cache clause needs `pnpm smoke:live`.
+  console.log('\nG1 OFFLINE HALF PASSED - end-to-end mock conversation + full logging.');
+  console.log(
+    "G1's cache-billing clause is not testable here (0 model calls). It is proven\n" +
+      'separately by `pnpm smoke:live --model=<provider/model>` — re-run that whenever\n' +
+      'the prompt layout or provider options change. Last verified run: see CLAUDE.md.',
+  );
 }
 
 function describeTermination(record: ConversationRecord): string {

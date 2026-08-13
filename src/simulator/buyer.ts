@@ -16,7 +16,7 @@ import type { ModelMessage } from 'ai';
 import type { ChatMessage } from '../contestants/types.js';
 import type { ScenarioConfig } from '../engine/orchestrator.js';
 import { sha256, type SimClock } from '../env/db.js';
-import { resolveModel, supportsSamplingParams } from '../providers/registry.js';
+import { cacheCallOptions, resolveModel, supportsSamplingParams } from '../providers/registry.js';
 import { meterCall, type CostMeter } from '../telemetry/cost.js';
 
 export interface BuyerTurnInput {
@@ -151,9 +151,8 @@ export class ModelBuyer implements Buyer {
           ...(allowSampling ? { temperature, seed: this.#options.seed ?? scenario.seed } : {}),
           // Cache-first: the stable prefix (guardrails + persona card) is
           // identical on every turn, so the provider serves it from cache.
-          ...(this.#resolved.spec.supportsExplicitCaching
-            ? { providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } } }
-            : {}),
+          // The routing key is what makes that true on OpenAI as well.
+          ...cacheCallOptions(this.#resolved.spec, `gharbench-buyer-${this.systemPromptSha256}`),
         }),
       (r) => r.usage,
     );

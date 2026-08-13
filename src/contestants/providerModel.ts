@@ -18,7 +18,7 @@ import type { z } from 'zod';
 import type { ScenarioConfig } from '../engine/orchestrator.js';
 import { sha256, type SimClock } from '../env/db.js';
 import { TOOL_SPECS } from '../env/tools.js';
-import { resolveModel, supportsSamplingParams } from '../providers/registry.js';
+import { cacheCallOptions, resolveModel, supportsSamplingParams } from '../providers/registry.js';
 import { meterCall, type CostMeter } from '../telemetry/cost.js';
 import type {
   ChatMessage,
@@ -112,9 +112,10 @@ export class ProviderModelContestant implements Contestant {
       maxOutputTokens: options.maxOutputTokens ?? 800,
       maxRetries: 2,
       ...(allowSampling ? { temperature, seed: options.seed ?? options.scenario.seed } : {}),
-      ...(this.#resolved.spec.supportsExplicitCaching
-        ? { providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } } }
-        : {}),
+      // Cache-first: breakpoint on Anthropic, stable cache routing on OpenAI.
+      // Keyed on the prompt hash, so every turn sharing this prefix routes to
+      // the same backend and can actually hit.
+      ...cacheCallOptions(this.#resolved.spec, `gharbench-agent-${this.systemPromptSha256}`),
     });
   }
 

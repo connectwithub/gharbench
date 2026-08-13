@@ -37,13 +37,19 @@ import {
 import { TranscriptWriter } from '../logging/transcript.js';
 import { ModelBuyer } from '../simulator/buyer.js';
 import { CostMeter, isPriceKnown, normaliseUsage } from '../telemetry/cost.js';
-import { parseModelRef, providerEndpoint, resolveModel } from '../providers/registry.js';
+import {
+  cacheCallOptions,
+  parseModelRef,
+  providerEndpoint,
+  resolveModel,
+} from '../providers/registry.js';
 import { RUNS_DIR, loadFixtures } from './smoke.js';
 
 interface LiveArgs {
   contestantModel: string;
   buyerModel: string;
   skipCacheCheck: boolean;
+  forceCacheCheck: boolean;
   maxSteps: number | undefined;
 }
 
@@ -51,6 +57,7 @@ function parseArgs(argv: readonly string[]): LiveArgs {
   let contestantModel: string | undefined;
   let buyerModel: string | undefined;
   let skipCacheCheck = false;
+  let forceCacheCheck = false;
   let maxSteps: number | undefined;
 
   for (const arg of argv) {
@@ -61,18 +68,21 @@ function parseArgs(argv: readonly string[]): LiveArgs {
     const steps = /^--max-steps=(\d+)$/.exec(arg);
     if (steps?.[1]) maxSteps = Number.parseInt(steps[1], 10);
     if (arg === '--no-cache-check') skipCacheCheck = true;
+    if (arg === '--force-cache-check') forceCacheCheck = true;
   }
 
   if (!contestantModel) {
     throw new Error(
-      'Usage: pnpm smoke:live --model=<provider/model> [--buyer-model=<provider/model>] [--max-steps=N] [--no-cache-check]\n' +
-        'Example: pnpm smoke:live --model=anthropic/claude-haiku-4-5',
+      'Usage: pnpm smoke:live --model=<provider/model> [--buyer-model=<provider/model>] [--max-steps=N] [--no-cache-check] [--force-cache-check]\n' +
+        'Example: pnpm smoke:live --model=anthropic/claude-haiku-4-5\n' +
+        '  --force-cache-check  run the probe against a provider whose cache reporting is unverified',
     );
   }
   return {
     contestantModel,
     buyerModel: buyerModel ?? contestantModel,
     skipCacheCheck,
+    forceCacheCheck,
     maxSteps,
   };
 }
@@ -95,6 +105,11 @@ export function buildCacheProbePrefix(clauses = 900): string {
 
 export interface CacheProbeResult {
   supported: boolean;
+  /**
+   * `explicit` — we placed the breakpoint, so a miss is unambiguously our bug.
+   * `automatic` — the provider caches on its own; a miss is ambiguous.
+   */
+  mode: 'explicit' | 'automatic' | 'none';
   calls: Array<{
     inputTokens: number;
     outputTokens: number;
@@ -105,26 +120,57 @@ export interface CacheProbeResult {
   note?: string;
 }
 
-/** Two byte-identical calls. The second must read cached tokens. */
+/** Automatic caches populate asynchronously; give the provider a moment. */
+const AUTOMATIC_RETRY_DELAY_MS = 2_000;
+/** Call 1 warms; up to 3 more may be needed before an automatic cache reports. */
+const AUTOMATIC_MAX_CALLS = 4;
+
+const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Byte-identical calls; a later one must read cached tokens.
+ *
+ * Two regimes, because a miss means different things in each:
+ *
+ * - **explicit** (Anthropic): we place the breakpoint. Call 1 writes, call 2
+ *   reads. Two calls, no retries — a miss here means the prefix layout is
+ *   broken, full stop.
+ * - **automatic** (OpenAI, Google): the provider caches a >=1,024-token prefix
+ *   by itself, best-effort, with no write signal to observe. A miss can mean a
+ *   broken layout *or* a cold/elsewhere-routed cache, so we retry before
+ *   concluding anything. That ambiguity is why an explicit provider is the
+ *   stronger witness for G1.
+ */
 export async function runCacheProbe(
   modelRef: string,
   meter: CostMeter,
   ts: string,
+  force = false,
 ): Promise<CacheProbeResult> {
   const resolved = resolveModel(modelRef);
-  if (!resolved.spec.supportsExplicitCaching) {
+  const { supportsExplicitCaching, reportsCacheReads } = resolved.spec;
+
+  if (!reportsCacheReads && !force) {
     return {
       supported: false,
+      mode: 'none',
       calls: [],
       cacheHit: false,
-      note: `Provider "${resolved.provider}" has no explicit cache-breakpoint control in this registry; skipping.`,
+      note:
+        `Provider "${resolved.provider}" is not known to report cache reads through ` +
+        `this registry. Re-run with --force-cache-check to probe it anyway; if it ` +
+        `reports, set reportsCacheReads: true for it.`,
     };
   }
 
+  const mode: 'explicit' | 'automatic' = supportsExplicitCaching ? 'explicit' : 'automatic';
+  const maxCalls = mode === 'explicit' ? 2 : AUTOMATIC_MAX_CALLS;
   const system = buildCacheProbePrefix();
   const calls: CacheProbeResult['calls'] = [];
 
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  for (let attempt = 0; attempt < maxCalls; attempt += 1) {
+    if (attempt > 0 && mode === 'automatic') await sleep(AUTOMATIC_RETRY_DELAY_MS);
+
     const started = performance.now();
     const result = await generateText({
       model: resolved.model,
@@ -132,7 +178,9 @@ export async function runCacheProbe(
       messages: [{ role: 'user', content: 'Reply with OK.' }],
       maxOutputTokens: 16,
       maxRetries: 2,
-      providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } },
+      // Exactly what a real sweep sends: breakpoint on Anthropic, stable cache
+      // routing on OpenAI. The probe must not be luckier than production.
+      ...cacheCallOptions(resolved.spec, `gharbench-probe-${sha256(system)}`),
     });
     const usage = normaliseUsage(result.usage);
     meter.record(
@@ -146,12 +194,19 @@ export async function runCacheProbe(
       cacheReadTokens: usage.cacheReadTokens,
       cacheWriteTokens: usage.cacheWriteTokens,
     });
+
+    // Anything after the warming call counts; stop as soon as one reads.
+    if (attempt > 0 && usage.cacheReadTokens > 0) break;
   }
 
   return {
     supported: true,
+    mode,
     calls,
-    cacheHit: (calls[1]?.cacheReadTokens ?? 0) > 0,
+    cacheHit: calls.slice(1).some((c) => c.cacheReadTokens > 0),
+    ...(force && !reportsCacheReads
+      ? { note: `forced probe: "${resolved.provider}" cache reporting was unverified` }
+      : {}),
   };
 }
 
@@ -210,8 +265,14 @@ async function main(): Promise<void> {
 
   // --- Prompt-cache billing check -------------------------------------------
   const probe: CacheProbeResult = args.skipCacheCheck
-    ? { supported: false, calls: [], cacheHit: false, note: 'skipped via --no-cache-check' }
-    : await runCacheProbe(contestantRef.ref, costMeter, clock.now());
+    ? {
+        supported: false,
+        mode: 'none',
+        calls: [],
+        cacheHit: false,
+        note: 'skipped via --no-cache-check',
+      }
+    : await runCacheProbe(contestantRef.ref, costMeter, clock.now(), args.forceCacheCheck);
 
   const costSummary = costMeter.summary();
   const costsPath = join(runDir, 'costs.json');
@@ -294,18 +355,35 @@ async function main(): Promise<void> {
     `conversation cache ${costSummary.cacheHits}/${costSummary.calls} calls hit, ${costSummary.cacheReadTokens} cached-read tokens`,
   );
   console.log('-'.repeat(64));
-  console.log('prompt cache billing check (2 byte-identical calls)');
+  console.log(
+    `prompt cache billing check (byte-identical calls, ${probe.mode} caching)` +
+      (probe.mode === 'automatic' ? ' - provider caches on its own, no breakpoint sent' : ''),
+  );
   if (!probe.supported) {
     console.log(`  skipped: ${probe.note ?? 'unsupported'}`);
   } else {
+    if (probe.note) console.log(`  note: ${probe.note}`);
     probe.calls.forEach((c, i) => {
       console.log(
         `  call ${i + 1}: input=${c.inputTokens} cacheWrite=${c.cacheWriteTokens} cacheRead=${c.cacheReadTokens} output=${c.outputTokens}`,
       );
     });
-    console.log(
-      `  verdict: ${probe.cacheHit ? `CACHE HIT - call 2 billed ${probe.calls[1]?.cacheReadTokens ?? 0} tokens at cache-read rate` : 'NO CACHE READ - prompt layout is not caching'}`,
-    );
+    const hitIndex = probe.calls.findIndex((c, i) => i > 0 && c.cacheReadTokens > 0);
+    if (probe.cacheHit) {
+      console.log(
+        `  verdict: CACHE HIT - call ${hitIndex + 1} billed ${probe.calls[hitIndex]?.cacheReadTokens ?? 0} tokens at cache-read rate`,
+      );
+    } else if (probe.mode === 'explicit') {
+      console.log('  verdict: NO CACHE READ - prompt layout is not caching');
+    } else {
+      // Do not let an ambiguous miss masquerade as a proven defect.
+      console.log(
+        `  verdict: NO CACHE READ after ${probe.calls.length} calls - INCONCLUSIVE.\n` +
+          '           Automatic caching is best-effort, so this is either a broken prefix\n' +
+          '           layout or a cold/elsewhere-routed cache. Re-run before concluding;\n' +
+          '           an explicit-cache provider (anthropic) gives an unambiguous answer.',
+      );
+    }
   }
   console.log('-'.repeat(64));
   console.log(`transcript        ${transcripts.path}`);
@@ -314,8 +392,16 @@ async function main(): Promise<void> {
   console.log('='.repeat(64));
 
   if (probe.supported && !probe.cacheHit) {
-    console.error('\nLive smoke WARNING: no cache read on the second identical call.');
+    console.error(
+      probe.mode === 'explicit'
+        ? '\nLive smoke FAILED: no cache read on the second identical call. G1 not met.'
+        : '\nLive smoke INCONCLUSIVE: no cache read after retries. G1 not met (yet).',
+    );
     process.exitCode = 1;
+  } else if (probe.supported) {
+    console.log(
+      `\nG1 CACHE CLAUSE MET (${probe.mode}): a repeated identical call billed cached input.`,
+    );
   }
 }
 
