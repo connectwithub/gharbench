@@ -28,3 +28,11 @@ dist/
 coverage/
 *.tsbuildinfo
 .eslintcache
+
+# Mirror of the private Claude project (Master Plan, personas, scenario
+# taxonomy, compliance traps, judge rubrics, cost model, paper draft).
+# Same reasoning as private-pool/ above: a contestant that can read the exact
+# personas, traps and rubric can be tuned against them, and the score stops
+# measuring sales capability. Re-create it locally with the endpoints in
+# docs/claude-project/README.md.
+docs/claude-project/
