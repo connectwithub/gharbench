@@ -13,6 +13,11 @@ reproducible by construction offline.
 > benchmark _content_ - 12 personas, 60-80 scenarios, the programmatic checks
 > and the judge panel - is Phase 1 onward and **does not exist yet**. See
 > [Roadmap](#roadmap).
+>
+> Figures from live provider runs are reported here, not shipped as artefacts -
+> `runs/` is gitignored. See
+> [Reproducing the numbers](#reproducing-the-numbers-above) for how to check them
+> yourself.
 
 ---
 
@@ -228,6 +233,29 @@ different backends and caching _nothing_ until a stable `promptCacheKey` was
 added. Contestant cache hits went from 1/19 calls to 10/19. Without the probe,
 every sweep would have paid list price while believing the cache lever was
 engaged.
+
+### Reproducing the numbers above
+
+Those figures come from local runs that are **not in this repo**. `runs/` is
+gitignored: a transcript is a full conversation, the directory grows without
+bound, and once real personas exist it will contain material that must not be
+published (see `docs/decisions/README.md`). So the numbers are reported here,
+not shipped as artefacts - take them as claims to check, not as evidence.
+
+Checking them costs a few cents and one key:
+
+```sh
+pnpm smoke:live --model=anthropic/claude-haiku-4-5
+```
+
+Prefer that model when you have the choice. Anthropic is the only provider here
+where the cache **write** and the **read** are both visible, so the mechanism is
+proven in both directions rather than inferred from a read alone. Each run writes
+its own `transcripts.jsonl`, `manifest.json` and `costs.json` locally.
+
+Nothing above the provider boundary needs a key or a claim of trust: `pnpm smoke`
+is $0, offline, and verifies the engine, the tool layer, determinism and the
+logging end to end.
 
 ---
 
