@@ -42,3 +42,10 @@ docs/claude-project/
 # scenario taxonomy, trap construction, rubric internals, scoring thresholds,
 # calibration composition, funding strategy. Same G16 reasoning as private-pool/.
 docs/decisions-private/
+
+# Working notes for the AI agent, and the Phase 0 build prompt. Kept local and
+# versioned in the private companion repo. This is a research artifact: the
+# public history should read as engineering, and the durable decisions live in
+# docs/decisions/ instead. Purged from history before the repo went public.
+CLAUDE.md
+docs/GharBench_Phase0_Setup_Prompt.md
