@@ -48,7 +48,7 @@ un-leaked.
 ### Reference direction is one-way
 
 A **private ADR may cite a public one**. A **public ADR must never cite a private
-one** — not its content, and not its id. An id like `ADR-P0004` in a public file
+one** — not its content, and not its id. A private-log id in a public file
 tells a reader a hidden decision exists and roughly where it sits, and titles leak
 more than people expect. Public ADRs stand alone.
 

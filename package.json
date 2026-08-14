@@ -45,5 +45,13 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.2",
     "vitest": "^3.2.4"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/connectwithub/gharbench.git"
+  },
+  "bugs": {
+    "url": "https://github.com/connectwithub/gharbench/issues"
+  },
+  "homepage": "https://github.com/connectwithub/gharbench#readme"
 }

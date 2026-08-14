@@ -17,9 +17,17 @@ if (!dir) {
   process.exit(1);
 }
 
+// The private log is gitignored, so it is simply absent in a fresh clone and in
+// CI. That is the expected state for anyone but the maintainer - skip it rather
+// than failing the command for every contributor.
+if (!existsSync(dir)) {
+  console.log(`${dir} - not present, skipped`);
+  process.exit(0);
+}
+
 const jsonlPath = join(dir, 'decisions.jsonl');
 if (!existsSync(jsonlPath)) {
-  console.error(`no decisions.jsonl in ${dir}`);
+  console.error(`${dir} exists but has no decisions.jsonl`);
   process.exit(1);
 }
 
