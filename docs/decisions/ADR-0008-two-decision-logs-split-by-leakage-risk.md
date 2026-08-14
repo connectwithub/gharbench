@@ -6,10 +6,10 @@ Tags: process, architecture
 
 ## Context
 
-Decisions were accumulating in `CLAUDE.md` under "API-surface deviations and
+Decisions were accumulating in the project working notes under "API-surface deviations and
 decisions". Two problems:
 
-1. `CLAUDE.md` is a working guide. It gets rewritten as the project moves, so
+1. the project working notes is a working guide. It gets rewritten as the project moves, so
    the reasoning behind a superseded decision is lost exactly when someone is
    about to re-derive it.
 2. A benchmark cannot publish every decision it makes. Persona design, trap
@@ -39,7 +39,7 @@ shape and the reason this log is worth keeping for a benchmark.
 ## Evidence
 
 The decisions seeded into this log at creation were all recoverable only from
-this session's transcript or from prose buried in `CLAUDE.md` — including
+this session's transcript or from prose buried in the project working notes — including
 ADR-0004, where the reasoning ("layout was right, routing was wrong") is the part
 that matters and the part a diff does not show.
 
@@ -47,7 +47,7 @@ that matters and the part a diff does not show.
 
 Two places to look, and a rule to apply every time.
 
-`CLAUDE.md` becomes a guide that points at the log rather than a growing
+the project working notes becomes a guide that points at the log rather than a growing
 decision record. The existing deviations section stays for now; entries migrate
 as they are touched, rather than in one bulk rewrite that would lose the dates.
 

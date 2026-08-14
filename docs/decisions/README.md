@@ -1,7 +1,7 @@
 # Decision log
 
 Append-only project memory. Every decision that future work should not have to
-re-derive lives here, one ADR per decision — **not** in `CLAUDE.md`, which is a
+re-derive lives here, one ADR per decision — **not** in the project working notes, which is a
 working guide and gets rewritten. An ADR is never rewritten.
 
 ## Files

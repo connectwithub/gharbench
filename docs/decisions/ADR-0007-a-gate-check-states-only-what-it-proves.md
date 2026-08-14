@@ -10,7 +10,7 @@ G1 has two clauses: an end-to-end mock conversation with full logging, **and** a
 repeated call that demonstrably bills cached input.
 
 `pnpm smoke` printed `G1 PASSED.` after a run that makes **zero model calls**
-and therefore cannot test the second clause. `CLAUDE.md` opened with "Phase 0
+and therefore cannot test the second clause. the project working notes opened with "Phase 0
 complete". Half a gate read as a whole one, and the remediation column for G1 is
 "fix before authoring" — so the mislabel pointed at starting Phase 1 on an
 unverified cost assumption.

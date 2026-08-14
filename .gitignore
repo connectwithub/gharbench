@@ -29,12 +29,11 @@ coverage/
 *.tsbuildinfo
 .eslintcache
 
-# Mirror of the private Claude project (Master Plan, personas, scenario
-# taxonomy, compliance traps, judge rubrics, cost model, paper draft).
+# Local mirror of the private design source of truth (master plan, personas,
+# scenario taxonomy, compliance traps, judge rubrics, cost model, paper draft).
 # Same reasoning as private-pool/ above: a contestant that can read the exact
 # personas, traps and rubric can be tuned against them, and the score stops
-# measuring sales capability. Re-create it locally with the endpoints in
-# docs/claude-project/README.md.
+# measuring sales capability.
 docs/claude-project/
 
 # Private half of the decision log (docs/decisions/ is the public half).
@@ -43,9 +42,8 @@ docs/claude-project/
 # calibration composition, funding strategy. Same G16 reasoning as private-pool/.
 docs/decisions-private/
 
-# Working notes for the AI agent, and the Phase 0 build prompt. Kept local and
-# versioned in the private companion repo. This is a research artifact: the
-# public history should read as engineering, and the durable decisions live in
-# docs/decisions/ instead. Purged from history before the repo went public.
+# Local working notes and the initial build brief. Version-controlled
+# separately; they are scratch documents, not part of the published artifact.
+# Durable decisions belong in docs/decisions/ instead.
 CLAUDE.md
 docs/GharBench_Phase0_Setup_Prompt.md

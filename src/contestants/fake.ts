@@ -41,7 +41,14 @@ export class FakeContestant implements Contestant {
   }
 }
 
-/** Paired with `mockBuyerScript`; see the turn-by-turn mapping in CLAUDE.md. */
+/**
+ * Paired turn-for-turn with `mockBuyerScript`.
+ *
+ * The script contains two intentional defects - a `hallucinated_argument` on
+ * buyer turn 2 and a `schema_violation` on turn 6, each followed by a recovery -
+ * so the Layer-1 event path is exercised offline without needing a live model
+ * to misbehave. Changing either one changes what `pnpm smoke` proves.
+ */
 export function mockAgentScript(): ContestantTurnOutput[] {
   return [
     // --- buyer turn 1: "what's the price for a 2bhk?"

@@ -290,7 +290,8 @@ async function main(): Promise<void> {
   console.log(
     "G1's cache-billing clause is not testable here (0 model calls). It is proven\n" +
       'separately by `pnpm smoke:live --model=<provider/model>` — re-run that whenever\n' +
-      'the prompt layout or provider options change. Last verified run: see CLAUDE.md.',
+      'the prompt layout or provider options change. See the cache measurements in\n' +
+      'the README and docs/decisions/ADR-0004 for what a passing run looks like.',
   );
 }
 
