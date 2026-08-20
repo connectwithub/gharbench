@@ -95,6 +95,20 @@ evidence; "call 1 wrote 33,337 tokens and call 2 read 33,337 in run
 `20260813T091118Z-smoke-live`" is. A decision recorded without its evidence
 cannot be re-checked when a provider changes under you.
 
+## Dependency overrides
+
+`package.json` carries `pnpm.overrides`. Each one exists to close a published
+advisory that the upstream range does not allow, and each should be **removed**
+once upstream widens its range:
+
+| override          | why                                                                                                                                                                                                                                                 |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `undici: ^7`      | `@ai-sdk/provider-utils` pins `^5.29.0`, and 5.29.0 is the newest 5.x, so 12 advisories (4 high) had no in-range fix. It uses only `{ Agent, fetch }`, which is stable across majors. Verified by a real provider call, not just by the test suite. |
+| `nanoid: ^3.3.18` | Dev-only path (`vitest > vite > postcss`); patched in 3.3.18.                                                                                                                                                                                       |
+
+Re-check with `pnpm audit` before any release, and drop an override the moment
+the dependency's own range covers the fix.
+
 ## Tags in use
 
 `stack`, `architecture`, `caching`, `cost`, `determinism`, `provider`,

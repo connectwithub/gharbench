@@ -12,7 +12,11 @@
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild"
-    ]
+    ],
+    "overrides": {
+      "undici": "^7",
+      "nanoid": "^3.3.18"
+    }
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
