@@ -14,7 +14,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { z } from 'zod';
 
 import { FakeContestant, mockAgentScript } from '../contestants/fake.js';
 import {
@@ -23,6 +22,7 @@ import {
   type ConversationRecord,
   type ScenarioConfig,
 } from '../engine/orchestrator.js';
+import { loadScenarioConfig } from '../engine/scenario.js';
 import {
   SimClock,
   canonicalJson,
@@ -53,22 +53,6 @@ export const REPO_ROOT = resolve(import.meta.dirname, '..', '..');
 export const DATA_DIR = join(REPO_ROOT, 'data', 'realestate-mock');
 export const RUNS_DIR = join(REPO_ROOT, 'runs');
 
-const scenarioSchema = z.object({
-  scenarioId: z.string().min(1),
-  version: z.string().min(1),
-  personaId: z.string().min(1),
-  dbVersion: z.string().min(1),
-  channel: z.string().min(1),
-  seed: z.number().int(),
-  clock: z.object({ startIso: z.string().min(1), stepSeconds: z.number().nonnegative() }),
-  temperatures: z.object({ buyer: z.number(), contestant: z.number() }),
-  maxSteps: z.number().int().positive(),
-  maxToolStepsPerTurn: z.number().int().positive(),
-  flowEndingTools: z.array(z.string()),
-  openingMessage: z.string().min(1),
-  agentBrief: z.object({ role: z.string().min(1), objectives: z.array(z.string()).min(1) }),
-});
-
 export interface Fixtures {
   gold: RealEstateDb;
   goldHash: string;
@@ -81,9 +65,7 @@ export function loadFixtures(dataDir: string = DATA_DIR): Fixtures {
   const goldPath = join(dataDir, 'project.json');
   const gold = loadGoldDb(goldPath);
   const persona = loadPersonaCard(join(dataDir, 'persona.json'));
-  const scenario = scenarioSchema.parse(
-    JSON.parse(readFileSync(join(dataDir, 'scenario.json'), 'utf8')),
-  ) as ScenarioConfig;
+  const scenario = loadScenarioConfig(join(dataDir, 'scenario.json'));
 
   if (scenario.dbVersion !== gold.dbVersion) {
     throw new Error(

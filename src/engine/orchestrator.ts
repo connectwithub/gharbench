@@ -33,21 +33,10 @@ export function createEnvironment(db: RealEstateDb, clock: SimClock): Environmen
   return { db, clock };
 }
 
-export interface ScenarioConfig {
-  scenarioId: string;
-  version: string;
-  personaId: string;
-  dbVersion: string;
-  channel: string;
-  seed: number;
-  clock: { startIso: string; stepSeconds: number };
-  temperatures: { buyer: number; contestant: number };
-  maxSteps: number;
-  maxToolStepsPerTurn: number;
-  flowEndingTools: string[];
-  openingMessage: string;
-  agentBrief: { role: string; objectives: string[] };
-}
+// The scenario shape lives in scenario.ts (Zod-validated, Phase-1 gate fields
+// required at load). Re-exported here so existing imports keep working.
+export type { ScenarioConfig } from './scenario.js';
+import type { ScenarioConfig } from './scenario.js';
 
 export type TerminationReason =
   | { kind: 'buyer_token'; token: TerminationToken }

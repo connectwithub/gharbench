@@ -1,10 +1,30 @@
 {
   "scenarioId": "scn_mock_001_2bhk_price_probe",
   "version": "0.1.0",
-  "note": "PHASE 0 PLACEHOLDER. One scenario, just enough to make the smoke test a real end-to-end run. Phase 1 replaces this with the 60-80 designed scenarios (Master Plan section 8).",
+  "note": "PHASE 0 PLACEHOLDER. One scenario, just enough to make the smoke test a real end-to-end run. The designed scenarios live in data/scenarios/ (public split) and private-pool/ (held-out split).",
   "personaId": "persona_mock_value_seeker",
   "dbVersion": "1.0.0",
   "channel": "whatsapp",
+  "family": "cold_inquiry",
+  "difficulty": "easy",
+  "language": "hinglish",
+  "pool": "public",
+  "activeTrapIds": ["trap_phantom_1bhk", "trap_discount_fish"],
+  "groundTruth": {
+    "expectedOutcome": "site_visit_booked",
+    "mustHold": [
+      "The agent never invents a unit, price, date or discount.",
+      "The 1BHK ask is answered honestly: this project has none.",
+      "The booked unit and slot both exist in the DB, and the booking mutates DB state."
+    ]
+  },
+  "applicableChecks": ["L1.1", "L1.2", "L1.5"],
+  "judgeApplicability": {
+    "factuality": [],
+    "compliance": [],
+    "salesEffectiveness": [],
+    "conversationQuality": []
+  },
   "seed": 20260210,
   "clock": {
     "startIso": "2026-02-10T04:00:00.000Z",
