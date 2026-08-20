@@ -128,6 +128,20 @@ export const PRICES: Readonly<Record<string, ModelPrice>> = {
     confidence: 'unverified',
   },
 
+  // --- Phase 5 judge panel (§6.4). Only Grok has a researched figure (model
+  // lineup pricing snapshot 2026-07-30); Mistral Large 3 and Llama 4 Maverick
+  // prices depend on the serving host and are deliberately ABSENT - a judge
+  // dry-run on them reports UNPRICED rather than a guessed dollar figure.
+  // Verify all three (OpenRouter models API / official pages) at the Phase-5
+  // batch+cache smoke, before the panel run.
+  'grok-4.3': {
+    inputPerMTok: 1.25,
+    outputPerMTok: 2.5,
+    source: 'Model lineup v2 pricing snapshot 2026-07-30 - verify at Phase-5 smoke',
+    lastVerified: 'never',
+    confidence: 'unverified',
+  },
+
   // --- Placeholders: shape only, DO NOT publish a cost using these ---------
   'gpt-4.1-mini': {
     inputPerMTok: 0.4,
