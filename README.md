@@ -13,9 +13,9 @@ reproducible by construction offline.
 > benchmark content is in: the grounding corpus (v2, derived and
 > drift-checked), all **12 persona cards**, and **150 scenario instances
 > across 74 base situations** (105 public here; the held-out ~30% lives
-> outside this repo, per the contamination-control design). `pnpm
-gate:phase1` machine-checks every authoring floor: all MET. The
-> L1.1-L1.13 checks and the judge panel are Phase 2. See
+> outside this repo, per the contamination-control design).
+> `pnpm gate:phase1` machine-checks every authoring floor: all MET.
+> The L1.1-L1.13 checks and the judge panel are Phase 2. See
 > [Roadmap](#roadmap).
 >
 > Figures from live provider runs are reported here, not shipped as artefacts -
