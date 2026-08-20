@@ -293,10 +293,12 @@ Phase 0 is the engine. Everything that makes it a _benchmark_ is ahead:
 
 ## Licence
 
-[MIT](LICENSE), (c) 2026 Udbhav Bharti.
+[MIT](LICENSE), (c) 2026 Udbhav Bharti. The LICENSE file is the unmodified MIT
+template so licence scanners match it exactly.
 
-`docs/tau2-attribution/` is vendored verbatim from tau2-bench and is covered by
-its own upstream MIT licence, included in that directory.
+Third-party material: `docs/tau2-attribution/` is vendored verbatim from
+sierra-research/tau2-bench (tag v1.0.1) and is covered by its own upstream MIT
+licence, included in that directory; the copyright above does not extend to it.
 
 ---
 
