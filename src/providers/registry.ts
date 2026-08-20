@@ -404,12 +404,21 @@ export function resolveModel(ref: string, env: NodeJS.ProcessEnv = process.env):
       model = createGoogleGenerativeAI({ apiKey })(parsed.modelId);
       break;
     case 'openai-compatible':
+      // .chat(), not the default callable: the default is the Responses API,
+      // which OpenRouter serves through a translation layer with its own
+      // pre-flight endpoint-capability checks. Measured 2026-08-20 on
+      // qwen/qwen3-32b: batches of byte-reasonable requests 400'd with
+      // "does not support assistant message prefill" as endpoint metadata
+      // shifted, then the same requests passed 15 minutes later - and a
+      // thinking model's text came back empty through the translation while
+      // /chat/completions returned it intact. Chat completions is the surface
+      // these gateways natively serve; use it.
       model = createOpenAI({
         apiKey,
         baseURL: spec.baseURL,
         name: spec.id,
         ...(parsed.routingPin !== undefined ? { fetch: pinnedFetch(parsed.routingPin) } : {}),
-      })(parsed.modelId);
+      }).chat(parsed.modelId);
       break;
   }
 

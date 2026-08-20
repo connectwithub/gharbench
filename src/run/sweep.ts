@@ -194,6 +194,11 @@ async function main(): Promise<void> {
             modelRef: options.buyer,
             costMeter,
             clock,
+            // Thinking buyers (qwen3-32b) spend reasoning tokens inside the
+            // output budget; the default 300 truncates the surface reply to a
+            // fragment. The surface stays terse - the prompt controls style,
+            // this cap is only the runaway bound.
+            maxOutputTokens: 1000,
           }),
           environment: createEnvironment(db, clock),
           scenario: job.scenario,
