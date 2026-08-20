@@ -177,36 +177,56 @@ async function main(): Promise<void> {
         const persona = set.personas.get(job.scenario.personaId);
         if (!persona) throw new Error(`persona ${job.scenario.personaId} missing`);
 
-        const db = resetDb(set.corpus);
-        const clock = new SimClock(job.scenario.clock);
-        const costMeter = new CostMeter();
+        const runOnce = async (): Promise<{
+          record: Awaited<ReturnType<Orchestrator['run']>>;
+          summary: CostSummary;
+        }> => {
+          const db = resetDb(set.corpus);
+          const clock = new SimClock(job.scenario.clock);
+          const costMeter = new CostMeter();
 
-        const orchestrator = new Orchestrator({
-          contestant: new ProviderModelContestant({
-            modelRef: job.contestantRef,
+          const orchestrator = new Orchestrator({
+            contestant: new ProviderModelContestant({
+              modelRef: job.contestantRef,
+              scenario: job.scenario,
+              costMeter,
+              clock,
+            }),
+            buyer: new ModelBuyer({
+              persona,
+              scenario: job.scenario,
+              modelRef: options.buyer,
+              costMeter,
+              clock,
+              // Thinking buyers (qwen3-32b) spend reasoning tokens inside the
+              // output budget; the default 300 truncates the surface reply to a
+              // fragment. The surface stays terse - the prompt controls style,
+              // this cap is only the runaway bound.
+              maxOutputTokens: 1000,
+            }),
+            environment: createEnvironment(db, clock),
             scenario: job.scenario,
-            costMeter,
-            clock,
-          }),
-          buyer: new ModelBuyer({
-            persona,
-            scenario: job.scenario,
-            modelRef: options.buyer,
-            costMeter,
-            clock,
-            // Thinking buyers (qwen3-32b) spend reasoning tokens inside the
-            // output budget; the default 300 truncates the surface reply to a
-            // fragment. The surface stays terse - the prompt controls style,
-            // this cap is only the runaway bound.
-            maxOutputTokens: 1000,
-          }),
-          environment: createEnvironment(db, clock),
-          scenario: job.scenario,
-          runIndex: job.trial,
-        });
+            runIndex: job.trial,
+          });
 
-        const record = await orchestrator.run();
-        const summary = costMeter.summary();
+          const record = await orchestrator.run();
+          return { record, summary: costMeter.summary() };
+        };
+
+        // A conversation that dies on a provider/network error is an infra
+        // casualty, not data: retry once from a fresh clone. Both attempts'
+        // costs are counted; the retry is logged so a flaky window is visible.
+        let { record, summary } = await runOnce();
+        let retried = false;
+        if (record.terminationReason.kind === 'error') {
+          console.warn(
+            `retry ${job.contestantRef} :: ${record.conversationId} after error: ` +
+              record.terminationReason.message.slice(0, 120),
+          );
+          spentUsd += summary.totalUsd;
+          retried = true;
+          ({ record, summary } = await runOnce());
+        }
         spentUsd += summary.totalUsd;
         console.log(
           `done ${job.contestantRef} :: ${record.conversationId} -> ${record.terminationReason.kind}` +
@@ -218,7 +238,7 @@ async function main(): Promise<void> {
             `BUDGET: $${spentUsd.toFixed(2)} >= $${options.maxUsd}; skipping remaining conversations.`,
           );
         }
-        return { job, record, summary };
+        return { job, record, summary, retried };
       }),
     ),
   );
@@ -280,6 +300,7 @@ async function main(): Promise<void> {
         abortedOnBudget: aborted,
         plannedConversations: jobs.length,
         completedConversations: completed.length,
+        retriedConversations: completed.filter((r) => r.retried).length,
         scenarios: scenarios.map((s) => {
           const persona = set.personas.get(s.personaId);
           return {
