@@ -16,9 +16,11 @@
  *
  * Computed through log-binomials so large n does not overflow.
  *
- * TODO(G15): golden-test these values against the published tau^2-bench v1.0.1
- * numbers once the reference task set is vendored, so a refactor here cannot
- * silently change the headline metric.
+ * G15 (met 2026-08-20): golden-tested in tests/passkGolden.test.ts against the
+ * raw per-trial results published in tau2-bench v1.0.1 (provenance shas in the
+ * test header), using upstream's own success rule and estimator, so a refactor
+ * here cannot silently change the headline metric. Grading boundary pinned:
+ * upstream results from tau2-bench < 1.0.1 are not comparable.
  */
 
 /** Lanczos approximation, g=7, n=9. Accurate to ~1e-13 relative for our range. */

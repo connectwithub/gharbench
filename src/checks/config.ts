@@ -294,6 +294,21 @@ export const HINDI_TOKENS: ReadonlySet<string> = new Set([
   'isme',
   'wagera',
   'vagera',
+  'itna',
+  'itni',
+  'itne',
+  'warna',
+  'jayega',
+  'jayegi',
+  'aata',
+  'aati',
+  'aate',
+  'roz',
+  'nikal',
+  'batau',
+  'fikar',
+  'chinta',
+  'kagaz',
 ]);
 
 // ---------------------------------------------------------------------------

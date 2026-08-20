@@ -34,6 +34,7 @@ import { TranscriptWriter } from '../logging/transcript.js';
 import { resolveModel } from '../providers/registry.js';
 import { ModelBuyer, buildBuyerSystemPrompt } from '../simulator/buyer.js';
 import { CostMeter, type CostSummary } from '../telemetry/cost.js';
+import { checkRun } from './checksRun.js';
 import { REPO_ROOT, loadScenarioSet, type ScenarioSet } from './scenarioSet.js';
 
 export interface SweepOptions {
@@ -297,7 +298,26 @@ async function main(): Promise<void> {
     `\nsweep ${runId}: ${completed.length}/${jobs.length} conversations, $${aggregate.totalUsd.toFixed(4)}, ` +
       `${aggregate.totalTokens} tokens, ${aggregate.cacheHits} cache hits, ${aggregate.unpricedCalls} unpriced calls`,
   );
-  console.log(`outputs: runs/${runId}/{transcripts.jsonl, sweep-manifest.json, costs.json}`);
+
+  // Layer-1 checks run right away: every sweep leaves with its transcripts
+  // already scored. A checker crash must not lose the paid-for transcripts,
+  // so it degrades to a warning.
+  try {
+    const { reports } = checkRun(runId);
+    const checkFails = reports.reduce((a, r) => a + r.results.filter((x) => !x.passed).length, 0);
+    const gated = reports.filter((r) => r.gatesJudging).length;
+    console.log(
+      `layer-1 checks: ${reports.length} conversation(s) scored, ${checkFails} check fail(s), ${gated} judge-gated -> checks.jsonl`,
+    );
+  } catch (cause) {
+    console.warn(
+      `WARN layer-1 checks failed to run: ${cause instanceof Error ? cause.message : String(cause)}`,
+    );
+  }
+
+  console.log(
+    `outputs: runs/${runId}/{transcripts.jsonl, sweep-manifest.json, costs.json, checks.jsonl}`,
+  );
 }
 
 function describeModel(ref: string): Record<string, unknown> {

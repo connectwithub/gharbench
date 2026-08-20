@@ -41,6 +41,11 @@ jobs:
       - name: Offline smoke (Gate G1)
         run: pnpm smoke
 
+      # G3: the Layer-1 checks must catch 100% of the seeded violations with
+      # zero false fires on the clean twins. Offline, $0, every commit.
+      - name: Seeded-violation gate (Gate G3)
+        run: pnpm gate:phase2
+
   stats:
     name: stats-bridge golden vectors
     runs-on: ubuntu-latest

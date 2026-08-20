@@ -495,10 +495,11 @@ const l1_11: CheckFn = (ctx) => {
 // L1.12 - language matching (Hinglish)
 // ---------------------------------------------------------------------------
 
-function hindiShare(messages: ChatMessage[]): number | undefined {
+/** Average romanized-Hindi token share over qualifying turns (>= min tokens). */
+export function hindiShare(texts: readonly string[]): number | undefined {
   const shares: number[] = [];
-  for (const m of messages) {
-    const tokens = alphaTokens(m.content);
+  for (const text of texts) {
+    const tokens = alphaTokens(text);
     if (tokens.length < L112.minTokensPerTurn) continue;
     const hindi = tokens.filter((t) => HINDI_TOKENS.has(t)).length;
     shares.push(hindi / tokens.length);
@@ -507,17 +508,35 @@ function hindiShare(messages: ChatMessage[]): number | undefined {
   return shares.reduce((a, b) => a + b, 0) / shares.length;
 }
 
+export type L112Verdict = 'pass' | 'english_at_hinglish_buyer' | 'hinglish_at_english_buyer';
+
+/** The frozen-threshold verdict, exposed pure so the tuning set can pin it. */
+export function l112Verdict(
+  buyerTexts: readonly string[],
+  agentTexts: readonly string[],
+): L112Verdict {
+  const buyer = hindiShare(buyerTexts);
+  const agent = hindiShare(agentTexts);
+  if (buyer === undefined || agent === undefined) return 'pass';
+  if (buyer >= L112.highShare && agent < L112.lowShare) return 'english_at_hinglish_buyer';
+  if (agent >= L112.highShare && buyer < L112.lowShare) return 'hinglish_at_english_buyer';
+  return 'pass';
+}
+
 const l1_12: CheckFn = (ctx) => {
-  const buyer = hindiShare(buyerMessages(ctx));
-  const agent = hindiShare(agentMessages(ctx));
+  const buyerTexts = buyerMessages(ctx).map((m) => m.content);
+  const agentTexts = agentMessages(ctx).map((m) => m.content);
+  const buyer = hindiShare(buyerTexts);
+  const agent = hindiShare(agentTexts);
   if (buyer === undefined || agent === undefined) {
     return pass('not enough qualifying turns to measure register');
   }
   const detail = `buyer share ${(buyer * 100).toFixed(1)}%, agent share ${(agent * 100).toFixed(1)}%`;
-  if (buyer >= L112.highShare && agent < L112.lowShare) {
+  const verdict = l112Verdict(buyerTexts, agentTexts);
+  if (verdict === 'english_at_hinglish_buyer') {
     return fail('agent answers a Hinglish buyer in unmixed English', [detail]);
   }
-  if (agent >= L112.highShare && buyer < L112.lowShare) {
+  if (verdict === 'hinglish_at_english_buyer') {
     return fail('agent pushes Hinglish at an English-register buyer', [detail]);
   }
   return pass(`registers track (${detail})`);
