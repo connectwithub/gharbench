@@ -8,8 +8,8 @@ The agent has six typed tools and a grounding document set. The harness records
 every message, every tool call, every token and every rupee - and it is
 reproducible by construction offline.
 
-> **Status: Phases 0-3 complete** (G1, Phase-1 gate, G3, G15 met; the Phase-3
-> human spot-check is the one open leg).
+> **Status: Phases 0-3 complete** (G1, Phase-1 gate, G3, G15 met; Phase-3
+> machine and blind-human legs both closed).
 > The engine is wired end to end and provable by a $0 offline run. The
 > benchmark content is in: the grounding corpus (v2, derived and
 > drift-checked), all **12 persona cards**, and **150 scenario instances
@@ -301,6 +301,8 @@ Five deterministic probes score the _buyer_, not the agent
 | Over-cooperation bookings in non-buyer scenarios                      | **0/9** - MET         | 0/9 - MET                   |
 | P09 walk-away executed (the cold lead actually ghosts)                | **3/3** - MET         | 3/3 - MET                   |
 | Frame breaks: echoed private prompt scaffolding (zero tolerated)      | **0** - MET           | 16 turns in 8 convs - UNMET |
+| Human blind review: flagged "obviously an AI" (≤20% of transcripts)   | **0/5 (0%)** - MET    | 5/5 (100%) - UNMET          |
+| Human blind review: mean realism (0-2)                                | **1.8**               | 0.2                         |
 | Hindi token share in Hinglish scenarios                               | 0.42                  | 0.39                        |
 
 **Decision (per the pre-registered rule):** Qwen3-235B stays the primary
@@ -311,9 +313,14 @@ private `<simulation-reminder>` block ("he is not buying; there is no
 budget...") straight into the WhatsApp chat - handing the agent the hidden
 brief and voiding those conversations for scoring. The frame-break probe now
 exists because of that finding, with a zero-tolerance gate. 32B also stopped
-early twice. It remains the sensitivity-analysis slice. The remaining gate leg
-is human: spot-checks that fewer than 20% of transcripts read "obviously an
-AI".
+early twice.
+
+The human leg ran blind: ten transcripts, five per model, shuffled with model
+identity hidden from the rater. Every 32B transcript was flagged (reminder
+echoes, markdown headings mid-WhatsApp, a narrated "(voice note style)" stage
+direction); no 235B transcript was. **The Phase 3 gate is closed: Qwen3-235B
+is the confirmed primary simulator.** 32B remains only a sensitivity-analysis
+slice, with its failures disclosed.
 
 Runs: `20260820T140309Z-sweep` (235B) and `20260820T130934Z-sweep` (32B),
 $2.27 all-in for the pair. A leak here means the buyer _stated a hidden
@@ -332,7 +339,7 @@ completions, and retry infra-errored conversations once from a fresh clone.
 - [x] **Phase 0** - TS engine scaffold, orchestrator, tools, telemetry, G1
 - [x] **Phase 1** - corpus v2, 12 personas, 150 scenario instances (gate MET)
 - [x] **Phase 2** - Layer-1 checks L1.1-L1.13; G3 20/20 caught, 0 false fires; G15
-- [x] **Phase 3** - buyer-simulator pilot (machine gates; human spot-check open)
+- [x] **Phase 3** - buyer-simulator pilot (machine gates + blind human review)
 - [ ] **Phase 4+** - calibration set, judge panel, composite scoring, the
       scored run and the paper
 
