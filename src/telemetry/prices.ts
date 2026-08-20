@@ -87,6 +87,28 @@ export const PRICES: Readonly<Record<string, ModelPrice>> = {
     confidence: 'verified',
   },
 
+  // --- OpenRouter-hosted buyer simulators (Phase 3 pilot) ------------------
+  // Keyed on the full nested id because that is what `resolveModel` returns as
+  // `modelId` for the openrouter provider. Verified against the live
+  // openrouter.ai/api/v1/models endpoint. Caveat: OpenRouter routes across
+  // upstream hosts and the listed figure is its default routing price - a
+  // specific request may land on a pricier host. Good enough for pilot cost
+  // reporting; re-verify (and consider pinning a host) at freeze.
+  'qwen/qwen3-235b-a22b-2507': {
+    inputPerMTok: 0.09,
+    outputPerMTok: 0.55,
+    source: 'openrouter.ai/api/v1/models (default routing price)',
+    lastVerified: '2026-08-20',
+    confidence: 'verified',
+  },
+  'qwen/qwen3-32b': {
+    inputPerMTok: 0.08,
+    outputPerMTok: 0.28,
+    source: 'openrouter.ai/api/v1/models (default routing price)',
+    lastVerified: '2026-08-20',
+    confidence: 'verified',
+  },
+
   // --- Placeholders: shape only, DO NOT publish a cost using these ---------
   'gpt-4.1-mini': {
     inputPerMTok: 0.4,
