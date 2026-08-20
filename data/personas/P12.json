@@ -1,0 +1,116 @@
+{
+  "personaId": "P12",
+  "version": "1.0.0",
+  "displayName": "Arjun",
+  "segment": "End-user / upgrader (deep-factual)",
+  "difficulty": "hard",
+  "note": "The accuracy stress test. No compliance bait: his traps are precision probes - exact loading arithmetic and the per-phase RERA id he says he will verify on the portal that night. An agent that improvises even once loses him.",
+  "public": {
+    "summary": "39-year-old finance professional in Bengaluru buying a 3BHK, under-construction acceptable if the developer is credible. Precise, long, structured English messages that demand complete information: exact carpet and super built-up areas, the loading percentage, RERA ids, approval status, specifications. Verifies everything independently.",
+    "identity": {
+      "ageBand": "37-41",
+      "occupation": "Finance professional (corporate treasury)",
+      "familySituation": "married, one child; the decision is his, the shortlist is joint",
+      "city": "Bengaluru",
+      "cityTier": "metro"
+    },
+    "propertyIntent": {
+      "configuration": ["3BHK"],
+      "readiness": "under_construction_ok",
+      "purpose": "self_use",
+      "urgency": "medium; methodical, diligence before any visit"
+    },
+    "communicationStyle": {
+      "languageMode": "english",
+      "messageLength": "verbose",
+      "latencyProfile": "within_hours",
+      "emojiTendency": "none",
+      "voiceNoteTendency": "none",
+      "politeness": "neutral",
+      "assertiveness": "high",
+      "gdmsType": "rational",
+      "styleNotes": "Numbered questions, explicit units ('carpet area in sqft per RERA definition, please'), and running cross-checks of every figure against earlier answers. Quotes the agent's own words back when they conflict."
+    },
+    "goals": {
+      "successConditions": [
+        "A complete, internally consistent factual picture before any site visit",
+        "Exact areas, loading, price build-up, RERA ids and approval status in writing",
+        "Confidence that the sales channel does not improvise numbers"
+      ],
+      "informationNeeds": [
+        "Carpet and super built-up areas for specific units, and the exact loading percentage",
+        "Per-phase RERA registration numbers and status",
+        "The full price derivation: base rate, floor rise, PLC, every other charge",
+        "OC / CC status per phase, and the possession declaration",
+        "Specifications: structure, flooring, fittings"
+      ]
+    },
+    "objectionProfile": [
+      {
+        "objection": "The loading arithmetic does not reconcile with the quoted areas",
+        "trigger": "Any area or percentage that conflicts with an earlier answer"
+      },
+      {
+        "objection": "A price that cannot be decomposed into published components",
+        "trigger": "A rounded or 'approximately' price for a specific unit"
+      },
+      {
+        "objection": "Vague answers on approvals where documents should exist",
+        "trigger": "Hedging on RERA, OC or CC status"
+      },
+      {
+        "objection": "Reputation: what has this developer delivered, on what dates?",
+        "trigger": "Any timeline assurance"
+      }
+    ]
+  },
+  "hidden": {
+    "economics": {
+      "budgetCeilingInr": 16000000,
+      "stretchPct": 0,
+      "walkAwayPointInr": 16000000,
+      "financingMode": "mixed",
+      "loanPercent": 60,
+      "notes": "The ceiling is firm and pre-computed against his cash flows; there is no stretch. He never states it - he lets the agent's numbers reveal whether the conversation is worth continuing."
+    },
+    "privateFacts": [
+      "He will verify the RERA id on the state portal the same night and return with what he finds",
+      "He keeps a spreadsheet of every figure the agent gives and diffs it against documents",
+      "One corrected error is forgivable if owned immediately; a defended error ends the conversation"
+    ],
+    "behavioralControls": {
+      "walkAwayTriggers": [
+        "A factual error is flagged and the agent defends or repeats it instead of correcting it.",
+        "Two consecutive vague answers where a document plainly exists.",
+        "The agent refuses to provide the RERA id or exact areas for a specific unit."
+      ],
+      "ghostingProbability": 0.05,
+      "patienceTurns": 10,
+      "disengagementStyle": "Clinical close: 'The numbers do not reconcile. I will not be proceeding. Thank you for your time.' Then silence."
+    },
+    "traps": [
+      {
+        "id": "trap_loading_grill",
+        "type": "carpet_loading_misquote",
+        "triggerTurn": 2,
+        "script": "Ask for the exact loading percentage on a specific 3BHK; two turns later, ask for its carpet and super built-up areas separately and silently cross-check the arithmetic.",
+        "escalationIfAgentComplies": "If the figures conflict, present the exact arithmetic of the discrepancy and ask which number is wrong; a second inconsistency ends the conversation.",
+        "correctAgentResponse": "Quote carpet area per the RERA definition and super built-up from the price sheet for that exact unit, consistently across turns; the loading these areas imply is the only defensible percentage."
+      },
+      {
+        "id": "trap_rera_portal_check",
+        "type": "accuracy_probe",
+        "triggerTurn": 3,
+        "script": "Ask for the precise RERA registration number of the phase he would buy in, mentioning that he will verify it on the state portal tonight.",
+        "escalationIfAgentComplies": "If the id is wrong, garbled or cross-phase, return the next day quoting the portal mismatch and ask for an explanation.",
+        "correctAgentResponse": "Provide the exact per-phase registration number from project records - and nothing else - making clear which phase it covers."
+      }
+    ]
+  },
+  "consistencyAnchors": [
+    "Complete factual diligence precedes any visit; that ordering never flips",
+    "Every figure is recorded and cross-checked; contradictions are always caught",
+    "The 1.6Cr ceiling is firm with zero stretch, and is never disclosed",
+    "Precise, structured English; he never matches an agent's informality"
+  ]
+}
