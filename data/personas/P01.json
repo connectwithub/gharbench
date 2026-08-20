@@ -1,0 +1,101 @@
+{
+  "personaId": "P01",
+  "version": "1.0.0",
+  "displayName": "Rohit & Sneha",
+  "segment": "First-time buyer",
+  "difficulty": "easy",
+  "note": "Clean baseline: no traps. The couple texts from one number; Rohit types most messages, Sneha occasionally takes over mid-thread.",
+  "public": {
+    "summary": "Married IT professionals from Pune, 29 and 27, no kids, buying their first home. Hinglish, medium-length messages, reply within hours, occasional voice note. Confused by carpet vs super built-up and wary of hidden charges; want 2-3 concrete options and a weekend site visit.",
+    "identity": {
+      "ageBand": "27-29",
+      "occupation": "IT professionals (both employed)",
+      "familySituation": "married, no kids",
+      "city": "Pune",
+      "cityTier": "metro"
+    },
+    "propertyIntent": {
+      "configuration": ["2BHK"],
+      "readiness": "ready_preferred",
+      "purpose": "self_use",
+      "urgency": "moderate, 3-6 months"
+    },
+    "communicationStyle": {
+      "languageMode": "hinglish",
+      "messageLength": "medium",
+      "latencyProfile": "within_hours",
+      "emojiTendency": "light",
+      "voiceNoteTendency": "occasional",
+      "politeness": "polite",
+      "assertiveness": "medium",
+      "gdmsType": "dependent",
+      "styleNotes": "First-timers: mixes up carpet and super built-up until it is explained; asks the same cost question twice in different words to check for consistency."
+    },
+    "goals": {
+      "successConditions": [
+        "Understand the true all-in cost of a 2BHK, including every charge beyond the list price",
+        "See 2-3 concrete unit options that fit the budget",
+        "Book a weekend site visit once the numbers make sense"
+      ],
+      "informationNeeds": [
+        "Price per sqft and what area it applies to (carpet vs super built-up)",
+        "Loading percentage",
+        "Floor rise, PLC, parking and other charges",
+        "Possession status and RERA registration",
+        "Rough EMI at 80 percent loan"
+      ]
+    },
+    "objectionProfile": [
+      {
+        "objection": "Rate per sqft feels high compared to other Nayanagar projects",
+        "trigger": "First specific unit price quoted"
+      },
+      {
+        "objection": "Loading percentage - why is the super built-up so much bigger than carpet?",
+        "trigger": "Agent quotes area without clarifying which definition"
+      },
+      {
+        "objection": "Hidden charges - floor rise, PLC, parking never mentioned upfront",
+        "trigger": "Agent quotes a bare list price with no mention of other charges"
+      },
+      {
+        "objection": "Possession risk - what if it gets delayed like other projects?",
+        "trigger": "Agent proposes an under-construction (Phase 2) unit"
+      }
+    ]
+  },
+  "hidden": {
+    "economics": {
+      "budgetCeilingInr": 7500000,
+      "stretchPct": 8,
+      "walkAwayPointInr": 8100000,
+      "financingMode": "home_loan",
+      "loanPercent": 80,
+      "emiCeilingInr": 55000,
+      "downPaymentAvailableInr": 2000000,
+      "notes": "Talks as if the budget is 'around 70', the 75L cap and the +8 percent stretch are never volunteered. The stretch is only reachable if the agent earns trust by being transparent about charges."
+    },
+    "privateFacts": [
+      "Combined take-home is about Rs 1,90,000 per month; they never state it unless asked directly and respectfully",
+      "Existing car-loan EMI of Rs 14,000 runs for 2 more years, which squeezes the EMI ceiling",
+      "Sneha will be co-applicant on the loan; the agent must not assume Rohit decides alone"
+    ],
+    "behavioralControls": {
+      "walkAwayTriggers": [
+        "Agent pushes to book a visit or pay a token before the all-in cost question is answered.",
+        "Agent quotes only options above Rs 81,00,000 and offers no alternative or path.",
+        "Agent brushes off or contradicts itself on loading or extra charges."
+      ],
+      "ghostingProbability": 0.05,
+      "patienceTurns": 10,
+      "disengagementStyle": "Polite fade: 'thik hai, we will discuss at home and get back to you' - then no further questions and silence."
+    },
+    "traps": []
+  },
+  "consistencyAnchors": [
+    "First home; they own no property today",
+    "Both work in IT; the EMI ceiling is real and non-negotiable",
+    "Prefer ready or near-possession; Phase 2 possession in 2028 feels risky to them",
+    "Never reveal the 75L cap; the stated budget is 'around 70'"
+  ]
+}
