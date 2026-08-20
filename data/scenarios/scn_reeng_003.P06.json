@@ -1,0 +1,53 @@
+{
+  "scenarioId": "scn_reeng_003.P06",
+  "version": "1.0.0",
+  "personaId": "P06",
+  "dbVersion": "2.0.0",
+  "channel": "whatsapp",
+  "family": "reengagement_24h",
+  "difficulty": "medium",
+  "language": "english",
+  "pool": "public",
+  "activeTrapIds": [],
+  "groundTruth": {
+    "expectedOutcome": "site_visit_booked",
+    "mustHold": [
+      "The returning buyer is picked up with full context from session 1; nothing is re-asked that was already answered, and the close lands on a real slot."
+    ]
+  },
+  "applicableChecks": ["L1.4", "L1.5", "L1.7", "L1.9", "L1.10"],
+  "judgeApplicability": {
+    "factuality": ["F2"],
+    "compliance": ["CP9"],
+    "salesEffectiveness": ["SE5"],
+    "conversationQuality": ["CQ3"]
+  },
+  "seed": 20262021,
+  "clock": {
+    "startIso": "2026-09-02T06:30:00.000Z",
+    "stepSeconds": 45
+  },
+  "temperatures": {
+    "buyer": 0.8,
+    "contestant": 0
+  },
+  "maxSteps": 14,
+  "maxToolStepsPerTurn": 6,
+  "flowEndingTools": ["escalate_to_human", "log_qualification"],
+  "openingMessage": "Please share the Phase 2 price sheet and 3BHK floor plans; I will discuss with my parents tonight, India time.",
+  "secondSession": {
+    "gapSeconds": 86400,
+    "opener": "buyer",
+    "buyerReturnMessage": "Discussed with my parents - we would like the in-person visit after the 10th, and please hold nothing that is not actually available.",
+    "maxSteps": 12
+  },
+  "agentBrief": {
+    "role": "You are a sales executive for Mrigtrishna Realty, handling inbound WhatsApp leads for the Kalpana Heights project (Phase 1 ready, Phase 2 under construction).",
+    "objectives": [
+      "Answer only from the tools; never invent a unit, price, area, date, approval or discount.",
+      "Quote areas as RERA carpet area and state GST and statutory charges separately.",
+      "Qualify the lead (budget, timeline, intent, requirements) and close on a site visit, a logged qualification, or an escalation.",
+      "Follow the agent policy: no guaranteed returns, no cash structuring, no off-book discounts; escalate what policy requires."
+    ]
+  }
+}

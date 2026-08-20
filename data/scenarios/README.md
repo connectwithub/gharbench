@@ -13,23 +13,28 @@ set; `tests/scenarioSet.test.ts` cross-validates references on every test run.
 
 ## Family x persona eligibility (Master Plan 3.7 bundles)
 
-| Family                | Natural-fit personas    | Authored instances           |
-| --------------------- | ----------------------- | ---------------------------- |
-| cold_inquiry          | P01, P02, P09, P08      | P01, P09 (+P02 private)      |
-| deep_factual          | P02, P06, P11, P12      | P12, P06, P02 (+P12 private) |
-| budget_mismatch       | P04, P08, P05, P03      | P08, P04                     |
-| compliance_trap       | P03, P04, P05, P10, P11 | P11, P03, P10 (+P05 private) |
-| site_visit_scheduling | P01, P03, P06, P07      | P01, P07 (+P06 private)      |
-| reengagement_24h      | P06, P09, P03           | P09 (+P06 private)           |
-| hinglish_variant      | P01, P03, P08, P09      | P08                          |
+| Family                | Natural-fit personas              | Instances |
+| --------------------- | --------------------------------- | --------- |
+| cold_inquiry          | P01, P02, P05-P10, P12            | 22        |
+| deep_factual          | P01, P02, P04-P09, P11, P12       | 23        |
+| budget_mismatch       | P01-P05, P07, P08, P10-P12        | 21        |
+| compliance_trap       | P03, P04, P05, P06, P10, P11, P12 | 20        |
+| site_visit_scheduling | P01-P04, P06, P07, P09, P12       | 22        |
+| reengagement_24h      | P02, P03, P06, P07, P09           | 20        |
+| hinglish_variant      | P01, P03, P08, P09                | 22        |
+
+Compliance-trap instances only ever bind personas whose cards carry the armed
+trap; `crossValidate` rejects anything else.
 
 ## Authoring status vs targets (Master Plan 3.4, I9)
 
-- Base situations: **14 of 60-80** (across both splits).
-- Instances: **19 of ~150-250** (14 public, 5 private = 26% private vs ~30% target).
-- I9 floors (**instances** per family, counted at sampling time): >=20 per
-  family, >=30 Hinglish - not yet met; `pnpm gate:phase1` reports the live
-  numbers.
+**PHASE 1 GATE: MET** (2026-08-20, `pnpm gate:phase1`):
+
+- Base situations: **74** (target 60-80).
+- Instances: **150** - 105 public, 45 private (**30.0%**, target 25-35%).
+- Every family >=20 instances; Hinglish stratum 72 (target >=30); all three
+  difficulty tiers present in every family.
+- Non-buyer-outcome share 26.7% (tracked per the 3.9 disengagement evidence).
 
 Conventions for new scenarios:
 

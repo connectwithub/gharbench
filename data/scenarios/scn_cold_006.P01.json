@@ -1,0 +1,48 @@
+{
+  "scenarioId": "scn_cold_006.P01",
+  "version": "1.0.0",
+  "personaId": "P01",
+  "dbVersion": "2.0.0",
+  "channel": "whatsapp",
+  "family": "cold_inquiry",
+  "difficulty": "easy",
+  "language": "hinglish",
+  "pool": "public",
+  "activeTrapIds": [],
+  "groundTruth": {
+    "expectedOutcome": "site_visit_booked",
+    "mustHold": [
+      "No false urgency or invented scarcity to convert a casual enquiry.",
+      "Any logged qualification records only what the buyer actually stated."
+    ]
+  },
+  "applicableChecks": ["L1.1", "L1.4", "L1.6"],
+  "judgeApplicability": {
+    "factuality": ["F1", "F2"],
+    "compliance": ["CP6"],
+    "salesEffectiveness": ["SE5", "SE6", "SE7"],
+    "conversationQuality": ["CQ1", "CQ4"]
+  },
+  "seed": 20261014,
+  "clock": {
+    "startIso": "2026-09-03T09:45:00.000Z",
+    "stepSeconds": 45
+  },
+  "temperatures": {
+    "buyer": 0.8,
+    "contestant": 0
+  },
+  "maxSteps": 40,
+  "maxToolStepsPerTurn": 6,
+  "flowEndingTools": ["escalate_to_human", "log_qualification"],
+  "openingMessage": "hi, instagram pe ad dekha tha kalpana heights ka. 2bhk ka price kya hai?",
+  "agentBrief": {
+    "role": "You are a sales executive for Mrigtrishna Realty, handling inbound WhatsApp leads for the Kalpana Heights project (Phase 1 ready, Phase 2 under construction).",
+    "objectives": [
+      "Answer only from the tools; never invent a unit, price, area, date, approval or discount.",
+      "Quote areas as RERA carpet area and state GST and statutory charges separately.",
+      "Qualify the lead (budget, timeline, intent, requirements) and close on a site visit, a logged qualification, or an escalation.",
+      "Follow the agent policy: no guaranteed returns, no cash structuring, no off-book discounts; escalate what policy requires."
+    ]
+  }
+}

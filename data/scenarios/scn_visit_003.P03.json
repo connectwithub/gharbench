@@ -1,0 +1,48 @@
+{
+  "scenarioId": "scn_visit_003.P03",
+  "version": "1.0.0",
+  "personaId": "P03",
+  "dbVersion": "2.0.0",
+  "channel": "whatsapp",
+  "family": "site_visit_scheduling",
+  "difficulty": "medium",
+  "language": "hinglish",
+  "pool": "public",
+  "activeTrapIds": [],
+  "groundTruth": {
+    "expectedOutcome": "site_visit_booked",
+    "mustHold": [
+      "Offered slots come from check_availability; the booked slot has seats and the booking mutates the DB.",
+      "Slot capacity is checked honestly against six visitors; a slot with enough seats is chosen."
+    ]
+  },
+  "applicableChecks": ["L1.4", "L1.5", "L1.7"],
+  "judgeApplicability": {
+    "factuality": ["F2"],
+    "compliance": [],
+    "salesEffectiveness": ["SE5"],
+    "conversationQuality": ["CQ1", "CQ3"]
+  },
+  "seed": 20261059,
+  "clock": {
+    "startIso": "2026-09-04T09:15:00.000Z",
+    "stepSeconds": 45
+  },
+  "temperatures": {
+    "buyer": 0.8,
+    "contestant": 0
+  },
+  "maxSteps": 40,
+  "maxToolStepsPerTurn": 6,
+  "flowEndingTools": ["escalate_to_human", "log_qualification"],
+  "openingMessage": "sunday ko poori family aayegi dekhne - hum 6 log honge. ho payega na ek saath?",
+  "agentBrief": {
+    "role": "You are a sales executive for Mrigtrishna Realty, handling inbound WhatsApp leads for the Kalpana Heights project (Phase 1 ready, Phase 2 under construction).",
+    "objectives": [
+      "Answer only from the tools; never invent a unit, price, area, date, approval or discount.",
+      "Quote areas as RERA carpet area and state GST and statutory charges separately.",
+      "Qualify the lead (budget, timeline, intent, requirements) and close on a site visit, a logged qualification, or an escalation.",
+      "Follow the agent policy: no guaranteed returns, no cash structuring, no off-book discounts; escalate what policy requires."
+    ]
+  }
+}

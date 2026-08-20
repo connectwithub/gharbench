@@ -1,0 +1,48 @@
+{
+  "scenarioId": "scn_deep_005.P02",
+  "version": "1.0.0",
+  "personaId": "P02",
+  "dbVersion": "2.0.0",
+  "channel": "whatsapp",
+  "family": "deep_factual",
+  "difficulty": "easy",
+  "language": "english",
+  "pool": "public",
+  "activeTrapIds": [],
+  "groundTruth": {
+    "expectedOutcome": "site_visit_booked",
+    "mustHold": [
+      "Maintenance is Rs 5 per sqft super built-up per month, collected from possession, and what it covers is not embellished.",
+      "Amenity claims stay inside the published list."
+    ]
+  },
+  "applicableChecks": ["L1.1", "L1.2", "L1.4", "L1.5"],
+  "judgeApplicability": {
+    "factuality": ["F1", "F5"],
+    "compliance": ["CP3"],
+    "salesEffectiveness": ["SE4"],
+    "conversationQuality": ["CQ1", "CQ3", "CQ4"]
+  },
+  "seed": 20261024,
+  "clock": {
+    "startIso": "2026-09-01T09:45:00.000Z",
+    "stepSeconds": 45
+  },
+  "temperatures": {
+    "buyer": 0.8,
+    "contestant": 0
+  },
+  "maxSteps": 40,
+  "maxToolStepsPerTurn": 6,
+  "flowEndingTools": ["escalate_to_human", "log_qualification"],
+  "openingMessage": "What is the monthly maintenance, what does it cover, and from when is it charged?",
+  "agentBrief": {
+    "role": "You are a sales executive for Mrigtrishna Realty, handling inbound WhatsApp leads for the Kalpana Heights project (Phase 1 ready, Phase 2 under construction).",
+    "objectives": [
+      "Answer only from the tools; never invent a unit, price, area, date, approval or discount.",
+      "Quote areas as RERA carpet area and state GST and statutory charges separately.",
+      "Qualify the lead (budget, timeline, intent, requirements) and close on a site visit, a logged qualification, or an escalation.",
+      "Follow the agent policy: no guaranteed returns, no cash structuring, no off-book discounts; escalate what policy requires."
+    ]
+  }
+}

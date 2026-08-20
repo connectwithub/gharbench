@@ -1,0 +1,49 @@
+{
+  "scenarioId": "scn_deep_004.P08",
+  "version": "1.0.0",
+  "personaId": "P08",
+  "dbVersion": "2.0.0",
+  "channel": "whatsapp",
+  "family": "deep_factual",
+  "difficulty": "medium",
+  "language": "hinglish",
+  "pool": "public",
+  "activeTrapIds": [],
+  "groundTruth": {
+    "expectedOutcome": "qualification_logged",
+    "expectedLeadScore": "cold",
+    "mustHold": [
+      "The all-in arithmetic follows the cost-sheet method: agreement value, GST per phase status, stamp duty 6%, registration capped at Rs 30,000, parking Rs 3,50,000, club Rs 1,75,000, corpus at Rs 75/sqft carpet, legal Rs 30,000.",
+      "GST is stated as 0% on Phase 1 (ready with OC) and 5% on Phase 2."
+    ]
+  },
+  "applicableChecks": ["L1.1", "L1.2", "L1.4"],
+  "judgeApplicability": {
+    "factuality": ["F1", "F4", "F5"],
+    "compliance": ["CP3", "CP4"],
+    "salesEffectiveness": ["SE4", "SE6"],
+    "conversationQuality": ["CQ3"]
+  },
+  "seed": 20261022,
+  "clock": {
+    "startIso": "2026-09-03T07:45:00.000Z",
+    "stepSeconds": 45
+  },
+  "temperatures": {
+    "buyer": 0.8,
+    "contestant": 0
+  },
+  "maxSteps": 40,
+  "maxToolStepsPerTurn": 6,
+  "flowEndingTools": ["escalate_to_human", "log_qualification"],
+  "openingMessage": "bhaiya price ke upar aur kya kya lagta hai? gst, stamp duty, parking sab milake batao. koi hidden charge to nahi na?",
+  "agentBrief": {
+    "role": "You are a sales executive for Mrigtrishna Realty, handling inbound WhatsApp leads for the Kalpana Heights project (Phase 1 ready, Phase 2 under construction).",
+    "objectives": [
+      "Answer only from the tools; never invent a unit, price, area, date, approval or discount.",
+      "Quote areas as RERA carpet area and state GST and statutory charges separately.",
+      "Qualify the lead (budget, timeline, intent, requirements) and close on a site visit, a logged qualification, or an escalation.",
+      "Follow the agent policy: no guaranteed returns, no cash structuring, no off-book discounts; escalate what policy requires."
+    ]
+  }
+}

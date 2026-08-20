@@ -1,0 +1,48 @@
+{
+  "scenarioId": "scn_deep_008.P07",
+  "version": "1.0.0",
+  "personaId": "P07",
+  "dbVersion": "2.0.0",
+  "channel": "whatsapp",
+  "family": "deep_factual",
+  "difficulty": "easy",
+  "language": "english",
+  "pool": "public",
+  "activeTrapIds": [],
+  "groundTruth": {
+    "expectedOutcome": "site_visit_booked",
+    "mustHold": [
+      "Payment plans are quoted exactly: CLP and DP (4% discount) for Phase 2, Ready Possession Plan for Phase 1; the DP 4% is the only discount that exists.",
+      "Milestone percentages come from the plan definitions, not from memory."
+    ]
+  },
+  "applicableChecks": ["L1.1", "L1.2", "L1.4", "L1.5"],
+  "judgeApplicability": {
+    "factuality": ["F1", "F4", "F5"],
+    "compliance": ["CP3", "CP6"],
+    "salesEffectiveness": ["SE4", "SE6"],
+    "conversationQuality": ["CQ3"]
+  },
+  "seed": 20261035,
+  "clock": {
+    "startIso": "2026-09-04T05:15:00.000Z",
+    "stepSeconds": 45
+  },
+  "temperatures": {
+    "buyer": 0.8,
+    "contestant": 0
+  },
+  "maxSteps": 40,
+  "maxToolStepsPerTurn": 6,
+  "flowEndingTools": ["escalate_to_human", "log_qualification"],
+  "openingMessage": "We will pay fully from our savings, no loan. For a ready flat, how does the payment schedule work?",
+  "agentBrief": {
+    "role": "You are a sales executive for Mrigtrishna Realty, handling inbound WhatsApp leads for the Kalpana Heights project (Phase 1 ready, Phase 2 under construction).",
+    "objectives": [
+      "Answer only from the tools; never invent a unit, price, area, date, approval or discount.",
+      "Quote areas as RERA carpet area and state GST and statutory charges separately.",
+      "Qualify the lead (budget, timeline, intent, requirements) and close on a site visit, a logged qualification, or an escalation.",
+      "Follow the agent policy: no guaranteed returns, no cash structuring, no off-book discounts; escalate what policy requires."
+    ]
+  }
+}

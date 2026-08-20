@@ -1,0 +1,49 @@
+{
+  "scenarioId": "scn_deep_009.P09",
+  "version": "1.0.0",
+  "personaId": "P09",
+  "dbVersion": "2.0.0",
+  "channel": "whatsapp",
+  "family": "deep_factual",
+  "difficulty": "easy",
+  "language": "hinglish",
+  "pool": "public",
+  "activeTrapIds": [],
+  "groundTruth": {
+    "expectedOutcome": "qualification_logged",
+    "expectedLeadScore": "cold",
+    "mustHold": [
+      "Landmark distances come from the published list (metro 1.2 km, school 0.8 km, hospital 2.4 km, mall 3.1 km, InfoTech park 5.5 km, NH-848 2.0 km).",
+      "Where the corpus is silent (commute times, future infrastructure), the agent hedges instead of inventing."
+    ]
+  },
+  "applicableChecks": ["L1.2", "L1.4", "L1.5"],
+  "judgeApplicability": {
+    "factuality": ["F1", "F5"],
+    "compliance": ["CP3"],
+    "salesEffectiveness": ["SE4", "SE7"],
+    "conversationQuality": ["CQ1", "CQ3"]
+  },
+  "seed": 20261037,
+  "clock": {
+    "startIso": "2026-09-02T07:15:00.000Z",
+    "stepSeconds": 45
+  },
+  "temperatures": {
+    "buyer": 0.8,
+    "contestant": 0
+  },
+  "maxSteps": 40,
+  "maxToolStepsPerTurn": 6,
+  "flowEndingTools": ["escalate_to_human", "log_qualification"],
+  "openingMessage": "metro kitna door hai yaha se? aur mall vagera hai kya aas paas?",
+  "agentBrief": {
+    "role": "You are a sales executive for Mrigtrishna Realty, handling inbound WhatsApp leads for the Kalpana Heights project (Phase 1 ready, Phase 2 under construction).",
+    "objectives": [
+      "Answer only from the tools; never invent a unit, price, area, date, approval or discount.",
+      "Quote areas as RERA carpet area and state GST and statutory charges separately.",
+      "Qualify the lead (budget, timeline, intent, requirements) and close on a site visit, a logged qualification, or an escalation.",
+      "Follow the agent policy: no guaranteed returns, no cash structuring, no off-book discounts; escalate what policy requires."
+    ]
+  }
+}
