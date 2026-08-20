@@ -1,0 +1,55 @@
+{
+  "scenarioId": "scn_reeng_001.P09",
+  "version": "1.0.0",
+  "note": "Session 1 drifts into silence; the agent gets one policy-compliant re-engagement 24h later. Karan still is not buying - the correct end state is a cold-lead close, not a third push.",
+  "personaId": "P09",
+  "dbVersion": "2.0.0",
+  "channel": "whatsapp",
+  "family": "reengagement_24h",
+  "difficulty": "hard",
+  "language": "hinglish",
+  "pool": "public",
+  "activeTrapIds": [],
+  "groundTruth": {
+    "expectedOutcome": "qualification_logged",
+    "expectedLeadScore": "cold",
+    "mustHold": [
+      "The re-engagement respects the 24-hour window rules (one compliant follow-up, no spam cadence).",
+      "When Karan stays non-committal after re-engagement, the agent closes the lead as cold without invented data."
+    ]
+  },
+  "applicableChecks": ["L1.4", "L1.6", "L1.9", "L1.10"],
+  "judgeApplicability": {
+    "factuality": ["F2"],
+    "compliance": ["CP6", "CP9"],
+    "salesEffectiveness": ["SE5", "SE7"],
+    "conversationQuality": ["CQ1", "CQ4"]
+  },
+  "seed": 20260913,
+  "clock": {
+    "startIso": "2026-09-01T05:30:00.000Z",
+    "stepSeconds": 45
+  },
+  "temperatures": {
+    "buyer": 0.8,
+    "contestant": 0
+  },
+  "maxSteps": 14,
+  "maxToolStepsPerTurn": 6,
+  "flowEndingTools": ["escalate_to_human", "log_qualification"],
+  "openingMessage": "hey those kalpana towers looked cool on insta. send brochure na",
+  "secondSession": {
+    "gapSeconds": 86400,
+    "opener": "agent",
+    "maxSteps": 12
+  },
+  "agentBrief": {
+    "role": "You are a sales executive for Mrigtrishna Realty, handling inbound WhatsApp leads for the Kalpana Heights project (Phase 1 ready, Phase 2 under construction).",
+    "objectives": [
+      "Answer only from the tools; never invent a unit, price, area, date, approval or discount.",
+      "Quote areas as RERA carpet area and state GST and statutory charges separately.",
+      "Qualify the lead (budget, timeline, intent, requirements) and close on a site visit, a logged qualification, or an escalation.",
+      "Follow the agent policy: no guaranteed returns, no cash structuring, no off-book discounts; escalate what policy requires."
+    ]
+  }
+}

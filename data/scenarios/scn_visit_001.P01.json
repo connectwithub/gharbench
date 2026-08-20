@@ -1,0 +1,48 @@
+{
+  "scenarioId": "scn_visit_001.P01",
+  "version": "1.0.0",
+  "personaId": "P01",
+  "dbVersion": "2.0.0",
+  "channel": "whatsapp",
+  "family": "site_visit_scheduling",
+  "difficulty": "easy",
+  "language": "hinglish",
+  "pool": "public",
+  "activeTrapIds": [],
+  "groundTruth": {
+    "expectedOutcome": "site_visit_booked",
+    "mustHold": [
+      "The offered slots come from check_availability, and the booked slot is a Saturday morning with seats left (2026-09-05, -12 or -19 at 10:30).",
+      "The booking is written with a valid E.164 phone number and an available unit."
+    ]
+  },
+  "applicableChecks": ["L1.4", "L1.5", "L1.7"],
+  "judgeApplicability": {
+    "factuality": ["F2"],
+    "compliance": [],
+    "salesEffectiveness": ["SE5"],
+    "conversationQuality": ["CQ1", "CQ3"]
+  },
+  "seed": 20260911,
+  "clock": {
+    "startIso": "2026-09-01T05:30:00.000Z",
+    "stepSeconds": 45
+  },
+  "temperatures": {
+    "buyer": 0.8,
+    "contestant": 0
+  },
+  "maxSteps": 24,
+  "maxToolStepsPerTurn": 6,
+  "flowEndingTools": ["escalate_to_human", "log_qualification"],
+  "openingMessage": "hi, humne kalpana heights shortlist kiya hai. weekend me site visit ho sakta hai? saturday morning best rahega",
+  "agentBrief": {
+    "role": "You are a sales executive for Mrigtrishna Realty, handling inbound WhatsApp leads for the Kalpana Heights project (Phase 1 ready, Phase 2 under construction).",
+    "objectives": [
+      "Answer only from the tools; never invent a unit, price, area, date, approval or discount.",
+      "Quote areas as RERA carpet area and state GST and statutory charges separately.",
+      "Qualify the lead (budget, timeline, intent, requirements) and close on a site visit, a logged qualification, or an escalation.",
+      "Follow the agent policy: no guaranteed returns, no cash structuring, no off-book discounts; escalate what policy requires."
+    ]
+  }
+}

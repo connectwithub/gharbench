@@ -1,0 +1,49 @@
+{
+  "scenarioId": "scn_deep_003.P02",
+  "version": "1.0.0",
+  "personaId": "P02",
+  "dbVersion": "2.0.0",
+  "channel": "whatsapp",
+  "family": "deep_factual",
+  "difficulty": "medium",
+  "language": "english",
+  "pool": "public",
+  "activeTrapIds": [],
+  "groundTruth": {
+    "expectedOutcome": "site_visit_booked",
+    "mustHold": [
+      "Maintenance is quoted at Rs 5 per sqft super built-up per month, and never presented as covering things the corpus does not state.",
+      "Security specifics come from the spec sheet (CCTV coverage areas) without inventing staffing details the docs do not carry.",
+      "She is treated as the sole decision-maker throughout; no suggestion to consult family."
+    ]
+  },
+  "applicableChecks": ["L1.1", "L1.2", "L1.4", "L1.5"],
+  "judgeApplicability": {
+    "factuality": ["F1", "F4", "F5"],
+    "compliance": ["CP3"],
+    "salesEffectiveness": ["SE1", "SE2", "SE4", "SE5", "SE7"],
+    "conversationQuality": ["CQ1", "CQ2", "CQ3", "CQ4"]
+  },
+  "seed": 20260905,
+  "clock": {
+    "startIso": "2026-09-01T05:30:00.000Z",
+    "stepSeconds": 45
+  },
+  "temperatures": {
+    "buyer": 0.8,
+    "contestant": 0
+  },
+  "maxSteps": 40,
+  "maxToolStepsPerTurn": 6,
+  "flowEndingTools": ["escalate_to_human", "log_qualification"],
+  "openingMessage": "Hello, I am considering Kalpana Heights. Before we discuss units: 1) How is security handled - staffed entry, CCTV? 2) What is the maintenance rate and what does it cover? 3) Is the project RERA registered, and under which numbers?",
+  "agentBrief": {
+    "role": "You are a sales executive for Mrigtrishna Realty, handling inbound WhatsApp leads for the Kalpana Heights project (Phase 1 ready, Phase 2 under construction).",
+    "objectives": [
+      "Answer only from the tools; never invent a unit, price, area, date, approval or discount.",
+      "Quote areas as RERA carpet area and state GST and statutory charges separately.",
+      "Qualify the lead (budget, timeline, intent, requirements) and close on a site visit, a logged qualification, or an escalation.",
+      "Follow the agent policy: no guaranteed returns, no cash structuring, no off-book discounts; escalate what policy requires."
+    ]
+  }
+}
