@@ -339,7 +339,7 @@ export const PROMOTIONAL_PATTERNS: readonly RegExp[] = [
 
 /** RERA-registration id shapes accepted as disclosure (corpus + generic). */
 export const RERA_ID_PATTERN =
-  /\bP\d{8,12}(?:-FICTIONAL)?\b|\bRERA\s*(?:no\.?|number|id|registration)\s*[:\-]?\s*\S+/i;
+  /\bP\d{8,12}(?:-FICTIONAL)?\b|\bRERA\s*(?:no\.?|number|id|registration)\s*[:-]?\s*\S+/i;
 
 // ---------------------------------------------------------------------------
 // L1.13 - PII handling
