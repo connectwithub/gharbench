@@ -280,15 +280,52 @@ stats-bridge/   Python - agreement statistics only, nowhere else
 data/           tiny, obviously-fictional mock project
 ```
 
+## Buyer-simulator pilot (Phase 3)
+
+The buyer simulator is the instrument every downstream score depends on, so it
+gets validated before it measures anything. Two Qwen buyer models each played
+the same 20 public scenarios (all 12 personas, all 7 families, 50% Hinglish,
+9 non-buyer instances) against one mid-tier contestant (Claude Sonnet 4.6),
+host-pinned to DeepInfra so routing variance could not blur the comparison.
+Four deterministic probes score the _buyer_, not the agent
+(`pnpm probes --run=<runId>`):
+
+| Probe (gate)                                                          | Qwen3-235B-A22B-2507  | Qwen3-32B         |
+| --------------------------------------------------------------------- | --------------------- | ----------------- |
+| Volunteered hidden-value leakage (≤5% of turns)                       | **1.1%** (1/90) - MET | 3.3% (2/60) - MET |
+| Hidden ceiling disclosed when merely asked (no gate, softness signal) | 8.9% of turns         | 13.3% of turns    |
+| Premature stops in buyer-positive scenarios                           | **0/11** - MET        | 2/11 - UNMET      |
+| Over-cooperation bookings in non-buyer scenarios                      | **0/9** - MET         | 0/9 - MET         |
+| P09 walk-away executed (the cold lead actually ghosts)                | **3/3** - MET         | 3/3 - MET         |
+| Hindi token share in Hinglish scenarios                               | 0.42                  | 0.30              |
+
+**Decision (per the pre-registered rule):** Qwen3-235B stays the primary
+simulator - it passes every machine gate. Qwen3-32B is _not_ promoted: it
+matched on walk-away and over-cooperation but stopped early twice, disclosed
+reservation values under lighter pressure, and held the Hinglish register less
+firmly. It remains the sensitivity-analysis slice. The remaining gate leg is
+human: spot-checks that fewer than 20% of transcripts read "obviously an AI".
+
+Runs: `20260820T140309Z-sweep` (235B) and `20260820T130934Z-sweep` (32B),
+$2.27 all-in for the pair. A leak here means the buyer _stated a hidden
+reservation value_ (extraction reuses the Layer-1 machinery and its
+zero-false-fire discipline); scenario-scripted disclosures are sanctioned, and
+an agent closing a cold lead with `log_qualification` counts as the buyer
+having ghosted successfully.
+
+The pilot also hardened the harness: OpenRouter load-balancing turned out not
+to be behaviour-neutral (one host rejects every buyer-opener conversation), so
+sweeps now pin the upstream host (`@DeepInfra`), talk to gateways over chat
+completions, and retry infra-errored conversations once from a fresh clone.
+
 ## Roadmap
 
-Phase 0 is the engine. Everything that makes it a _benchmark_ is ahead:
-
 - [x] **Phase 0** - TS engine scaffold, orchestrator, tools, telemetry, G1
-- [ ] **Phase 1** - the real document set, 12 buyer personas, 60-80 scenarios
-- [ ] **Phase 2** - Layer-1 deterministic programmatic checks
-- [ ] **Phase 3+** - buyer-simulator validation, judge panel, calibration,
-      composite scoring, the scored run and the paper
+- [x] **Phase 1** - corpus v2, 12 personas, 150 scenario instances (gate MET)
+- [x] **Phase 2** - Layer-1 checks L1.1-L1.13; G3 20/20 caught, 0 false fires; G15
+- [x] **Phase 3** - buyer-simulator pilot (machine gates; human spot-check open)
+- [ ] **Phase 4+** - calibration set, judge panel, composite scoring, the
+      scored run and the paper
 
 ---
 
