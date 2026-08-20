@@ -3,10 +3,11 @@
 Generated from `decisions.jsonl` — do not edit by hand.
 Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 
-13 decisions.
+14 decisions.
 
 ## By date
 
+- **ADR-0014** (2026-08-20) — [Personas are public; scenarios are persona-bound instance files split at authoring time](ADR-0014-personas-are-public-scenarios-are-persona-bound-instance-files.md)
 - **ADR-0011** (2026-08-14) — [AI SDK v6 surface: five places reality differed from the plan](ADR-0011-ai-sdk-v6-surface-deviations.md)
 - **ADR-0012** (2026-08-14) — [Gate sampling params per model instead of discovering the 400 mid-sweep](ADR-0012-gate-sampling-params-per-model.md)
 - **ADR-0013** (2026-08-14) — [The price table refuses to invent a number](ADR-0013-the-price-table-refuses-to-invent-a-number.md)
@@ -30,6 +31,7 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 - ADR-0008 — [Two decision logs, split by leakage risk](ADR-0008-two-decision-logs-split-by-leakage-risk.md)
 - ADR-0010 — [No application framework in the harness; NestJS is the product stack](ADR-0010-no-application-framework-in-the-harness.md)
 - ADR-0011 — [AI SDK v6 surface: five places reality differed from the plan](ADR-0011-ai-sdk-v6-surface-deviations.md)
+- ADR-0014 — [Personas are public; scenarios are persona-bound instance files split at authoring time](ADR-0014-personas-are-public-scenarios-are-persona-bound-instance-files.md)
 
 ### `caching`
 
@@ -51,6 +53,7 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 - ADR-0001 — [The Environment is the only place tools execute](ADR-0001-environment-is-the-only-tool-execution-site.md)
 - ADR-0006 — [No provider honours seed; live reproducibility rests elsewhere](ADR-0006-no-provider-honours-seed.md)
 - ADR-0009 — [Pin floating model aliases to dated snapshots](ADR-0009-pin-dated-model-snapshots.md)
+- ADR-0014 — [Personas are public; scenarios are persona-bound instance files split at authoring time](ADR-0014-personas-are-public-scenarios-are-persona-bound-instance-files.md)
 
 ### `gate`
 
@@ -64,6 +67,7 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 - ADR-0010 — [No application framework in the harness; NestJS is the product stack](ADR-0010-no-application-framework-in-the-harness.md)
 - ADR-0012 — [Gate sampling params per model instead of discovering the 400 mid-sweep](ADR-0012-gate-sampling-params-per-model.md)
 - ADR-0013 — [The price table refuses to invent a number](ADR-0013-the-price-table-refuses-to-invent-a-number.md)
+- ADR-0014 — [Personas are public; scenarios are persona-bound instance files split at authoring time](ADR-0014-personas-are-public-scenarios-are-persona-bound-instance-files.md)
 
 ### `provider`
 
@@ -78,6 +82,7 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 
 - ADR-0006 — [No provider honours seed; live reproducibility rests elsewhere](ADR-0006-no-provider-honours-seed.md)
 - ADR-0009 — [Pin floating model aliases to dated snapshots](ADR-0009-pin-dated-model-snapshots.md)
+- ADR-0014 — [Personas are public; scenarios are persona-bound instance files split at authoring time](ADR-0014-personas-are-public-scenarios-are-persona-bound-instance-files.md)
 
 ### `stack`
 
