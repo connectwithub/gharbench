@@ -327,6 +327,7 @@ function describeModel(ref: string): Record<string, unknown> {
     resolvedRef: resolved.ref,
     modelId: resolved.modelId,
     pinned: resolved.pinned,
+    routingPin: resolved.routingPin ?? null,
   };
 }
 

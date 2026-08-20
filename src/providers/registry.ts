@@ -278,16 +278,44 @@ export interface ModelRef {
   requestedRef: string;
   /** False means no dated snapshot is published for this id - the run is not version-pinned. */
   pinned: boolean;
+  /**
+   * OpenRouter upstream host pin from the `@Host` ref suffix
+   * (`openrouter/qwen/qwen3-32b@DeepInfra`). Injected into the request body as
+   * `provider: { order: [pin], allow_fallbacks: false }` - OpenRouter's own
+   * routing-preference field, honoured on both its chat and responses
+   * surfaces (verified 2026-08-20: a Groq pin propagates Groq's error, a
+   * DeepInfra pin succeeds).
+   *
+   * Exists because OpenRouter's load balancing is not behaviour-neutral:
+   * `qwen/qwen3-32b` is served by DeepInfra, Nebius, SiliconFlow and Groq,
+   * and Groq rejects any conversation that ends after an assistant message
+   * ("does not support assistant message prefill") - which every buyer-opener
+   * scenario produces. Unpinned, 14/20 pilot conversations died on whichever
+   * requests landed on Groq. The `:provider` model-id suffix is NOT this: it
+   * is silently ignored (`qwen3-32b:deepinfra` routed to Nebius when probed).
+   */
+  routingPin?: string;
 }
 
 function buildModelRef(provider: string, requestedModelId: string): ModelRef {
+  // OpenRouter only: an `@Host` suffix pins the upstream provider.
+  let routingPin: string | undefined;
+  let bareModelId = requestedModelId;
+  if (provider === 'openrouter') {
+    const at = requestedModelId.lastIndexOf('@');
+    if (at > 0) {
+      routingPin = requestedModelId.slice(at + 1);
+      bareModelId = requestedModelId.slice(0, at);
+    }
+  }
+
   // Only the three direct providers. An OpenAI-compatible gateway routes by its
   // own rules, so substituting an id there would imply a guarantee we cannot make.
   const kind = PROVIDERS[provider]?.kind;
   const direct = kind === 'anthropic' || kind === 'openai' || kind === 'google';
   const { modelId, pinned } = direct
-    ? pinModelId(requestedModelId)
-    : { modelId: requestedModelId, pinned: false };
+    ? pinModelId(bareModelId)
+    : { modelId: bareModelId, pinned: false };
 
   return {
     provider,
@@ -296,6 +324,7 @@ function buildModelRef(provider: string, requestedModelId: string): ModelRef {
     requestedModelId,
     requestedRef: `${provider}/${requestedModelId}`,
     pinned,
+    ...(routingPin !== undefined ? { routingPin } : {}),
   };
 }
 
@@ -375,11 +404,37 @@ export function resolveModel(ref: string, env: NodeJS.ProcessEnv = process.env):
       model = createGoogleGenerativeAI({ apiKey })(parsed.modelId);
       break;
     case 'openai-compatible':
-      model = createOpenAI({ apiKey, baseURL: spec.baseURL, name: spec.id })(parsed.modelId);
+      model = createOpenAI({
+        apiKey,
+        baseURL: spec.baseURL,
+        name: spec.id,
+        ...(parsed.routingPin !== undefined ? { fetch: pinnedFetch(parsed.routingPin) } : {}),
+      })(parsed.modelId);
       break;
   }
 
   return { ...parsed, model, spec };
+}
+
+/**
+ * A fetch that injects OpenRouter's routing-preference field into every POST
+ * body, honouring a ModelRef's `routingPin` (see that field's doc for why).
+ * Anything unparseable passes through untouched - failing open here would
+ * only reintroduce the load-balancing roulette the pin exists to end.
+ */
+function pinnedFetch(pin: string): typeof fetch {
+  return (input, init) => {
+    if (init?.method === 'POST' && typeof init.body === 'string') {
+      try {
+        const body = JSON.parse(init.body) as Record<string, unknown>;
+        body['provider'] = { order: [pin], allow_fallbacks: false };
+        return fetch(input, { ...init, body: JSON.stringify(body) });
+      } catch {
+        // fall through to the unmodified request
+      }
+    }
+    return fetch(input, init);
+  };
 }
 
 /**

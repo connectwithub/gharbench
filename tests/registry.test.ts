@@ -149,6 +149,24 @@ describe('model version pinning', () => {
     expect(ref.pinned).toBe(false);
   });
 
+  it('parses an @Host suffix on an OpenRouter ref into a routing pin', () => {
+    // Load-balancing roulette is behaviour-visible: Groq rejects assistant-
+    // prefill conversations that DeepInfra accepts. The pin makes the host
+    // explicit while keeping the price-table/manifest modelId bare.
+    const ref = parseModelRef('openrouter/qwen/qwen3-32b@DeepInfra');
+    expect(ref.provider).toBe('openrouter');
+    expect(ref.modelId).toBe('qwen/qwen3-32b');
+    expect(ref.routingPin).toBe('DeepInfra');
+    expect(ref.requestedRef).toBe('openrouter/qwen/qwen3-32b@DeepInfra');
+    expect(ref.ref).toBe('openrouter/qwen/qwen3-32b');
+  });
+
+  it('leaves refs without a suffix unpinned, and non-OpenRouter @ literal', () => {
+    expect(parseModelRef('openrouter/qwen/qwen3-32b').routingPin).toBeUndefined();
+    // Other gateways have no such body field; an @ there stays part of the id.
+    expect(parseModelRef('deepinfra/qwen/qwen3-32b@x').modelId).toBe('qwen/qwen3-32b@x');
+  });
+
   it('only ever pins to a dated id that extends its own alias', () => {
     for (const [alias, snapshot] of Object.entries(MODEL_PINS)) {
       expect(snapshot.startsWith(alias), `${snapshot} is not a snapshot of ${alias}`).toBe(true);
