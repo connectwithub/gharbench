@@ -8,14 +8,15 @@ The agent has six typed tools and a grounding document set. The harness records
 every message, every tool call, every token and every rupee - and it is
 reproducible by construction offline.
 
-> **Status: Phase 0 complete (Gate G1 met). Phase 1 in progress.**
-> The engine is wired end to end and provable by a $0 offline run. The
-> benchmark _content_ is landing: the grounding corpus (v2, derived and
-> drift-checked), all **12 persona cards**, the two-session re-engagement
-> flow, a sweep runner, and the first tranche of scenario instances are in.
-> `pnpm gate:phase1` reports the authoring floors still open (scenario volume
-> toward 60-80 situations / 150-250 instances). The L1.1-L1.13 checks and the
-> judge panel are Phase 2. See [Roadmap](#roadmap).
+> **Status: Phases 0 and 1 complete (Gates G1 and G2 met).**
+> The engine is wired end to end and provable by a $0 offline run, and the
+> benchmark content is in: the grounding corpus (v2, derived and
+> drift-checked), all **12 persona cards**, and **150 scenario instances
+> across 74 base situations** (105 public here; the held-out ~30% lives
+> outside this repo, per the contamination-control design). `pnpm
+gate:phase1` machine-checks every authoring floor: all MET. The
+> L1.1-L1.13 checks and the judge panel are Phase 2. See
+> [Roadmap](#roadmap).
 >
 > Figures from live provider runs are reported here, not shipped as artefacts -
 > `runs/` is gitignored. See
