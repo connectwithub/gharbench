@@ -25,6 +25,7 @@
     "smoke": "tsx src/run/smoke.ts",
     "smoke:live": "tsx src/run/smokeLive.ts",
     "corpus:docs": "tsx src/run/corpusDocs.ts",
+    "gate:phase1": "tsx src/run/gatePhase1.ts",
     "stats:test": "vitest run --config vitest.stats.config.ts",
     "lint": "eslint .",
     "format": "prettier --write .",
