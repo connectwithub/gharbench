@@ -69,7 +69,18 @@ const PHONE = z
 export const fetchProjectInfoSchema = z.strictObject({
   sections: z
     .array(
-      z.enum(['overview', 'units', 'amenities', 'payment_plans', 'possession', 'nearby', 'rera']),
+      z.enum([
+        'overview',
+        'units',
+        'amenities',
+        'payment_plans',
+        'possession',
+        'nearby',
+        'rera',
+        'phases',
+        'charges',
+        'policy',
+      ]),
     )
     .min(1)
     .optional()
@@ -145,6 +156,8 @@ const publicUnit = (u: Unit) => ({
   floor: u.floor,
   unitType: u.unitType,
   carpetAreaSqft: u.carpetAreaSqft,
+  // Both areas are exposed so loading % is derivable fact, not agent guesswork.
+  ...(u.superBuiltUpAreaSqft !== undefined ? { superBuiltUpAreaSqft: u.superBuiltUpAreaSqft } : {}),
   facing: u.facing,
   priceInr: u.priceInr,
   status: u.status,
@@ -172,13 +185,28 @@ const publicAsset = (a: Asset) => ({
 
 const SECTION_ORDER = [
   'overview',
+  'phases',
   'possession',
   'rera',
   'units',
+  'charges',
   'amenities',
   'payment_plans',
   'nearby',
+  'policy',
 ] as const;
+
+const publicPhase = (ph: NonNullable<RealEstateDb['project']['phases']>[number]) => ({
+  id: ph.id,
+  name: ph.name,
+  towers: [...ph.towers].sort(),
+  reraId: ph.reraId,
+  status: ph.status,
+  possessionQuarter: ph.possessionQuarter,
+  ocReceived: ph.ocReceived,
+  ccReceived: ph.ccReceived,
+  basicRatePerSqftCarpetInr: ph.basicRatePerSqftCarpetInr,
+});
 
 function fetchProjectInfo(
   args: z.infer<typeof fetchProjectInfoSchema>,
@@ -186,6 +214,7 @@ function fetchProjectInfo(
 ): ToolOutcome {
   const requested = new Set(args.sections ?? ['overview']);
   const p = db.project;
+  const phases = p.phases ? sortedById(p.phases) : undefined;
   const out: Record<string, unknown> = {};
 
   for (const section of SECTION_ORDER) {
@@ -198,21 +227,44 @@ function fetchProjectInfo(
           developer: p.developer,
           city: p.city,
           locality: p.locality,
-          status: p.status,
+          // Multi-phase projects have per-phase statuses; say so instead of
+          // picking one and inviting the agent to over-generalise it.
+          status: phases ? 'multi_phase' : p.status,
           towers: [...p.towers].sort(),
           totalUnits: p.totalUnits,
           priceRangeInr: p.priceRangeInr,
           maintenancePerSqftPerMonthInr: p.maintenancePerSqftPerMonthInr,
         };
         break;
+      case 'phases':
+        out['phases'] = phases ? phases.map(publicPhase) : null;
+        break;
       case 'possession':
-        out['possession'] = { possessionQuarter: p.possessionQuarter, status: p.status };
+        out['possession'] = phases
+          ? phases.map((ph) => ({
+              phaseId: ph.id,
+              towers: [...ph.towers].sort(),
+              status: ph.status,
+              possessionQuarter: ph.possessionQuarter,
+              ocReceived: ph.ocReceived,
+            }))
+          : { possessionQuarter: p.possessionQuarter, status: p.status };
         break;
       case 'rera':
-        out['rera'] = { reraId: p.reraId, state: p.state };
+        out['rera'] = phases
+          ? phases.map((ph) => ({
+              phaseId: ph.id,
+              towers: [...ph.towers].sort(),
+              reraId: ph.reraId,
+              state: p.state,
+            }))
+          : { reraId: p.reraId, state: p.state };
         break;
       case 'units':
         out['units'] = sortedById(db.units).map(publicUnit);
+        break;
+      case 'charges':
+        out['charges'] = p.charges ?? null;
         break;
       case 'amenities':
         out['amenities'] = [...p.amenities].sort();
@@ -222,6 +274,9 @@ function fetchProjectInfo(
         break;
       case 'nearby':
         out['nearby'] = [...p.nearby].sort((a, b) => (a.name < b.name ? -1 : 1));
+        break;
+      case 'policy':
+        out['policy'] = db.agentPolicy ?? null;
         break;
     }
   }
@@ -422,7 +477,7 @@ export const TOOL_SPECS = [
     kind: 'READ',
     flowEnding: false,
     description:
-      'Read project facts: overview, possession, RERA, unit inventory, amenities, payment plans, nearby landmarks. This is the only source of truth about the project.',
+      'Read project facts: overview, phases, possession, RERA registration, unit inventory, charges, amenities, payment plans, nearby landmarks, and the agent policy. This is the only source of truth about the project.',
     schema: fetchProjectInfoSchema,
     run: fetchProjectInfo as ToolSpec['run'],
   },

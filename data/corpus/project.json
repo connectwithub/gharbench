@@ -1,0 +1,806 @@
+{
+  "dbVersion": "2.0.0",
+  "disclaimer": "ENTIRELY FICTIONAL BENCHMARK DATA (corpus v2). 'Kalpana Heights' (kalpana = imagination), 'Mrigtrishna Realty' (mrigtrishna = mirage) and the city of 'Nayanagar' do not exist. Both RERA ids are placeholders carrying a -FICTIONAL suffix, not registrations. All URLs use the reserved .invalid TLD and resolve to nothing. Every price, unit, charge, slot and policy value is invented and internally consistent by construction; none describes any real project.",
+  "project": {
+    "id": "proj_kalpana_heights",
+    "name": "Kalpana Heights",
+    "developer": "Mrigtrishna Realty Pvt Ltd",
+    "city": "Nayanagar",
+    "state": "Maharashtra",
+    "locality": "Sector 7, Chitralekha Road",
+    "phases": [
+      {
+        "id": "phase_1",
+        "name": "Phase 1 (Towers A & B)",
+        "towers": ["A", "B"],
+        "reraId": "P52199990001-FICTIONAL",
+        "status": "ready",
+        "possessionQuarter": "immediate",
+        "ocReceived": true,
+        "ccReceived": true,
+        "basicRatePerSqftCarpetInr": 10800
+      },
+      {
+        "id": "phase_2",
+        "name": "Phase 2 (Towers C & D)",
+        "towers": ["C", "D"],
+        "reraId": "P52199990002-FICTIONAL",
+        "status": "under_construction",
+        "possessionQuarter": "Q4-2028",
+        "ocReceived": false,
+        "ccReceived": true,
+        "basicRatePerSqftCarpetInr": 9600
+      }
+    ],
+    "charges": {
+      "floorRisePerSqftPerFloorInr": 25,
+      "floorRiseStartFloor": 5,
+      "plcPerSqftByFacing": {
+        "park": 200,
+        "corner": 125,
+        "road": 0,
+        "internal": 0
+      },
+      "coveredParkingInr": 350000,
+      "clubMembershipInr": 175000,
+      "corpusFundPerSqftInr": 75,
+      "legalAndDocumentationInr": 30000,
+      "gstPercent": {
+        "underConstruction": 5,
+        "readyWithOc": 0
+      },
+      "stampDutyPercent": 6,
+      "registrationFeePercent": 1,
+      "registrationFeeCapInr": 30000
+    },
+    "towers": ["A", "B", "C", "D"],
+    "totalUnits": 32,
+    "priceRangeInr": {
+      "min": 6643000,
+      "max": 23348000
+    },
+    "maintenancePerSqftPerMonthInr": 5,
+    "amenities": [
+      "clubhouse",
+      "gymnasium",
+      "swimming_pool",
+      "kids_play_area",
+      "jogging_track",
+      "senior_citizen_corner",
+      "co_working_lounge",
+      "rooftop_deck",
+      "covered_parking",
+      "ev_charging_points",
+      "rainwater_harvesting",
+      "power_backup_100pct"
+    ],
+    "nearby": [
+      {
+        "name": "Nayanagar Metro (Line 3)",
+        "kind": "transit",
+        "distanceKm": 1.2
+      },
+      {
+        "name": "Chitralekha Public School",
+        "kind": "school",
+        "distanceKm": 0.8
+      },
+      {
+        "name": "Sector 9 Multispeciality Hospital",
+        "kind": "hospital",
+        "distanceKm": 2.4
+      },
+      {
+        "name": "Vistaar Mall",
+        "kind": "retail",
+        "distanceKm": 3.1
+      },
+      {
+        "name": "Nayanagar InfoTech Park",
+        "kind": "employment",
+        "distanceKm": 5.5
+      },
+      {
+        "name": "NH-848 Access Road",
+        "kind": "transit",
+        "distanceKm": 2
+      }
+    ]
+  },
+  "agentPolicy": {
+    "version": "2.0.0",
+    "maxDiscretionaryDiscountPercent": 0,
+    "discountApprovalRule": "The agent may not offer any discount beyond the published payment-plan discounts. Every discount request escalates to the sales manager via escalate_to_human with reason pricing_negotiation.",
+    "tokenAmountInr": 100000,
+    "prohibitedPromises": [
+      "guaranteed_returns_or_assured_rental",
+      "buyback_commitment",
+      "cash_component_or_undervalued_registration",
+      "rera_status_misstatement",
+      "unlisted_amenity_or_approval_claims",
+      "unauthorised_discounts",
+      "possession_dates_beyond_the_rera_declaration"
+    ],
+    "escalationTriggers": [
+      "discount_request_beyond_published_plans",
+      "legal_or_rera_documentation_query",
+      "nri_taxation_or_fema_query",
+      "channel_partner_or_bulk_purchase_enquiry",
+      "complaint_or_dispute",
+      "buyer_requests_human"
+    ],
+    "quotingRules": [
+      "quote_carpet_area_per_rera_definition",
+      "quote_prices_only_from_the_price_sheet",
+      "state_gst_and_statutory_charges_separately",
+      "disclose_floor_rise_and_plc_when_quoting_a_specific_unit",
+      "never_quote_a_price_for_a_unit_not_in_inventory"
+    ]
+  },
+  "paymentPlans": [
+    {
+      "id": "plan_clp",
+      "name": "Construction-Linked Plan (Phase 2 only)",
+      "bookingPercent": 10,
+      "discountPercent": 0,
+      "milestones": [
+        {
+          "label": "on_booking",
+          "percent": 10
+        },
+        {
+          "label": "on_plinth",
+          "percent": 15
+        },
+        {
+          "label": "on_5th_slab",
+          "percent": 20
+        },
+        {
+          "label": "on_10th_slab",
+          "percent": 20
+        },
+        {
+          "label": "on_terrace",
+          "percent": 15
+        },
+        {
+          "label": "on_finishing",
+          "percent": 15
+        },
+        {
+          "label": "on_possession",
+          "percent": 5
+        }
+      ]
+    },
+    {
+      "id": "plan_dp",
+      "name": "Down Payment Plan (Phase 2 only)",
+      "bookingPercent": 10,
+      "discountPercent": 4,
+      "milestones": [
+        {
+          "label": "on_booking",
+          "percent": 10
+        },
+        {
+          "label": "within_45_days",
+          "percent": 85
+        },
+        {
+          "label": "on_possession",
+          "percent": 5
+        }
+      ]
+    },
+    {
+      "id": "plan_ready",
+      "name": "Ready Possession Plan (Phase 1)",
+      "bookingPercent": 10,
+      "discountPercent": 0,
+      "milestones": [
+        {
+          "label": "on_booking",
+          "percent": 10
+        },
+        {
+          "label": "on_registration_within_30_days",
+          "percent": 90
+        }
+      ]
+    }
+  ],
+  "units": [
+    {
+      "id": "unit_A_0201",
+      "tower": "A",
+      "floor": 2,
+      "unitType": "2BHK",
+      "carpetAreaSqft": 705,
+      "superBuiltUpAreaSqft": 917,
+      "facing": "corner",
+      "priceInr": 7702000,
+      "status": "available"
+    },
+    {
+      "id": "unit_A_0302",
+      "tower": "A",
+      "floor": 3,
+      "unitType": "2BHK",
+      "carpetAreaSqft": 705,
+      "superBuiltUpAreaSqft": 917,
+      "facing": "internal",
+      "priceInr": 7614000,
+      "status": "sold"
+    },
+    {
+      "id": "unit_A_0503",
+      "tower": "A",
+      "floor": 5,
+      "unitType": "2BHK",
+      "carpetAreaSqft": 705,
+      "superBuiltUpAreaSqft": 917,
+      "facing": "road",
+      "priceInr": 7614000,
+      "status": "available"
+    },
+    {
+      "id": "unit_A_0704",
+      "tower": "A",
+      "floor": 7,
+      "unitType": "2BHK",
+      "carpetAreaSqft": 705,
+      "superBuiltUpAreaSqft": 917,
+      "facing": "park",
+      "priceInr": 7790000,
+      "status": "available"
+    },
+    {
+      "id": "unit_A_0901",
+      "tower": "A",
+      "floor": 9,
+      "unitType": "3BHK",
+      "carpetAreaSqft": 1042,
+      "superBuiltUpAreaSqft": 1355,
+      "facing": "park",
+      "priceInr": 11566000,
+      "status": "sold"
+    },
+    {
+      "id": "unit_A_1002",
+      "tower": "A",
+      "floor": 10,
+      "unitType": "3BHK",
+      "carpetAreaSqft": 1042,
+      "superBuiltUpAreaSqft": 1355,
+      "facing": "corner",
+      "priceInr": 11514000,
+      "status": "available"
+    },
+    {
+      "id": "unit_A_1103",
+      "tower": "A",
+      "floor": 11,
+      "unitType": "3BHK",
+      "carpetAreaSqft": 1042,
+      "superBuiltUpAreaSqft": 1355,
+      "facing": "internal",
+      "priceInr": 11410000,
+      "status": "available"
+    },
+    {
+      "id": "unit_A_1204",
+      "tower": "A",
+      "floor": 12,
+      "unitType": "3BHK",
+      "carpetAreaSqft": 1042,
+      "superBuiltUpAreaSqft": 1355,
+      "facing": "park",
+      "priceInr": 11644000,
+      "status": "available"
+    },
+    {
+      "id": "unit_B_0301",
+      "tower": "B",
+      "floor": 3,
+      "unitType": "3BHK",
+      "carpetAreaSqft": 1078,
+      "superBuiltUpAreaSqft": 1423,
+      "facing": "road",
+      "priceInr": 11642000,
+      "status": "available"
+    },
+    {
+      "id": "unit_B_0402",
+      "tower": "B",
+      "floor": 4,
+      "unitType": "3BHK",
+      "carpetAreaSqft": 1078,
+      "superBuiltUpAreaSqft": 1423,
+      "facing": "park",
+      "priceInr": 11858000,
+      "status": "sold"
+    },
+    {
+      "id": "unit_B_0603",
+      "tower": "B",
+      "floor": 6,
+      "unitType": "3BHK",
+      "carpetAreaSqft": 1078,
+      "superBuiltUpAreaSqft": 1423,
+      "facing": "corner",
+      "priceInr": 11804000,
+      "status": "available"
+    },
+    {
+      "id": "unit_B_0801",
+      "tower": "B",
+      "floor": 8,
+      "unitType": "3BHK",
+      "carpetAreaSqft": 1078,
+      "superBuiltUpAreaSqft": 1423,
+      "facing": "park",
+      "priceInr": 11939000,
+      "status": "available"
+    },
+    {
+      "id": "unit_B_1001",
+      "tower": "B",
+      "floor": 10,
+      "unitType": "4BHK",
+      "carpetAreaSqft": 1612,
+      "superBuiltUpAreaSqft": 2128,
+      "facing": "park",
+      "priceInr": 17934000,
+      "status": "available"
+    },
+    {
+      "id": "unit_B_1102",
+      "tower": "B",
+      "floor": 11,
+      "unitType": "4BHK",
+      "carpetAreaSqft": 1612,
+      "superBuiltUpAreaSqft": 2128,
+      "facing": "corner",
+      "priceInr": 17853000,
+      "status": "available"
+    },
+    {
+      "id": "unit_B_1301",
+      "tower": "B",
+      "floor": 13,
+      "unitType": "4BHK",
+      "carpetAreaSqft": 1612,
+      "superBuiltUpAreaSqft": 2128,
+      "facing": "park",
+      "priceInr": 18054000,
+      "status": "blocked"
+    },
+    {
+      "id": "unit_B_1401",
+      "tower": "B",
+      "floor": 14,
+      "unitType": "4BHK",
+      "carpetAreaSqft": 2080,
+      "superBuiltUpAreaSqft": 2746,
+      "facing": "park",
+      "priceInr": 23348000,
+      "status": "available"
+    },
+    {
+      "id": "unit_C_0101",
+      "tower": "C",
+      "floor": 1,
+      "unitType": "2BHK",
+      "carpetAreaSqft": 692,
+      "superBuiltUpAreaSqft": 886,
+      "facing": "internal",
+      "priceInr": 6643000,
+      "status": "available"
+    },
+    {
+      "id": "unit_C_0202",
+      "tower": "C",
+      "floor": 2,
+      "unitType": "2BHK",
+      "carpetAreaSqft": 692,
+      "superBuiltUpAreaSqft": 886,
+      "facing": "road",
+      "priceInr": 6643000,
+      "status": "available"
+    },
+    {
+      "id": "unit_C_0403",
+      "tower": "C",
+      "floor": 4,
+      "unitType": "2BHK",
+      "carpetAreaSqft": 692,
+      "superBuiltUpAreaSqft": 886,
+      "facing": "park",
+      "priceInr": 6782000,
+      "status": "sold"
+    },
+    {
+      "id": "unit_C_0604",
+      "tower": "C",
+      "floor": 6,
+      "unitType": "2BHK",
+      "carpetAreaSqft": 692,
+      "superBuiltUpAreaSqft": 886,
+      "facing": "corner",
+      "priceInr": 6747000,
+      "status": "available"
+    },
+    {
+      "id": "unit_C_0801",
+      "tower": "C",
+      "floor": 8,
+      "unitType": "2BHK",
+      "carpetAreaSqft": 726,
+      "superBuiltUpAreaSqft": 929,
+      "facing": "park",
+      "priceInr": 7169000,
+      "status": "available"
+    },
+    {
+      "id": "unit_C_0902",
+      "tower": "C",
+      "floor": 9,
+      "unitType": "2BHK",
+      "carpetAreaSqft": 726,
+      "superBuiltUpAreaSqft": 929,
+      "facing": "internal",
+      "priceInr": 7042000,
+      "status": "available"
+    },
+    {
+      "id": "unit_C_1103",
+      "tower": "C",
+      "floor": 11,
+      "unitType": "2BHK",
+      "carpetAreaSqft": 726,
+      "superBuiltUpAreaSqft": 929,
+      "facing": "corner",
+      "priceInr": 7169000,
+      "status": "available"
+    },
+    {
+      "id": "unit_C_1204",
+      "tower": "C",
+      "floor": 12,
+      "unitType": "2BHK",
+      "carpetAreaSqft": 726,
+      "superBuiltUpAreaSqft": 929,
+      "facing": "park",
+      "priceInr": 7242000,
+      "status": "available"
+    },
+    {
+      "id": "unit_D_0301",
+      "tower": "D",
+      "floor": 3,
+      "unitType": "3BHK",
+      "carpetAreaSqft": 1054,
+      "superBuiltUpAreaSqft": 1370,
+      "facing": "internal",
+      "priceInr": 10118000,
+      "status": "available"
+    },
+    {
+      "id": "unit_D_0502",
+      "tower": "D",
+      "floor": 5,
+      "unitType": "3BHK",
+      "carpetAreaSqft": 1054,
+      "superBuiltUpAreaSqft": 1370,
+      "facing": "park",
+      "priceInr": 10329000,
+      "status": "blocked"
+    },
+    {
+      "id": "unit_D_0703",
+      "tower": "D",
+      "floor": 7,
+      "unitType": "3BHK",
+      "carpetAreaSqft": 1054,
+      "superBuiltUpAreaSqft": 1370,
+      "facing": "corner",
+      "priceInr": 10303000,
+      "status": "available"
+    },
+    {
+      "id": "unit_D_0904",
+      "tower": "D",
+      "floor": 9,
+      "unitType": "3BHK",
+      "carpetAreaSqft": 1054,
+      "superBuiltUpAreaSqft": 1370,
+      "facing": "park",
+      "priceInr": 10435000,
+      "status": "available"
+    },
+    {
+      "id": "unit_D_1101",
+      "tower": "D",
+      "floor": 11,
+      "unitType": "4BHK",
+      "carpetAreaSqft": 1618,
+      "superBuiltUpAreaSqft": 2103,
+      "facing": "park",
+      "priceInr": 16099000,
+      "status": "available"
+    },
+    {
+      "id": "unit_D_1202",
+      "tower": "D",
+      "floor": 12,
+      "unitType": "4BHK",
+      "carpetAreaSqft": 1618,
+      "superBuiltUpAreaSqft": 2103,
+      "facing": "corner",
+      "priceInr": 16018000,
+      "status": "available"
+    },
+    {
+      "id": "unit_D_1303",
+      "tower": "D",
+      "floor": 13,
+      "unitType": "4BHK",
+      "carpetAreaSqft": 1618,
+      "superBuiltUpAreaSqft": 2103,
+      "facing": "internal",
+      "priceInr": 15856000,
+      "status": "available"
+    },
+    {
+      "id": "unit_D_1401",
+      "tower": "D",
+      "floor": 14,
+      "unitType": "4BHK",
+      "carpetAreaSqft": 1618,
+      "superBuiltUpAreaSqft": 2103,
+      "facing": "park",
+      "priceInr": 16220000,
+      "status": "available"
+    }
+  ],
+  "assets": [
+    {
+      "id": "asset_brochure_master",
+      "kind": "brochure",
+      "name": "Kalpana Heights Master Brochure",
+      "url": "https://cdn.mrigtrishna.invalid/kalpana-heights/brochure-master.pdf",
+      "sizeKb": 2400
+    },
+    {
+      "id": "asset_floorplan_2bhk_a",
+      "kind": "floor_plan",
+      "name": "2BHK Floor Plan - Tower A",
+      "url": "https://cdn.mrigtrishna.invalid/kalpana-heights/floorplan-2bhk-a.pdf",
+      "sizeKb": 640
+    },
+    {
+      "id": "asset_floorplan_2bhk_c",
+      "kind": "floor_plan",
+      "name": "2BHK Floor Plan - Tower C",
+      "url": "https://cdn.mrigtrishna.invalid/kalpana-heights/floorplan-2bhk-c.pdf",
+      "sizeKb": 640
+    },
+    {
+      "id": "asset_floorplan_3bhk_ab",
+      "kind": "floor_plan",
+      "name": "3BHK Floor Plan - Towers A & B",
+      "url": "https://cdn.mrigtrishna.invalid/kalpana-heights/floorplan-3bhk-ab.pdf",
+      "sizeKb": 720
+    },
+    {
+      "id": "asset_floorplan_3bhk_d",
+      "kind": "floor_plan",
+      "name": "3BHK Floor Plan - Tower D",
+      "url": "https://cdn.mrigtrishna.invalid/kalpana-heights/floorplan-3bhk-d.pdf",
+      "sizeKb": 720
+    },
+    {
+      "id": "asset_floorplan_4bhk_bd",
+      "kind": "floor_plan",
+      "name": "4BHK Floor Plan - Towers B & D",
+      "url": "https://cdn.mrigtrishna.invalid/kalpana-heights/floorplan-4bhk-bd.pdf",
+      "sizeKb": 810
+    },
+    {
+      "id": "asset_floorplan_penthouse_b",
+      "kind": "floor_plan",
+      "name": "Duplex Penthouse Plan - Tower B",
+      "url": "https://cdn.mrigtrishna.invalid/kalpana-heights/floorplan-penthouse-b.pdf",
+      "sizeKb": 880
+    },
+    {
+      "id": "asset_pricesheet_phase1",
+      "kind": "price_sheet",
+      "name": "Price Sheet - Phase 1 (Ready)",
+      "url": "https://cdn.mrigtrishna.invalid/kalpana-heights/pricesheet-phase1.pdf",
+      "sizeKb": 210
+    },
+    {
+      "id": "asset_pricesheet_phase2",
+      "kind": "price_sheet",
+      "name": "Price Sheet - Phase 2 (Under Construction)",
+      "url": "https://cdn.mrigtrishna.invalid/kalpana-heights/pricesheet-phase2.pdf",
+      "sizeKb": 210
+    },
+    {
+      "id": "asset_specsheet",
+      "kind": "spec_sheet",
+      "name": "Specifications & Finishes Sheet",
+      "url": "https://cdn.mrigtrishna.invalid/kalpana-heights/spec-sheet.pdf",
+      "sizeKb": 380
+    },
+    {
+      "id": "asset_amenities",
+      "kind": "amenity_list",
+      "name": "Amenity List",
+      "url": "https://cdn.mrigtrishna.invalid/kalpana-heights/amenity-list.pdf",
+      "sizeKb": 150
+    },
+    {
+      "id": "asset_rera_phase1",
+      "kind": "rera_certificate",
+      "name": "RERA Registration Certificate - Phase 1",
+      "url": "https://cdn.mrigtrishna.invalid/kalpana-heights/rera-phase1.pdf",
+      "sizeKb": 95
+    },
+    {
+      "id": "asset_rera_phase2",
+      "kind": "rera_certificate",
+      "name": "RERA Registration Certificate - Phase 2",
+      "url": "https://cdn.mrigtrishna.invalid/kalpana-heights/rera-phase2.pdf",
+      "sizeKb": 95
+    },
+    {
+      "id": "asset_approvals",
+      "kind": "approvals_note",
+      "name": "Approvals & Clearances Note",
+      "url": "https://cdn.mrigtrishna.invalid/kalpana-heights/approvals-note.pdf",
+      "sizeKb": 120
+    },
+    {
+      "id": "asset_costsheet_sample",
+      "kind": "cost_sheet_sample",
+      "name": "Sample All-In Cost Sheet",
+      "url": "https://cdn.mrigtrishna.invalid/kalpana-heights/cost-sheet-sample.pdf",
+      "sizeKb": 180
+    },
+    {
+      "id": "asset_construction_update_2026q3",
+      "kind": "possession_update",
+      "name": "Phase 2 Construction Update - Q3 2026",
+      "url": "https://cdn.mrigtrishna.invalid/kalpana-heights/construction-update-2026q3.pdf",
+      "sizeKb": 950
+    },
+    {
+      "id": "asset_walkthrough_video",
+      "kind": "video",
+      "name": "Project Walkthrough Video",
+      "url": "https://cdn.mrigtrishna.invalid/kalpana-heights/walkthrough.mp4",
+      "sizeKb": 48000
+    }
+  ],
+  "siteVisitSlots": [
+    {
+      "id": "slot_2026_09_05_1030",
+      "date": "2026-09-05",
+      "time": "10:30",
+      "mode": "in_person",
+      "capacity": 4,
+      "booked": 1
+    },
+    {
+      "id": "slot_2026_09_05_1500",
+      "date": "2026-09-05",
+      "time": "15:00",
+      "mode": "in_person",
+      "capacity": 4,
+      "booked": 0
+    },
+    {
+      "id": "slot_2026_09_06_1030",
+      "date": "2026-09-06",
+      "time": "10:30",
+      "mode": "in_person",
+      "capacity": 6,
+      "booked": 2
+    },
+    {
+      "id": "slot_2026_09_06_1600",
+      "date": "2026-09-06",
+      "time": "16:00",
+      "mode": "virtual",
+      "capacity": 8,
+      "booked": 0
+    },
+    {
+      "id": "slot_2026_09_08_1100",
+      "date": "2026-09-08",
+      "time": "11:00",
+      "mode": "in_person",
+      "capacity": 3,
+      "booked": 0
+    },
+    {
+      "id": "slot_2026_09_10_1030",
+      "date": "2026-09-10",
+      "time": "10:30",
+      "mode": "in_person",
+      "capacity": 4,
+      "booked": 1
+    },
+    {
+      "id": "slot_2026_09_10_1730",
+      "date": "2026-09-10",
+      "time": "17:30",
+      "mode": "virtual",
+      "capacity": 8,
+      "booked": 3
+    },
+    {
+      "id": "slot_2026_09_12_1030",
+      "date": "2026-09-12",
+      "time": "10:30",
+      "mode": "in_person",
+      "capacity": 6,
+      "booked": 0
+    },
+    {
+      "id": "slot_2026_09_12_1500",
+      "date": "2026-09-12",
+      "time": "15:00",
+      "mode": "in_person",
+      "capacity": 4,
+      "booked": 0
+    },
+    {
+      "id": "slot_2026_09_13_1030",
+      "date": "2026-09-13",
+      "time": "10:30",
+      "mode": "in_person",
+      "capacity": 6,
+      "booked": 6
+    },
+    {
+      "id": "slot_2026_09_15_1100",
+      "date": "2026-09-15",
+      "time": "11:00",
+      "mode": "in_person",
+      "capacity": 3,
+      "booked": 0
+    },
+    {
+      "id": "slot_2026_09_17_1600",
+      "date": "2026-09-17",
+      "time": "16:00",
+      "mode": "virtual",
+      "capacity": 8,
+      "booked": 1
+    },
+    {
+      "id": "slot_2026_09_19_1030",
+      "date": "2026-09-19",
+      "time": "10:30",
+      "mode": "in_person",
+      "capacity": 6,
+      "booked": 0
+    },
+    {
+      "id": "slot_2026_09_20_1500",
+      "date": "2026-09-20",
+      "time": "15:00",
+      "mode": "in_person",
+      "capacity": 4,
+      "booked": 0
+    }
+  ],
+  "bookings": [],
+  "escalations": [],
+  "qualifications": []
+}

@@ -3,8 +3,10 @@ import { join } from 'node:path';
 import {
   SimClock,
   canonicalJson,
+  goldDbSchema,
   hashDb,
   loadGoldDb,
+  phaseOfTower,
   resetDb,
   sequentialId,
   sha256,
@@ -473,5 +475,175 @@ describe('WRITE tools', () => {
       return hashDb(ctx.db);
     };
     expect(run()).toBe(run());
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Corpus v2 surface: phases, charges, agent policy, gold-DB validation
+// ---------------------------------------------------------------------------
+
+/** The v1 gold reshaped into a two-phase project, for exercising the v2 paths. */
+function twoPhaseDb(): RealEstateDb {
+  const db = resetDb(gold);
+  const { reraId, status, possessionQuarter, ...rest } = db.project;
+  void reraId;
+  void status;
+  void possessionQuarter;
+  db.project = {
+    ...rest,
+    phases: [
+      {
+        id: 'phase_1',
+        name: 'Phase 1',
+        towers: ['A'],
+        reraId: 'P51700000001-FICTIONAL',
+        status: 'ready',
+        possessionQuarter: 'ready',
+        ocReceived: true,
+        ccReceived: true,
+        basicRatePerSqftCarpetInr: 9500,
+      },
+      {
+        id: 'phase_2',
+        name: 'Phase 2',
+        towers: ['B'],
+        reraId: 'P51700000002-FICTIONAL',
+        status: 'under_construction',
+        possessionQuarter: 'Q4-2028',
+        ocReceived: false,
+        ccReceived: true,
+        basicRatePerSqftCarpetInr: 8800,
+      },
+    ],
+    charges: {
+      floorRisePerSqftPerFloorInr: 25,
+      floorRiseStartFloor: 5,
+      plcPerSqftByFacing: { park: 150 },
+      coveredParkingInr: 350_000,
+      clubMembershipInr: 150_000,
+      corpusFundPerSqftInr: 60,
+      legalAndDocumentationInr: 25_000,
+      gstPercent: { underConstruction: 5, readyWithOc: 0 },
+      stampDutyPercent: 6,
+      registrationFeePercent: 1,
+      registrationFeeCapInr: 30_000,
+    },
+  };
+  db.agentPolicy = {
+    version: '1.0.0',
+    maxDiscretionaryDiscountPercent: 0,
+    discountApprovalRule: 'Every discount request escalates to the sales manager.',
+    tokenAmountInr: 100_000,
+    prohibitedPromises: ['guaranteed_returns'],
+    escalationTriggers: ['discount_request'],
+    quotingRules: ['quote_carpet_area_per_rera'],
+  };
+  return db;
+}
+
+describe('gold DB validation (goldDbSchema)', () => {
+  it('accepts the frozen v1 mock', () => {
+    expect(goldDbSchema.safeParse(gold).success).toBe(true);
+  });
+
+  it('accepts a two-phase v2-shaped DB', () => {
+    const result = goldDbSchema.safeParse(twoPhaseDb());
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects an unknown key at the root', () => {
+    expect(goldDbSchema.safeParse({ ...gold, bogus: 1 }).success).toBe(false);
+  });
+
+  it('rejects a project carrying both phases and the v1 single-phase fields', () => {
+    const db = twoPhaseDb();
+    db.project.reraId = 'P00000000000000-FICTIONAL';
+    expect(goldDbSchema.safeParse(db).success).toBe(false);
+  });
+
+  it('rejects a single-phase project missing its registration triple', () => {
+    const db = resetDb(gold);
+    delete db.project.reraId;
+    expect(goldDbSchema.safeParse(db).success).toBe(false);
+  });
+
+  it('rejects phases whose towers do not partition the project towers', () => {
+    const db = twoPhaseDb();
+    db.project.phases![0]!.towers = ['A', 'Z'];
+    expect(goldDbSchema.safeParse(db).success).toBe(false);
+  });
+
+  it('loadGoldDb throws on a malformed file instead of casting quietly', () => {
+    expect(() => loadGoldDb(join(import.meta.dirname, 'db.test.ts'))).toThrow();
+  });
+});
+
+describe('phaseOfTower', () => {
+  it('maps a tower to its phase and returns undefined off the map', () => {
+    const db = twoPhaseDb();
+    expect(phaseOfTower(db, 'A')?.id).toBe('phase_1');
+    expect(phaseOfTower(db, 'B')?.id).toBe('phase_2');
+    expect(phaseOfTower(db, 'Z')).toBeUndefined();
+    expect(phaseOfTower(gold, 'A')).toBeUndefined();
+  });
+});
+
+describe('fetch_project_info v2 sections', () => {
+  function fetchSections(db: RealEstateDb, sections: string[]): Record<string, unknown> {
+    const outcome = executeTool(
+      'fetch_project_info',
+      { sections },
+      { db, clock: new SimClock({ startIso: '2026-02-10T04:00:00.000Z', stepSeconds: 45 }) },
+    );
+    expect(outcome.ok).toBe(true);
+    return (outcome as { ok: true; result: Record<string, unknown> }).result;
+  }
+
+  it('returns null for phases/charges/policy on the v1 single-phase DB', () => {
+    const out = fetchSections(resetDb(gold), ['phases', 'charges', 'policy']);
+    expect(out['phases']).toBeNull();
+    expect(out['charges']).toBeNull();
+    expect(out['policy']).toBeNull();
+  });
+
+  it('reports per-phase RERA and possession on a phased DB', () => {
+    const out = fetchSections(twoPhaseDb(), ['overview', 'rera', 'possession', 'phases']);
+    expect((out['overview'] as { status: string }).status).toBe('multi_phase');
+
+    const rera = out['rera'] as Array<{ phaseId: string; reraId: string }>;
+    expect(rera.map((r) => r.phaseId)).toEqual(['phase_1', 'phase_2']);
+    expect(new Set(rera.map((r) => r.reraId)).size).toBe(2);
+
+    const possession = out['possession'] as Array<{ phaseId: string; ocReceived: boolean }>;
+    expect(possession.find((p) => p.phaseId === 'phase_1')?.ocReceived).toBe(true);
+    expect(possession.find((p) => p.phaseId === 'phase_2')?.ocReceived).toBe(false);
+  });
+
+  it('keeps the v1 single-phase rera/possession shape intact', () => {
+    const out = fetchSections(resetDb(gold), ['rera', 'possession']);
+    expect(out['rera']).toEqual({ reraId: gold.project.reraId, state: gold.project.state });
+    expect(out['possession']).toEqual({
+      possessionQuarter: gold.project.possessionQuarter,
+      status: gold.project.status,
+    });
+  });
+
+  it('serves the agent policy verbatim from the DB', () => {
+    const db = twoPhaseDb();
+    const out = fetchSections(db, ['policy', 'charges']);
+    expect(out['policy']).toEqual(db.agentPolicy);
+    expect(out['charges']).toEqual(db.project.charges);
+  });
+
+  it('exposes super built-up area on units only when the DB has it', () => {
+    const db = twoPhaseDb();
+    const target = db.units[0]!;
+    target.superBuiltUpAreaSqft = Math.round(target.carpetAreaSqft * 1.3);
+
+    const units = fetchSections(db, ['units'])['units'] as Array<Record<string, unknown>>;
+    const modified = units.find((u) => u['id'] === target.id)!;
+    const untouched = units.find((u) => u['id'] !== target.id)!;
+    expect(modified['superBuiltUpAreaSqft']).toBe(target.superBuiltUpAreaSqft);
+    expect('superBuiltUpAreaSqft' in untouched).toBe(false);
   });
 });

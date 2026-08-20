@@ -12,11 +12,22 @@
 
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { z } from 'zod';
 
 export type UnitType = '1BHK' | '2BHK' | '3BHK' | '4BHK';
 export type UnitStatus = 'available' | 'blocked' | 'sold';
 export type VisitMode = 'in_person' | 'virtual';
-export type AssetKind = 'brochure' | 'floor_plan' | 'price_sheet' | 'video';
+export type AssetKind =
+  | 'brochure'
+  | 'floor_plan'
+  | 'price_sheet'
+  | 'video'
+  | 'spec_sheet'
+  | 'amenity_list'
+  | 'rera_certificate'
+  | 'approvals_note'
+  | 'cost_sheet_sample'
+  | 'possession_update';
 
 export interface Unit {
   id: string;
@@ -24,6 +35,12 @@ export interface Unit {
   floor: number;
   unitType: UnitType;
   carpetAreaSqft: number;
+  /**
+   * Corpus v2+: super built-up area, so loading % is derivable ground truth
+   * ((sbu - carpet) / carpet) rather than an untestable claim in prose.
+   * Absent in the frozen v1 mock fixture.
+   */
+  superBuiltUpAreaSqft?: number;
   facing: string;
   priceInr: number;
   status: UnitStatus;
@@ -54,6 +71,68 @@ export interface PaymentPlan {
   milestones: Array<{ label: string; percent: number }>;
 }
 
+export type PhaseStatus = 'ready' | 'under_construction';
+
+/**
+ * One RERA-registered phase of the project. Indian phased projects register
+ * each phase separately, so RERA id, status and possession are per-phase facts
+ * -- an agent quoting phase-1's RERA id or OC status for a phase-2 unit is
+ * making a checkable misrepresentation, which is exactly what several
+ * compliance traps probe.
+ */
+export interface ProjectPhase {
+  id: string;
+  name: string;
+  towers: string[];
+  reraId: string;
+  status: PhaseStatus;
+  possessionQuarter: string;
+  /** Occupancy certificate received (ready phases only, in practice). */
+  ocReceived: boolean;
+  /** Commencement certificate received. */
+  ccReceived: boolean;
+  /** Base rate the price sheet is keyed to, per sqft of RERA carpet area. */
+  basicRatePerSqftCarpetInr: number;
+}
+
+/**
+ * The published charge card. Unit prices in the gold DB must be derivable
+ * from these numbers plus the unit's own carpet area / floor / facing, so a
+ * consistency test can prove the price sheet has no invented figures.
+ */
+export interface ProjectCharges {
+  /** Added per sqft carpet for every floor above `floorRiseStartFloor`. */
+  floorRisePerSqftPerFloorInr: number;
+  floorRiseStartFloor: number;
+  /** Preferential-location charge per sqft carpet, keyed by unit facing. */
+  plcPerSqftByFacing: Record<string, number>;
+  coveredParkingInr: number;
+  clubMembershipInr: number;
+  corpusFundPerSqftInr: number;
+  legalAndDocumentationInr: number;
+  /** GST is a per-phase fact: charged on under-construction, nil on ready-with-OC. */
+  gstPercent: { underConstruction: number; readyWithOc: number };
+  stampDutyPercent: number;
+  registrationFeePercent: number;
+  registrationFeeCapInr: number;
+}
+
+/**
+ * What the selling agent may and may not do. Part of the hashed gold DB
+ * because it is the ground truth the off-book-discount and escalation checks
+ * resolve against -- a policy that lived in a prompt could drift per run.
+ */
+export interface AgentPolicy {
+  version: string;
+  /** Discounts the agent may offer unaided. 0 means every discount ask escalates. */
+  maxDiscretionaryDiscountPercent: number;
+  discountApprovalRule: string;
+  tokenAmountInr: number;
+  prohibitedPromises: string[];
+  escalationTriggers: string[];
+  quotingRules: string[];
+}
+
 export interface ProjectInfo {
   id: string;
   name: string;
@@ -61,9 +140,13 @@ export interface ProjectInfo {
   city: string;
   state: string;
   locality: string;
-  reraId: string;
-  status: string;
-  possessionQuarter: string;
+  /** v1 single-phase shape. Corpus v2+ moves these three onto `phases`. */
+  reraId?: string;
+  status?: string;
+  possessionQuarter?: string;
+  /** Corpus v2+: per-phase registration. Exactly one of {reraId/status/possessionQuarter, phases} is populated. */
+  phases?: ProjectPhase[];
+  charges?: ProjectCharges;
   towers: string[];
   totalUnits: number;
   priceRangeInr: { min: number; max: number };
@@ -106,6 +189,8 @@ export interface RealEstateDb {
   dbVersion: string;
   disclaimer: string;
   project: ProjectInfo;
+  /** Corpus v2+. Lives on the DB, not ProjectInfo: it is dealer-side, not marketing. */
+  agentPolicy?: AgentPolicy;
   paymentPlans: PaymentPlan[];
   units: Unit[];
   assets: Asset[];
@@ -113,6 +198,177 @@ export interface RealEstateDb {
   bookings: Booking[];
   escalations: Escalation[];
   qualifications: Qualification[];
+}
+
+// ---------------------------------------------------------------------------
+// Gold-DB validation
+// ---------------------------------------------------------------------------
+
+const UNIT_TYPE = z.enum(['1BHK', '2BHK', '3BHK', '4BHK']);
+const ASSET_KIND = z.enum([
+  'brochure',
+  'floor_plan',
+  'price_sheet',
+  'video',
+  'spec_sheet',
+  'amenity_list',
+  'rera_certificate',
+  'approvals_note',
+  'cost_sheet_sample',
+  'possession_update',
+]);
+
+const unitSchema = z.strictObject({
+  id: z.string().min(1),
+  tower: z.string().min(1),
+  floor: z.number().int().nonnegative(),
+  unitType: UNIT_TYPE,
+  carpetAreaSqft: z.number().positive(),
+  superBuiltUpAreaSqft: z.number().positive().optional(),
+  facing: z.string().min(1),
+  priceInr: z.number().int().positive(),
+  status: z.enum(['available', 'blocked', 'sold']),
+});
+
+const phaseSchema = z.strictObject({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  towers: z.array(z.string().min(1)).min(1),
+  reraId: z.string().min(1),
+  status: z.enum(['ready', 'under_construction']),
+  possessionQuarter: z.string().min(1),
+  ocReceived: z.boolean(),
+  ccReceived: z.boolean(),
+  basicRatePerSqftCarpetInr: z.number().positive(),
+});
+
+const chargesSchema = z.strictObject({
+  floorRisePerSqftPerFloorInr: z.number().nonnegative(),
+  floorRiseStartFloor: z.number().int().nonnegative(),
+  plcPerSqftByFacing: z.record(z.string(), z.number().nonnegative()),
+  coveredParkingInr: z.number().nonnegative(),
+  clubMembershipInr: z.number().nonnegative(),
+  corpusFundPerSqftInr: z.number().nonnegative(),
+  legalAndDocumentationInr: z.number().nonnegative(),
+  gstPercent: z.strictObject({
+    underConstruction: z.number().nonnegative(),
+    readyWithOc: z.number().nonnegative(),
+  }),
+  stampDutyPercent: z.number().nonnegative(),
+  registrationFeePercent: z.number().nonnegative(),
+  registrationFeeCapInr: z.number().nonnegative(),
+});
+
+const agentPolicySchema = z.strictObject({
+  version: z.string().min(1),
+  maxDiscretionaryDiscountPercent: z.number().nonnegative(),
+  discountApprovalRule: z.string().min(1),
+  tokenAmountInr: z.number().nonnegative(),
+  prohibitedPromises: z.array(z.string().min(1)).min(1),
+  escalationTriggers: z.array(z.string().min(1)).min(1),
+  quotingRules: z.array(z.string().min(1)).min(1),
+});
+
+const projectSchema = z
+  .strictObject({
+    id: z.string().min(1),
+    name: z.string().min(1),
+    developer: z.string().min(1),
+    city: z.string().min(1),
+    state: z.string().min(1),
+    locality: z.string().min(1),
+    reraId: z.string().min(1).optional(),
+    status: z.string().min(1).optional(),
+    possessionQuarter: z.string().min(1).optional(),
+    phases: z.array(phaseSchema).min(1).optional(),
+    charges: chargesSchema.optional(),
+    towers: z.array(z.string().min(1)).min(1),
+    totalUnits: z.number().int().positive(),
+    priceRangeInr: z.strictObject({ min: z.number().positive(), max: z.number().positive() }),
+    maintenancePerSqftPerMonthInr: z.number().nonnegative(),
+    amenities: z.array(z.string().min(1)),
+    nearby: z.array(
+      z.strictObject({
+        name: z.string().min(1),
+        kind: z.string().min(1),
+        distanceKm: z.number().nonnegative(),
+      }),
+    ),
+  })
+  .superRefine((p, ctx) => {
+    const legacy = p.reraId !== undefined || p.status !== undefined;
+    if (p.phases && legacy) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'project has both per-phase registration and the v1 single-phase fields; use one',
+        path: ['phases'],
+      });
+    }
+    if (
+      !p.phases &&
+      (p.reraId === undefined || p.status === undefined || p.possessionQuarter === undefined)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'single-phase project must carry reraId, status and possessionQuarter',
+        path: ['reraId'],
+      });
+    }
+    if (p.phases) {
+      const phaseTowers = p.phases.flatMap((ph) => ph.towers).sort();
+      const declared = [...p.towers].sort();
+      if (JSON.stringify(phaseTowers) !== JSON.stringify(declared)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `phase towers [${phaseTowers.join(',')}] must partition project towers [${declared.join(',')}]`,
+          path: ['phases'],
+        });
+      }
+    }
+  });
+
+export const goldDbSchema = z.strictObject({
+  dbVersion: z.string().min(1),
+  disclaimer: z.string().min(20),
+  project: projectSchema,
+  agentPolicy: agentPolicySchema.optional(),
+  paymentPlans: z.array(
+    z.strictObject({
+      id: z.string().min(1),
+      name: z.string().min(1),
+      bookingPercent: z.number().nonnegative(),
+      discountPercent: z.number().nonnegative(),
+      milestones: z.array(z.strictObject({ label: z.string().min(1), percent: z.number() })),
+    }),
+  ),
+  units: z.array(unitSchema).min(1),
+  assets: z.array(
+    z.strictObject({
+      id: z.string().min(1),
+      kind: ASSET_KIND,
+      name: z.string().min(1),
+      url: z.string().min(1),
+      sizeKb: z.number().positive(),
+    }),
+  ),
+  siteVisitSlots: z.array(
+    z.strictObject({
+      id: z.string().min(1),
+      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      time: z.string().min(1),
+      mode: z.enum(['in_person', 'virtual']),
+      capacity: z.number().int().positive(),
+      booked: z.number().int().nonnegative(),
+    }),
+  ),
+  bookings: z.array(z.unknown()),
+  escalations: z.array(z.unknown()),
+  qualifications: z.array(z.unknown()),
+});
+
+/** Phase a tower belongs to, for per-phase facts (RERA id, GST, possession). */
+export function phaseOfTower(db: RealEstateDb, tower: string): ProjectPhase | undefined {
+  return db.project.phases?.find((ph) => ph.towers.includes(tower));
 }
 
 /**
@@ -161,10 +417,21 @@ export function hashDb(db: RealEstateDb): string {
   return sha256(canonicalJson(db));
 }
 
-/** Load the gold (immutable reference) DB from disk. */
+/**
+ * Load the gold (immutable reference) DB from disk, validated. Ground truth
+ * that fails its own schema would silently corrupt every downstream check, so
+ * a malformed gold DB is a crash at load time, never a quiet cast.
+ */
 export function loadGoldDb(path: string): RealEstateDb {
   const parsed: unknown = JSON.parse(readFileSync(path, 'utf8'));
-  return parsed as RealEstateDb;
+  const result = goldDbSchema.safeParse(parsed);
+  if (!result.success) {
+    const issues = result.error.issues
+      .map((i) => `  ${i.path.join('.') || '(root)'}: ${i.message}`)
+      .join('\n');
+    throw new Error(`Gold DB at ${path} failed validation:\n${issues}`);
+  }
+  return result.data as RealEstateDb;
 }
 
 /** Every trial gets its own deep clone; the gold DB is never mutated. */
