@@ -291,7 +291,14 @@ function toWireMessages(message: ChatMessage, index: number): WhatsAppLikeMessag
     ];
   }
 
-  if (message.role === 'system') return [];
+  // Environment events (the 24h re-engagement gap) travel as system text so
+  // an external endpoint sees the same cue a provider-model contestant does.
+  if (message.role === 'system') {
+    if (message.content.trim().length === 0) return [];
+    return [
+      { id, from: 'system', timestamp: message.ts, type: 'text', text: { body: message.content } },
+    ];
+  }
 
   const from = message.role === 'buyer' ? 'buyer' : 'agent';
   const hasText = message.content.trim().length > 0;

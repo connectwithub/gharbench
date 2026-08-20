@@ -160,8 +160,13 @@ export function toModelMessages(messages: readonly ChatMessage[]): ModelMessage[
   for (const m of messages) {
     switch (m.role) {
       case 'system':
-        // The system prompt is supplied via `instructions`; a stray system
-        // message in the transcript would break the cached prefix.
+        // The system prompt itself is supplied via `instructions` and never
+        // appears here. Mid-conversation environment events (the 24h
+        // re-engagement gap) surface as bracketed user context: appended at
+        // the tail, they extend the cached prefix without rewriting it.
+        if (m.content.trim().length > 0) {
+          out.push({ role: 'user', content: `[system event] ${m.content}` });
+        }
         break;
 
       case 'buyer':

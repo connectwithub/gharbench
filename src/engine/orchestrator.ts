@@ -44,6 +44,18 @@ export type TerminationReason =
   | { kind: 'max_steps'; maxSteps: number }
   | { kind: 'error'; message: string };
 
+/**
+ * May the conversation continue into a second session? Only after a quiet
+ * ending: a polite ###STOP### or an exhausted budget. A flow-ending tool means
+ * the lead was already handled; ###TRANSFER### / ###OUT-OF-SCOPE### mean a
+ * human owns the thread now; an error voids the run.
+ */
+function sessionAllowsContinuation(reason: TerminationReason): boolean {
+  return (
+    (reason.kind === 'buyer_token' && reason.token === '###STOP###') || reason.kind === 'max_steps'
+  );
+}
+
 export type ToolEventType = 'call' | 'result' | ToolErrorCode | 'tool_step_limit';
 
 export interface ToolEvent {
@@ -53,6 +65,14 @@ export interface ToolEvent {
   toolCallId?: string;
   toolKind?: ToolKind;
   detail?: unknown;
+}
+
+/** One session of a (possibly two-session) conversation. */
+export interface SessionSummary {
+  index: number;
+  startTs: string;
+  steps: number;
+  endReason: TerminationReason;
 }
 
 export interface ConversationRecord {
@@ -69,6 +89,8 @@ export interface ConversationRecord {
   messages: ChatMessage[];
   terminationReason: TerminationReason;
   steps: number;
+  /** One entry per session; single-session scenarios have exactly one. */
+  sessions: SessionSummary[];
   dbHashStart: string;
   dbHashEnd: string;
   toolEvents: ToolEvent[];
@@ -117,147 +139,61 @@ export class Orchestrator {
     const messages: ChatMessage[] = [];
     const toolEvents: ToolEvent[] = [];
     const dbHashStart = hashDb(this.#env.db);
-    const flowEnding = new Set(scenario.flowEndingTools);
+    const sessions: SessionSummary[] = [];
 
-    let steps = 0;
+    let totalSteps = 0;
     let terminationReason: TerminationReason = { kind: 'max_steps', maxSteps: this.#maxSteps };
-    let finished = false;
 
     try {
-      while (!finished && steps < this.#maxSteps) {
-        // ---- Buyer half-turn -------------------------------------------------
-        const buyerOut = await this.#buyer.respond({ conversationId, messages });
-        steps += 1;
-        const scan = scanTerminationTokens(buyerOut.message);
-        const buyerTs = clock.tick();
+      const s1Start = clock.now();
+      const s1 = await this.#runSession({
+        conversationId,
+        messages,
+        toolEvents,
+        budget: this.#maxSteps,
+        agentSpeaksFirst: false,
+      });
+      totalSteps += s1.steps;
+      sessions.push({ index: 1, startTs: s1Start, steps: s1.steps, endReason: s1.reason });
+      terminationReason = s1.reason;
 
-        if (scan.text.length > 0) {
-          messages.push({ role: 'buyer', content: scan.text, ts: buyerTs });
-        }
+      // ---- The 24-hour re-engagement flow (scenario family 6) ---------------
+      // Session 2 runs only if session 1 ended "quietly": a polite ###STOP###
+      // or the session budget. A flow-ending tool means the lead was already
+      // handled; a transfer/out-of-scope means a human owns it now.
+      const second = scenario.secondSession;
+      if (second !== undefined && sessionAllowsContinuation(s1.reason)) {
+        const gapTs = clock.advanceSeconds(second.gapSeconds);
+        const hours = Math.round((second.gapSeconds / 3600) * 10) / 10;
+        const eventText =
+          second.opener === 'agent'
+            ? `${hours} hours have passed with no further reply from the buyer. Policy allows one re-engagement follow-up within the messaging window. Re-engage the lead or close it out.`
+            : `${hours} hours have passed. The buyer has returned to the conversation.`;
+        // role:'system' is agent-visible context only - toBuyerView drops it,
+        // so the buyer never sees stage directions about itself.
+        messages.push({ role: 'system', content: eventText, ts: gapTs });
 
-        if (scan.token !== null) {
-          terminationReason = { kind: 'buyer_token', token: scan.token };
-          break;
-        }
-        if (steps >= this.#maxSteps) break;
-
-        // ---- Agent half-turn (with bounded inner tool loop) -------------------
-        let pendingResults: ToolResult[] | undefined;
-        let innerStep = 0;
-
-        for (; innerStep < scenario.maxToolStepsPerTurn; innerStep += 1) {
-          const turnInput = {
-            conversationId,
-            messages,
-            ...(pendingResults ? { toolResults: pendingResults } : {}),
-          };
-          const out = await this.#contestant.turn(turnInput);
-          steps += 1;
-          const agentTs = clock.tick();
-
-          const surface = (out.message ?? '').trim();
-          const calls = this.#stampCallIds(out.toolCalls ?? []);
-
-          if (surface.length > 0 || calls.length > 0) {
-            messages.push({
-              role: 'agent',
-              content: surface,
-              ts: agentTs,
-              ...(calls.length > 0 ? { toolCalls: calls } : {}),
-            });
-          }
-
-          if (calls.length === 0) {
-            pendingResults = undefined;
-            break;
-          }
-
-          const results: ToolResult[] = [];
-          let flowEndingHit: { tool: string; toolCallId: string } | null = null;
-
-          for (const call of calls) {
-            const spec = getToolSpec(call.name);
-            toolEvents.push({
-              type: 'call',
-              ts: agentTs,
-              toolName: call.name,
-              toolCallId: call.id,
-              ...(spec ? { toolKind: spec.kind } : {}),
-              detail: { args: call.args },
-            });
-
-            const outcome: ToolOutcome = executeTool(call.name, call.args, this.#env);
-            const resultTs = clock.tick();
-
-            if (outcome.ok) {
-              results.push({
-                toolCallId: call.id,
-                name: call.name,
-                ok: true,
-                result: outcome.result,
-              });
-              toolEvents.push({
-                type: 'result',
-                ts: resultTs,
-                toolName: call.name,
-                toolCallId: call.id,
-                ...(spec ? { toolKind: spec.kind } : {}),
-              });
-              if (flowEnding.has(call.name) && flowEndingHit === null) {
-                flowEndingHit = { tool: call.name, toolCallId: call.id };
-              }
-            } else {
-              results.push({
-                toolCallId: call.id,
-                name: call.name,
-                ok: false,
-                error: outcome.error,
-              });
-              toolEvents.push({
-                type: outcome.error.code,
-                ts: resultTs,
-                toolName: call.name,
-                toolCallId: call.id,
-                ...(spec ? { toolKind: spec.kind } : {}),
-                detail: outcome.error,
-              });
-            }
-          }
-
+        if (second.opener === 'buyer') {
+          // The return line is scenario data, like the opening message: it
+          // must be identical across every contestant being compared.
           messages.push({
-            role: 'tool',
-            content: '',
-            ts: clock.now(),
-            toolResults: results,
-          });
-
-          if (flowEndingHit !== null) {
-            terminationReason = {
-              kind: 'flow_ending_tool',
-              tool: flowEndingHit.tool,
-              toolCallId: flowEndingHit.toolCallId,
-            };
-            finished = true;
-            break;
-          }
-
-          pendingResults = results;
-
-          if (steps >= this.#maxSteps) {
-            finished = true;
-            break;
-          }
-        }
-
-        // Inner loop exhausted while the agent still had tool results pending:
-        // its next reply never happened. Record it; the buyer speaks again.
-        if (!finished && innerStep >= scenario.maxToolStepsPerTurn) {
-          toolEvents.push({
-            type: 'tool_step_limit',
-            ts: clock.now(),
-            detail: { maxToolStepsPerTurn: scenario.maxToolStepsPerTurn },
+            role: 'buyer',
+            content: second.buyerReturnMessage ?? '',
+            ts: clock.tick(),
           });
         }
+
+        const s2Start = clock.now();
+        const s2 = await this.#runSession({
+          conversationId,
+          messages,
+          toolEvents,
+          budget: second.maxSteps,
+          agentSpeaksFirst: true,
+        });
+        totalSteps += s2.steps;
+        sessions.push({ index: 2, startTs: s2Start, steps: s2.steps, endReason: s2.reason });
+        terminationReason = s2.reason;
       }
     } catch (cause) {
       terminationReason = {
@@ -279,12 +215,174 @@ export class Orchestrator {
       temperatures: scenario.temperatures,
       messages,
       terminationReason,
-      steps,
+      steps: totalSteps,
+      sessions,
       dbHashStart,
       dbHashEnd: hashDb(this.#env.db),
       toolEvents,
       cost: this.#costMeter?.summary() ?? null,
     };
+  }
+
+  /** One session of the half-duplex loop, against its own step budget. */
+  async #runSession(opts: {
+    conversationId: string;
+    messages: ChatMessage[];
+    toolEvents: ToolEvent[];
+    budget: number;
+    /** Session 2 always starts with the agent (after any injected buyer return). */
+    agentSpeaksFirst: boolean;
+  }): Promise<{ reason: TerminationReason; steps: number }> {
+    const scenario = this.#scenario;
+    const clock = this.#env.clock;
+    const { conversationId, messages, toolEvents, budget } = opts;
+    const flowEnding = new Set(scenario.flowEndingTools);
+
+    let steps = 0;
+    let reason: TerminationReason = { kind: 'max_steps', maxSteps: budget };
+    let finished = false;
+    let skipBuyerTurn = opts.agentSpeaksFirst;
+
+    while (!finished && steps < budget) {
+      // ---- Buyer half-turn -------------------------------------------------
+      if (!skipBuyerTurn) {
+        const buyerOut = await this.#buyer.respond({ conversationId, messages });
+        steps += 1;
+        const scan = scanTerminationTokens(buyerOut.message);
+        const buyerTs = clock.tick();
+
+        if (scan.text.length > 0) {
+          messages.push({ role: 'buyer', content: scan.text, ts: buyerTs });
+        }
+
+        if (scan.token !== null) {
+          reason = { kind: 'buyer_token', token: scan.token };
+          break;
+        }
+        if (steps >= budget) break;
+      }
+      skipBuyerTurn = false;
+
+      // ---- Agent half-turn (with bounded inner tool loop) -------------------
+      let pendingResults: ToolResult[] | undefined;
+      let innerStep = 0;
+
+      for (; innerStep < scenario.maxToolStepsPerTurn; innerStep += 1) {
+        const turnInput = {
+          conversationId,
+          messages,
+          ...(pendingResults ? { toolResults: pendingResults } : {}),
+        };
+        const out = await this.#contestant.turn(turnInput);
+        steps += 1;
+        const agentTs = clock.tick();
+
+        const surface = (out.message ?? '').trim();
+        const calls = this.#stampCallIds(out.toolCalls ?? []);
+
+        if (surface.length > 0 || calls.length > 0) {
+          messages.push({
+            role: 'agent',
+            content: surface,
+            ts: agentTs,
+            ...(calls.length > 0 ? { toolCalls: calls } : {}),
+          });
+        }
+
+        if (calls.length === 0) {
+          pendingResults = undefined;
+          break;
+        }
+
+        const results: ToolResult[] = [];
+        let flowEndingHit: { tool: string; toolCallId: string } | null = null;
+
+        for (const call of calls) {
+          const spec = getToolSpec(call.name);
+          toolEvents.push({
+            type: 'call',
+            ts: agentTs,
+            toolName: call.name,
+            toolCallId: call.id,
+            ...(spec ? { toolKind: spec.kind } : {}),
+            detail: { args: call.args },
+          });
+
+          const outcome: ToolOutcome = executeTool(call.name, call.args, this.#env);
+          const resultTs = clock.tick();
+
+          if (outcome.ok) {
+            results.push({
+              toolCallId: call.id,
+              name: call.name,
+              ok: true,
+              result: outcome.result,
+            });
+            toolEvents.push({
+              type: 'result',
+              ts: resultTs,
+              toolName: call.name,
+              toolCallId: call.id,
+              ...(spec ? { toolKind: spec.kind } : {}),
+            });
+            if (flowEnding.has(call.name) && flowEndingHit === null) {
+              flowEndingHit = { tool: call.name, toolCallId: call.id };
+            }
+          } else {
+            results.push({
+              toolCallId: call.id,
+              name: call.name,
+              ok: false,
+              error: outcome.error,
+            });
+            toolEvents.push({
+              type: outcome.error.code,
+              ts: resultTs,
+              toolName: call.name,
+              toolCallId: call.id,
+              ...(spec ? { toolKind: spec.kind } : {}),
+              detail: outcome.error,
+            });
+          }
+        }
+
+        messages.push({
+          role: 'tool',
+          content: '',
+          ts: clock.now(),
+          toolResults: results,
+        });
+
+        if (flowEndingHit !== null) {
+          reason = {
+            kind: 'flow_ending_tool',
+            tool: flowEndingHit.tool,
+            toolCallId: flowEndingHit.toolCallId,
+          };
+          finished = true;
+          break;
+        }
+
+        pendingResults = results;
+
+        if (steps >= budget) {
+          finished = true;
+          break;
+        }
+      }
+
+      // Inner loop exhausted while the agent still had tool results pending:
+      // its next reply never happened. Record it; the buyer speaks again.
+      if (!finished && innerStep >= scenario.maxToolStepsPerTurn) {
+        toolEvents.push({
+          type: 'tool_step_limit',
+          ts: clock.now(),
+          detail: { maxToolStepsPerTurn: scenario.maxToolStepsPerTurn },
+        });
+      }
+    }
+
+    return { reason, steps };
   }
 
   /**

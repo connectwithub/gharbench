@@ -482,6 +482,15 @@ export class SimClock {
     return this.now();
   }
 
+  /** Jump an absolute duration (the 24h gap between re-engagement sessions). */
+  advanceSeconds(seconds: number): string {
+    if (!Number.isFinite(seconds) || seconds < 0) {
+      throw new Error('SimClock: advanceSeconds needs a non-negative finite number');
+    }
+    this.#currentMs += Math.round(seconds * 1000);
+    return this.now();
+  }
+
   reset(): void {
     this.#currentMs = this.startMs;
   }
