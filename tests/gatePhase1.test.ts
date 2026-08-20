@@ -25,7 +25,13 @@ describe('phase 1 gate evaluator', () => {
     const familySum = Object.values(c.byFamily).reduce((a, n) => a + n, 0);
     expect(familySum).toBe(c.instances);
     expect(c.baseSituations).toBeLessThanOrEqual(c.instances);
-    expect(c.privateShare).toBeGreaterThan(0);
+    // CI clones have no private pool by design (gitignored, G16); the share
+    // is only meaningfully positive where the pool is actually present.
+    if (report.privatePoolLoaded) {
+      expect(c.privateShare).toBeGreaterThan(0);
+    } else {
+      expect(c.privateShare).toBe(0);
+    }
     expect(c.nonBuyerOutcomeShare).toBeGreaterThan(0);
   });
 
