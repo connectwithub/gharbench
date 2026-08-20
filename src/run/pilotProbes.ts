@@ -16,8 +16,17 @@
  *    instance) are excluded: there, an early stop is in-character.
  *  - over-cooperation: a successful site-visit booking in a non-buyer
  *    scenario - the buyer had to hand over a phone number to make that happen.
- *  - walk-away execution: every P09 conversation must end in a buyer-initiated
- *    ###STOP### with no successful booking (does the cold lead actually ghost?).
+ *  - walk-away execution: every P09 conversation must end without a booking,
+ *    via the buyer's ###STOP### or the agent logging the cold lead (the
+ *    scenario's expected outcome - an agent closing the file first is not a
+ *    buyer failure). A booking, a ###TRANSFER### or a max_steps grind means
+ *    the cold lead did not actually ghost.
+ *
+ * Values the scenario itself scripts - the authored openingMessage and the
+ * second-session buyerReturnMessage - are sanctioned: a hidden figure the
+ * harness injects verbatim (or the buyer later repeats) is authorial fiat,
+ * not simulator leakage. scn_budget_006 opens with the exact ceiling by
+ * design; scoring its restatement as a leak would punish consistency.
  *
  * Extraction reuses the L1 machinery (extractMoneyClaims / matchesGround), so
  * the same zero-false-fire discipline applies: a leak is a *stated* hidden
@@ -171,6 +180,13 @@ export function probeConversation(
   scenario: ScenarioConfig,
   persona: PersonaCard,
 ): ConversationProbe {
+  // Hidden fields the scenario's scripted buyer text already disclosed are
+  // sanctioned for the whole conversation.
+  const scripted = [scenario.openingMessage, scenario.secondSession?.buyerReturnMessage]
+    .filter((t): t is string => typeof t === 'string')
+    .join('\n');
+  const sanctionedFields = new Set(findLeaks(scripted, persona, false, -1).map((l) => l.field));
+
   const buyerMessages: Array<{ index: number; text: string; elicited: boolean }> = [];
   let lastAgentText = '';
   for (let i = 0; i < record.messages.length; i += 1) {
@@ -186,7 +202,9 @@ export function probeConversation(
     }
   }
 
-  const leaks = buyerMessages.flatMap((m) => findLeaks(m.text, persona, m.elicited, m.index));
+  const leaks = buyerMessages
+    .flatMap((m) => findLeaks(m.text, persona, m.elicited, m.index))
+    .filter((l) => !sanctionedFields.has(l.field));
 
   const bookingSucceeded = record.messages.some((m) =>
     (m.toolResults ?? []).some((r) => r.name === 'schedule_site_visit' && r.ok),
@@ -199,7 +217,9 @@ export function probeConversation(
   const nonBuyer = isNonBuyerScenario(scenario);
   const prematureStop = stopped && !nonBuyer && buyerMessages.length < PREMATURE_FLOOR_TURNS;
   const overCooperation = nonBuyer && bookingSucceeded;
-  const walkAwayExecuted = persona.personaId === 'P09' ? stopped && !bookingSucceeded : null;
+  const quietClose = stopped || record.terminationReason.kind === 'flow_ending_tool';
+  const walkAwayExecuted =
+    persona.personaId === 'P09' ? quietClose && !bookingSucceeded : null;
 
   const totalChars = buyerMessages.reduce((a, m) => a + m.text.length, 0);
   const tokens = buyerMessages.flatMap((m) => alphaTokens(m.text));

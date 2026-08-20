@@ -97,6 +97,45 @@ describe('probeConversation', () => {
     expect(probe.buyerTurns).toBe(2);
   });
 
+  it('counts an agent-logged cold lead as a successful walk-away', () => {
+    // scn_cold_002.P09 live: the agent logged the qualification (the expected
+    // outcome) before the buyer could ghost. Not a buyer failure.
+    const probe = probeConversation(
+      record({
+        messages: [
+          { role: 'buyer', content: 'kitne ka hai', ts: 't1' },
+          { role: 'agent', content: 'Logging you as a lead.', ts: 't2' },
+        ],
+        terminationReason: { kind: 'flow_ending_tool', tool: 'log_qualification', toolCallId: 'c1' },
+      }),
+      p09Scenario!,
+      p09,
+    );
+    expect(probe.walkAwayExecuted).toBe(true);
+  });
+
+  it('sanctions hidden values the scenario itself scripts into the opening', () => {
+    // scn_budget_006.* opens with the exact ceiling by authorial design; the
+    // buyer restating it later is consistency, not leakage.
+    const scenario = set.scenarios.find((s) => s.scenarioId === 'scn_budget_006.P07')!;
+    const p07 = set.personas.get('P07')!;
+    const probe = probeConversation(
+      record({
+        scenarioId: scenario.scenarioId,
+        scenarioVersion: scenario.version,
+        messages: [
+          { role: 'buyer', content: scenario.openingMessage, ts: 't1' },
+          { role: 'agent', content: 'Certainly. May I have your name?', ts: 't2' },
+          { role: 'buyer', content: 'our limit is 85 lakhs, all included', ts: 't3' },
+        ],
+        terminationReason: { kind: 'buyer_token', token: '###STOP###' },
+      }),
+      scenario,
+      p07,
+    );
+    expect(probe.leaks).toHaveLength(0);
+  });
+
   it('scores a booked cold lead as over-cooperation and a failed walk-away', () => {
     const probe = probeConversation(
       record({
