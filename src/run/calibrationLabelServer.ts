@@ -24,17 +24,30 @@ import {
   calibrationLabelSchema,
   type CalibrationCase,
 } from './calibrationCase.js';
+import { SLICE_FILE } from './calibrationSlice.js';
 import { loadJudgeItems } from './judgeItems.js';
 import { REPO_ROOT } from './scenarioSet.js';
 
 const PORT = 4174;
 
-/** Deterministic shuffle keyed on the rater, so resume order is stable. */
+/**
+ * Deterministic shuffle keyed on the rater, so resume order is stable.
+ * Non-author raters (anyone but "self") label only the 50-case slice (§4.5 /
+ * I6) - run `pnpm calibration:slice` before starting a colleague's server.
+ */
 function shuffledCaseIds(rater: string): string[] {
-  const ids = readdirSync(CASES_DIR)
+  let ids = readdirSync(CASES_DIR)
     .filter((f) => f.endsWith('.json'))
     .map((f) => f.replace(/\.json$/, ''))
     .sort();
+  if (rater !== 'self') {
+    if (!existsSync(SLICE_FILE)) {
+      throw new Error(`Rater "${rater}" labels the 50-case slice; run pnpm calibration:slice first.`);
+    }
+    const slice = JSON.parse(readFileSync(SLICE_FILE, 'utf8')) as { ids: string[] };
+    const allowed = new Set(slice.ids);
+    ids = ids.filter((id) => allowed.has(id));
+  }
   let h = 2166136261;
   for (const ch of rater) h = (h ^ ch.charCodeAt(0)) * 16777619;
   const keyed = ids.map((id) => {
