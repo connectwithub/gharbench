@@ -23,6 +23,20 @@ sha256(simulation_guidelines.md) = 740a29dfa64d7bc08eea3bf7493575b914a63f744acba
 sha256(LICENSE)                  = e67c5aa0074dfcaefd3c3a1aedb94cb539234aecd15d5a972574e3200e6252fe
 ```
 
+**Verified against upstream on 2026-08-20.** Both files were re-fetched from
+`raw.githubusercontent.com/sierra-research/tau2-bench/v1.0.1/` and hashed, and
+both matched the values above byte for byte. That confirms the upstream *paths*
+in the table as well as the copies themselves - until then the hashes only
+proved the two local files had not drifted, not that they came from where this
+file says they did.
+
+```sh
+curl -sL https://raw.githubusercontent.com/sierra-research/tau2-bench/v1.0.1/data/tau2/user_simulator/simulation_guidelines.md | sha256sum
+curl -sL https://raw.githubusercontent.com/sierra-research/tau2-bench/v1.0.1/LICENSE | sha256sum
+```
+
+Re-run those two commands at freeze, and after any change to the pinned tag.
+
 Upstream is MIT licensed (Copyright (c) 2025 Sierra Research). The licence text
 is reproduced in full in `LICENSE`, as the licence requires. Do not edit the two
 vendored files: if upstream changes, re-fetch at a new pinned tag and update the
