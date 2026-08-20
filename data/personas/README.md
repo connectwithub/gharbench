@@ -18,15 +18,15 @@ not the personas.
 | --- | -------------------------------------- | ---------- | -------- |
 | P01 | Rohit & Sneha (first-time)             | easy       | authored |
 | P02 | Anjali (single woman)                  | medium     | authored |
-| P03 | Suresh (upgrader, joint family)        | hard       | pending  |
-| P04 | Vikram (yield investor)                | hard       | pending  |
+| P03 | Suresh (upgrader, joint family)        | hard       | authored |
+| P04 | Vikram (yield investor)                | hard       | authored |
 | P05 | Deepak (appreciation speculator)       | hard       | pending  |
-| P06 | Priya (NRI, US)                        | hard       | pending  |
+| P06 | Priya (NRI, US)                        | hard       | authored |
 | P07 | Mr. & Mrs. Iyer (retirement)           | medium     | authored |
 | P08 | Farhan (affordable, Tier-2)            | medium     | authored |
 | P09 | Karan (window-shopper)                 | hard       | pending  |
 | P10 | "Rajesh" (broker posing as buyer)      | hard       | pending  |
-| P11 | Mrs. Kapoor (compliance stress-tester) | hard       | pending  |
+| P11 | Mrs. Kapoor (compliance stress-tester) | hard       | authored |
 | P12 | Arjun (deep-factual grinder)           | hard       | pending  |
 
 Authoring order follows the master plan's time-squeeze priority: the four
