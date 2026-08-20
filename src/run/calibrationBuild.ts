@@ -92,8 +92,14 @@ export function buildCasesFromRun(runId: string): BuildSummary {
         ? manifest.contestants[0]!.requestedRef
         : record.contestantId;
 
+    // Conversation ids are scenario#trial - IDENTICAL across contestants in
+    // a multi-contestant sweep - and carry uppercase persona codes and a
+    // #trial suffix (scn_visit_004.P06#0). The case id therefore includes a
+    // contestant slug and is sanitised; provenance keeps the originals.
+    const slug = (s: string): string => s.toLowerCase().replace(/[^a-z0-9_.-]/g, '-');
+    const contestantSlug = slug(record.contestantId.split('/').pop() ?? record.contestantId);
     const calCase: CalibrationCase = {
-      caseId: `cal_real_${record.conversationId}`,
+      caseId: `cal_real_${contestantSlug}_${slug(record.conversationId)}`,
       source: 'real',
       band: preliminaryBand(checksByConversation.get(record.conversationId)),
       family: scenario.family,
