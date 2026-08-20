@@ -32,15 +32,18 @@ const PORT = 4174;
 
 /**
  * Deterministic shuffle keyed on the rater, so resume order is stable.
- * Non-author raters (anyone but "self") label only the 50-case slice (§4.5 /
- * I6) - run `pnpm calibration:slice` before starting a colleague's server.
+ * In calibration mode, non-author raters (anyone but "self") label only the
+ * 50-case slice (§4.5 / I6) - run `pnpm calibration:slice` first. In any
+ * other store (--dir, e.g. the Phase 7 human-validation sample) every rater
+ * sees the full case set: the Phase 7 protocol is three raters over the
+ * whole sample.
  */
-function shuffledCaseIds(rater: string): string[] {
-  let ids = readdirSync(CASES_DIR)
+function shuffledCaseIds(rater: string, casesDir: string): string[] {
+  let ids = readdirSync(casesDir)
     .filter((f) => f.endsWith('.json'))
     .map((f) => f.replace(/\.json$/, ''))
     .sort();
-  if (rater !== 'self') {
+  if (rater !== 'self' && casesDir === CASES_DIR) {
     if (!existsSync(SLICE_FILE)) {
       throw new Error(`Rater "${rater}" labels the 50-case slice; run pnpm calibration:slice first.`);
     }
@@ -68,8 +71,9 @@ function redactCase(raw: CalibrationCase): Record<string, unknown> {
   };
 }
 
-export function startServer(rater: string): void {
-  const labelsDir = join(CALIBRATION_DIR, 'labels', rater);
+export function startServer(rater: string, baseDir: string = CALIBRATION_DIR): void {
+  const casesDir = baseDir === CALIBRATION_DIR ? CASES_DIR : join(baseDir, 'cases');
+  const labelsDir = join(baseDir, 'labels', rater);
   mkdirSync(labelsDir, { recursive: true });
   const rubric = loadJudgeItems();
 
@@ -81,7 +85,7 @@ export function startServer(rater: string): void {
     };
 
     if (req.method === 'GET' && url.pathname === '/api/cases') {
-      const order = shuffledCaseIds(rater);
+      const order = shuffledCaseIds(rater, casesDir);
       const labeled = new Set(
         readdirSync(labelsDir)
           .filter((f) => f.endsWith('.json'))
@@ -93,7 +97,7 @@ export function startServer(rater: string): void {
 
     if (req.method === 'GET' && url.pathname.startsWith('/api/case/')) {
       const caseId = url.pathname.slice('/api/case/'.length);
-      const path = join(CASES_DIR, `${caseId}.json`);
+      const path = join(casesDir, `${caseId}.json`);
       if (!existsSync(path) || !/^cal_[a-z0-9_.-]+$/.test(caseId)) {
         json(404, { error: 'no such case' });
         return;
@@ -151,7 +155,8 @@ export function startServer(rater: string): void {
 
 function main(): void {
   const rater = process.argv.find((a) => a.startsWith('--rater='))?.slice(8) ?? 'self';
-  startServer(rater);
+  const dir = process.argv.find((a) => a.startsWith('--dir='))?.slice(6);
+  startServer(rater, dir ? join(REPO_ROOT, dir) : CALIBRATION_DIR);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {

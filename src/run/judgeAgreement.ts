@@ -75,8 +75,8 @@ export function loadJudgments(baseDir: string): StoredJudgment[] {
   return out;
 }
 
-export function loadLabels(rater: string): Map<string, CalibrationLabel> {
-  const dir = join(CALIBRATION_DIR, 'labels', rater);
+export function loadLabels(rater: string, baseDir: string = CALIBRATION_DIR): Map<string, CalibrationLabel> {
+  const dir = join(baseDir, 'labels', rater);
   const out = new Map<string, CalibrationLabel>();
   if (!existsSync(dir)) return out;
   for (const f of readdirSync(dir)) {
@@ -88,8 +88,8 @@ export function loadLabels(rater: string): Map<string, CalibrationLabel> {
   return out;
 }
 
-export function listRaters(): string[] {
-  const dir = join(CALIBRATION_DIR, 'labels');
+export function listRaters(baseDir: string = CALIBRATION_DIR): string[] {
+  const dir = join(baseDir, 'labels');
   if (!existsSync(dir)) return [];
   return readdirSync(dir, { withFileTypes: true })
     .filter((d) => d.isDirectory())

@@ -37,11 +37,20 @@ import { CostMeter, type CostSummary } from '../telemetry/cost.js';
 import { checkRun } from './checksRun.js';
 import { REPO_ROOT, loadScenarioSet, type ScenarioSet } from './scenarioSet.js';
 
+/** D5: the two n=5 families; everything else runs n=3 (Master Plan §4.3). */
+export const N5_FAMILIES: ReadonlySet<string> = new Set(['compliance_trap', 'hinglish_variant']);
+
+export function trialsFor(scenario: Pick<ScenarioConfig, 'family'>): number {
+  return N5_FAMILIES.has(scenario.family) ? 5 : 3;
+}
+
 export interface SweepOptions {
   contestants: string[];
   buyer: string;
   scenarios: 'public' | 'all' | string[];
   trials: number;
+  /** 'flat' = --trials everywhere; 'd5' = n=5/n=3 per family (Phase 6). */
+  trialsRule: 'flat' | 'd5';
   concurrency: number;
   maxUsd?: number;
   dryRun: boolean;
@@ -52,6 +61,7 @@ export function parseSweepArgs(argv: readonly string[]): SweepOptions {
   let buyer = '';
   let scenarios: SweepOptions['scenarios'] = 'public';
   let trials = 1;
+  let trialsRule: SweepOptions['trialsRule'] = 'flat';
   let concurrency = 4;
   let maxUsd: number | undefined;
   let dryRun = false;
@@ -71,6 +81,10 @@ export function parseSweepArgs(argv: readonly string[]): SweepOptions {
         break;
       case '--trials':
         trials = Math.max(1, Number.parseInt(value, 10) || 1);
+        break;
+      case '--trials-rule':
+        if (value !== 'flat' && value !== 'd5') throw new Error('--trials-rule=flat|d5');
+        trialsRule = value;
         break;
       case '--concurrency':
         concurrency = Math.max(1, Number.parseInt(value, 10) || 4);
@@ -94,10 +108,16 @@ export function parseSweepArgs(argv: readonly string[]): SweepOptions {
     buyer,
     scenarios,
     trials,
+    trialsRule,
     concurrency,
     ...(maxUsd !== undefined ? { maxUsd } : {}),
     dryRun,
   };
+}
+
+/** Trials for one scenario under the sweep's rule. */
+export function trialsUnderRule(options: SweepOptions, scenario: ScenarioConfig): number {
+  return options.trialsRule === 'd5' ? trialsFor(scenario) : options.trials;
 }
 
 export function selectScenarios(
@@ -139,14 +159,15 @@ async function main(): Promise<void> {
   const jobs: Job[] = [];
   for (const contestantRef of [...options.contestants].sort()) {
     for (const scenario of scenarios) {
-      for (let trial = 0; trial < options.trials; trial += 1) {
+      for (let trial = 0; trial < trialsUnderRule(options, scenario); trial += 1) {
         jobs.push({ contestantRef, scenario, trial });
       }
     }
   }
 
+  const trialsLabel = options.trialsRule === 'd5' ? 'D5 (n=5/n=3)' : `${options.trials} trial(s)`;
   console.log(
-    `sweep plan: ${options.contestants.length} contestant(s) x ${scenarios.length} scenario(s) x ${options.trials} trial(s) = ${jobs.length} conversations` +
+    `sweep plan: ${options.contestants.length} contestant(s) x ${scenarios.length} scenario(s) x ${trialsLabel} = ${jobs.length} conversations` +
       ` (buyer: ${options.buyer}, concurrency ${options.concurrency}${options.maxUsd !== undefined ? `, budget $${options.maxUsd}` : ''})`,
   );
   if (!set.privatePoolLoaded && options.scenarios === 'all') {
@@ -295,6 +316,7 @@ async function main(): Promise<void> {
         buyer: describeModel(options.buyer),
         contestants: [...options.contestants].sort().map(describeModel),
         trials: options.trials,
+        trialsRule: options.trialsRule,
         concurrency: options.concurrency,
         budgetUsd: options.maxUsd ?? null,
         abortedOnBudget: aborted,

@@ -36,6 +36,23 @@ export function preliminaryBand(report: CheckReport | undefined): CalibrationCas
   return fails === 0 ? 'known_pass' : 'borderline';
 }
 
+/**
+ * Project a ConversationRecord's messages into the case shape a human or a
+ * judge reads - shared by calibration cases, the judge run mode and the
+ * Phase 7 human-validation sample so all three see the same surface.
+ */
+export function projectMessages(record: {
+  messages: { role: string; content: string }[];
+}): { role: 'buyer' | 'agent' | 'system'; text: string }[] {
+  return record.messages
+    .filter((m) => m.content.trim().length > 0)
+    .map((m) => ({
+      role: (m.role === 'system' ? 'system' : m.role) as 'buyer' | 'agent' | 'system',
+      text: m.content.trim(),
+    }))
+    .filter((m) => m.role === 'buyer' || m.role === 'agent' || m.role === 'system');
+}
+
 export interface BuildSummary {
   written: number;
   skipped: string[];
@@ -79,13 +96,7 @@ export function buildCasesFromRun(runId: string): BuildSummary {
       continue;
     }
 
-    const messages = record.messages
-      .filter((m) => m.content.trim().length > 0)
-      .map((m) => ({
-        role: (m.role === 'system' ? 'system' : m.role) as 'buyer' | 'agent' | 'system',
-        text: m.content.trim(),
-      }))
-      .filter((m) => m.role === 'buyer' || m.role === 'agent' || m.role === 'system');
+    const messages = projectMessages(record);
 
     const contestantRef =
       manifest.contestants.length === 1

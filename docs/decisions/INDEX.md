@@ -3,7 +3,7 @@
 Generated from `decisions.jsonl` — do not edit by hand.
 Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 
-18 decisions.
+19 decisions.
 
 ## By date
 
@@ -12,6 +12,7 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 - **ADR-0016** (2026-08-20) — [OpenRouter routing is not behaviour-neutral: pin the host, use the chat surface](ADR-0016-openrouter-routing-is-not-behaviour-neutral.md)
 - **ADR-0017** (2026-08-20) — [Buyer probes: frame breaks are zero-tolerance, scripted values are sanctioned, the human leg runs blind](ADR-0017-buyer-probes-frame-breaks-and-the-blind-human-leg.md)
 - **ADR-0019** (2026-08-20) — [Judge scaffolding: offline-first, quote-then-verdict enforced structurally, polarity normalised once](ADR-0019-judge-scaffold-offline-first-quote-then-verdict-structural.md)
+- **ADR-0020** (2026-08-20) — [Phases 6-10 scaffolded machine-first: every gate is code before any run is paid for](ADR-0020-phase6-10-scaffolding-machine-side-complete.md)
 - **ADR-0011** (2026-08-14) — [AI SDK v6 surface: five places reality differed from the plan](ADR-0011-ai-sdk-v6-surface-deviations.md)
 - **ADR-0012** (2026-08-14) — [Gate sampling params per model instead of discovering the 400 mid-sweep](ADR-0012-gate-sampling-params-per-model.md)
 - **ADR-0013** (2026-08-14) — [The price table refuses to invent a number](ADR-0013-the-price-table-refuses-to-invent-a-number.md)
@@ -38,6 +39,7 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 - ADR-0014 — [Personas are public; scenarios are persona-bound instance files split at authoring time](ADR-0014-personas-are-public-scenarios-are-persona-bound-instance-files.md)
 - ADR-0015 — [Layer-1 checks fire only on quotable, context-anchored evidence](ADR-0015-checks-fire-only-on-quotable-context-anchored-evidence.md)
 - ADR-0019 — [Judge scaffolding: offline-first, quote-then-verdict enforced structurally, polarity normalised once](ADR-0019-judge-scaffold-offline-first-quote-then-verdict-structural.md)
+- ADR-0020 — [Phases 6-10 scaffolded machine-first: every gate is code before any run is paid for](ADR-0020-phase6-10-scaffolding-machine-side-complete.md)
 
 ### `buyer-simulator`
 
@@ -70,6 +72,7 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 
 - ADR-0017 — [Buyer probes: frame breaks are zero-tolerance, scripted values are sanctioned, the human leg runs blind](ADR-0017-buyer-probes-frame-breaks-and-the-blind-human-leg.md)
 - ADR-0019 — [Judge scaffolding: offline-first, quote-then-verdict enforced structurally, polarity normalised once](ADR-0019-judge-scaffold-offline-first-quote-then-verdict-structural.md)
+- ADR-0020 — [Phases 6-10 scaffolded machine-first: every gate is code before any run is paid for](ADR-0020-phase6-10-scaffolding-machine-side-complete.md)
 
 ### `gate`
 
@@ -77,6 +80,7 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 - ADR-0007 — [A gate check states only what it proves](ADR-0007-a-gate-check-states-only-what-it-proves.md)
 - ADR-0015 — [Layer-1 checks fire only on quotable, context-anchored evidence](ADR-0015-checks-fire-only-on-quotable-context-anchored-evidence.md)
 - ADR-0017 — [Buyer probes: frame breaks are zero-tolerance, scripted values are sanctioned, the human leg runs blind](ADR-0017-buyer-probes-frame-breaks-and-the-blind-human-leg.md)
+- ADR-0020 — [Phases 6-10 scaffolded machine-first: every gate is code before any run is paid for](ADR-0020-phase6-10-scaffolding-machine-side-complete.md)
 
 ### `harness`
 
@@ -97,6 +101,7 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 - ADR-0015 — [Layer-1 checks fire only on quotable, context-anchored evidence](ADR-0015-checks-fire-only-on-quotable-context-anchored-evidence.md)
 - ADR-0017 — [Buyer probes: frame breaks are zero-tolerance, scripted values are sanctioned, the human leg runs blind](ADR-0017-buyer-probes-frame-breaks-and-the-blind-human-leg.md)
 - ADR-0019 — [Judge scaffolding: offline-first, quote-then-verdict enforced structurally, polarity normalised once](ADR-0019-judge-scaffold-offline-first-quote-then-verdict-structural.md)
+- ADR-0020 — [Phases 6-10 scaffolded machine-first: every gate is code before any run is paid for](ADR-0020-phase6-10-scaffolding-machine-side-complete.md)
 
 ### `provider`
 
@@ -117,6 +122,10 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 - ADR-0009 — [Pin floating model aliases to dated snapshots](ADR-0009-pin-dated-model-snapshots.md)
 - ADR-0014 — [Personas are public; scenarios are persona-bound instance files split at authoring time](ADR-0014-personas-are-public-scenarios-are-persona-bound-instance-files.md)
 - ADR-0016 — [OpenRouter routing is not behaviour-neutral: pin the host, use the chat surface](ADR-0016-openrouter-routing-is-not-behaviour-neutral.md)
+
+### `scoring`
+
+- ADR-0020 — [Phases 6-10 scaffolded machine-first: every gate is code before any run is paid for](ADR-0020-phase6-10-scaffolding-machine-side-complete.md)
 
 ### `stack`
 

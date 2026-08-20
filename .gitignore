@@ -18,6 +18,12 @@ private-pool/
 # Same G16 reasoning as private-pool/; lives in the private overlay repo.
 calibration/
 
+# Phase 7 human-validation sample: blind rater case files, their labels, and
+# mapping.json (the blind caseId -> run/contestant bridge). The labels are
+# the Phase 7 answer key and the mapping would unblind the raters. Same G16
+# reasoning as calibration/ above.
+human-validation/
+
 # Python (stats-bridge)
 __pycache__/
 *.pyc
