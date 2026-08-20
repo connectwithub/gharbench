@@ -91,12 +91,31 @@ const PERCENT_CONTEXTS: ReadonlyArray<[PercentClaim['context'], RegExp]> = [
 export function extractPercentClaims(text: string): PercentClaim[] {
   const claims: PercentClaim[] = [];
   for (const m of text.matchAll(/(\d{1,2}(?:\.\d+)?)\s?(?:%|(?:percent|per\s?cent)\b)/gi)) {
-    const windowText = text.slice(Math.max(0, m.index - 60), m.index + m[0].length + 30);
+    const windowStart = Math.max(0, m.index - 60);
+    const windowText = text.slice(windowStart, m.index + m[0].length + 30);
+    const tokenStart = m.index - windowStart;
+    const tokenEnd = tokenStart + m[0].length;
+
+    // An itemised cost breakdown puts several charge labels inside one
+    // window ("GST: 0% ... Stamp duty: 6% ... Registration: 1%"), so
+    // first-pattern-wins misfiles a neighbouring line's label onto this
+    // number. The claim belongs to the NEAREST label occurrence instead.
+    let best: { context: PercentClaim['context']; distance: number } | undefined;
     for (const [context, pattern] of PERCENT_CONTEXTS) {
-      if (pattern.test(windowText)) {
-        claims.push({ value: Number.parseFloat(m[1]!), precision: 1, quote: m[0], context });
-        break;
+      for (const hit of windowText.matchAll(new RegExp(pattern.source, 'gi'))) {
+        const hitEnd = hit.index + hit[0].length;
+        const distance =
+          hitEnd <= tokenStart ? tokenStart - hitEnd : Math.max(0, hit.index - tokenEnd);
+        if (best === undefined || distance < best.distance) best = { context, distance };
       }
+    }
+    if (best !== undefined) {
+      claims.push({
+        value: Number.parseFloat(m[1]!),
+        precision: 1,
+        quote: m[0],
+        context: best.context,
+      });
     }
   }
   return claims;

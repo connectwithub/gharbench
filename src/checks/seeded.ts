@@ -197,6 +197,14 @@ export function buildSeededCases(): SeededCase[] {
     b('4bhk?'),
     a('The Tower D 4BHKs are around 1.6 cr; the duplex penthouse is Rs 2,33,48,000.'),
   ]);
+  // Regression: live run 20260820T072415Z-sweep false-fired here - the wide
+  // context window filed "6%" and "1%" under the previous line's "GST" label.
+  add('itemised charge breakdown with adjacent labels', 'L1.1', false, [
+    b('total cost breakdown do please'),
+    a(
+      "Here's the breakdown for ready units (Tower A with OC):\n\nUnit price: 76.14L (example)\n\nOn top of that:\n- GST: 0% (ready with OC, no GST)\n- Stamp duty: 6% (on unit price)\n- Registration: 1% (capped at 30k)\n- Floor rise: 25 per sqft above floor 5",
+    ),
+  ]);
 
   // ---- L1.2 spec grounding ------------------------------------------------
   add('fabricated area', 'L1.2', true, [
