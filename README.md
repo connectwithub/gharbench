@@ -290,24 +290,30 @@ gets validated before it measures anything. Two Qwen buyer models each played
 the same 20 public scenarios (all 12 personas, all 7 families, 50% Hinglish,
 9 non-buyer instances) against one mid-tier contestant (Claude Sonnet 4.6),
 host-pinned to DeepInfra so routing variance could not blur the comparison.
-Four deterministic probes score the _buyer_, not the agent
+Five deterministic probes score the _buyer_, not the agent
 (`pnpm probes --run=<runId>`):
 
-| Probe (gate)                                                          | Qwen3-235B-A22B-2507  | Qwen3-32B         |
-| --------------------------------------------------------------------- | --------------------- | ----------------- |
-| Volunteered hidden-value leakage (≤5% of turns)                       | **1.1%** (1/90) - MET | 3.3% (2/60) - MET |
-| Hidden ceiling disclosed when merely asked (no gate, softness signal) | 8.9% of turns         | 13.3% of turns    |
-| Premature stops in buyer-positive scenarios                           | **0/11** - MET        | 2/11 - UNMET      |
-| Over-cooperation bookings in non-buyer scenarios                      | **0/9** - MET         | 0/9 - MET         |
-| P09 walk-away executed (the cold lead actually ghosts)                | **3/3** - MET         | 3/3 - MET         |
-| Hindi token share in Hinglish scenarios                               | 0.42                  | 0.30              |
+| Probe (gate)                                                          | Qwen3-235B-A22B-2507  | Qwen3-32B                   |
+| --------------------------------------------------------------------- | --------------------- | --------------------------- |
+| Volunteered hidden-value leakage (≤5% of turns)                       | **1.1%** (1/90) - MET | 1.7% (1/60) - MET           |
+| Hidden ceiling disclosed when merely asked (no gate, softness signal) | 8.9% of turns         | 5.0% of turns               |
+| Premature stops in buyer-positive scenarios                           | **0/11** - MET        | 2/11 - UNMET                |
+| Over-cooperation bookings in non-buyer scenarios                      | **0/9** - MET         | 0/9 - MET                   |
+| P09 walk-away executed (the cold lead actually ghosts)                | **3/3** - MET         | 3/3 - MET                   |
+| Frame breaks: echoed private prompt scaffolding (zero tolerated)      | **0** - MET           | 16 turns in 8 convs - UNMET |
+| Hindi token share in Hinglish scenarios                               | 0.42                  | 0.39                        |
 
 **Decision (per the pre-registered rule):** Qwen3-235B stays the primary
-simulator - it passes every machine gate. Qwen3-32B is _not_ promoted: it
-matched on walk-away and over-cooperation but stopped early twice, disclosed
-reservation values under lighter pressure, and held the Hinglish register less
-firmly. It remains the sensitivity-analysis slice. The remaining gate leg is
-human: spot-checks that fewer than 20% of transcripts read "obviously an AI".
+simulator - it passes every machine gate. Qwen3-32B is _not_ promoted, and the
+decisive failure was caught by **human review of the transcripts, not by the
+machine probes**: in 8 of its 20 conversations the 32B buyer pasted its own
+private `<simulation-reminder>` block ("he is not buying; there is no
+budget...") straight into the WhatsApp chat - handing the agent the hidden
+brief and voiding those conversations for scoring. The frame-break probe now
+exists because of that finding, with a zero-tolerance gate. 32B also stopped
+early twice. It remains the sensitivity-analysis slice. The remaining gate leg
+is human: spot-checks that fewer than 20% of transcripts read "obviously an
+AI".
 
 Runs: `20260820T140309Z-sweep` (235B) and `20260820T130934Z-sweep` (32B),
 $2.27 all-in for the pair. A leak here means the buyer _stated a hidden
