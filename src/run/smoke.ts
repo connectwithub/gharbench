@@ -44,6 +44,7 @@ import { TranscriptWriter } from '../logging/transcript.js';
 import { passPowerKCurve, type TaskOutcome } from '../metrics/passk.js';
 import { FakeBuyer, mockBuyerScript } from '../simulator/fakeBuyer.js';
 import { buildBuyerSystemPrompt, type PersonaCard } from '../simulator/buyer.js';
+import { loadPersonaCard } from '../simulator/persona.js';
 import { buildAgentSystemPrompt } from '../contestants/providerModel.js';
 import { sha256 } from '../env/db.js';
 import { CostMeter } from '../telemetry/cost.js';
@@ -79,7 +80,7 @@ export interface Fixtures {
 export function loadFixtures(dataDir: string = DATA_DIR): Fixtures {
   const goldPath = join(dataDir, 'project.json');
   const gold = loadGoldDb(goldPath);
-  const persona = JSON.parse(readFileSync(join(dataDir, 'persona.json'), 'utf8')) as PersonaCard;
+  const persona = loadPersonaCard(join(dataDir, 'persona.json'));
   const scenario = scenarioSchema.parse(
     JSON.parse(readFileSync(join(dataDir, 'scenario.json'), 'utf8')),
   ) as ScenarioConfig;

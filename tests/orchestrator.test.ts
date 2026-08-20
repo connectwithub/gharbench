@@ -304,7 +304,8 @@ describe('information asymmetry', () => {
     for (const forbidden of [
       'budgetCeilingInr',
       'walkAwayTriggers',
-      'preApprovedAmountInr',
+      'ghostingProbability',
+      'consistencyAnchors',
       'trap_phantom_1bhk',
     ]) {
       expect(serialised).not.toContain(forbidden);

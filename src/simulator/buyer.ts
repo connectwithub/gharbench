@@ -35,16 +35,10 @@ export interface Buyer {
   respond(input: BuyerTurnInput): Promise<BuyerTurnOutput>;
 }
 
-export interface PersonaCard {
-  personaId: string;
-  version: string;
-  displayName: string;
-  note?: string;
-  language?: Record<string, unknown>;
-  public: Record<string, unknown>;
-  /** NEVER serialise this into a contestant prompt. */
-  hidden: Record<string, unknown>;
-}
+// The card shape lives in persona.ts (Zod-validated, Master Plan 3.6).
+// Re-exported here so existing imports keep working.
+export type { PersonaCard } from './persona.js';
+import type { PersonaCard } from './persona.js';
 
 /**
  * Fixed guardrail preamble. Stable across every scenario, so it sits at the
@@ -80,9 +74,9 @@ export function buildBuyerSystemPrompt(persona: PersonaCard, scenario: ScenarioC
     personaId: persona.personaId,
     personaVersion: persona.version,
     displayName: persona.displayName,
-    language: persona.language ?? {},
     public: persona.public,
     hidden: persona.hidden,
+    consistencyAnchors: persona.consistencyAnchors,
     situation: {
       channel: scenario.channel,
       project: 'Kalpana Heights',
