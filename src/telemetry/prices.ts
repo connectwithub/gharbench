@@ -109,6 +109,25 @@ export const PRICES: Readonly<Record<string, ModelPrice>> = {
     confidence: 'verified',
   },
 
+  // --- Phase 4 contestants (OpenAI GPT-5.6 tier names per Master Plan §7.2,
+  // researched 2026-07-30). Marked unverified until the freeze re-check; the
+  // ids exist on the account (models API, 2026-08-20) but publish no dated
+  // snapshot yet, so runs record them as unpinned.
+  'gpt-5.6-terra': {
+    inputPerMTok: 2.5,
+    outputPerMTok: 15,
+    source: 'Master Plan §7.2 pricing snapshot 2026-07-30 - verify at freeze',
+    lastVerified: 'never',
+    confidence: 'unverified',
+  },
+  'gpt-5.6-luna': {
+    inputPerMTok: 1,
+    outputPerMTok: 6,
+    source: 'Master Plan §7.2 pricing snapshot 2026-07-30 - verify at freeze',
+    lastVerified: 'never',
+    confidence: 'unverified',
+  },
+
   // --- Placeholders: shape only, DO NOT publish a cost using these ---------
   'gpt-4.1-mini': {
     inputPerMTok: 0.4,

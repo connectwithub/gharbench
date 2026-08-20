@@ -28,6 +28,7 @@
     "gate:phase1": "tsx src/run/gatePhase1.ts",
     "checks": "tsx src/run/checksRun.ts",
     "probes": "tsx src/run/pilotProbes.ts",
+    "calibration:seed": "tsx src/run/calibrationSeed.ts",
     "gate:phase2": "tsx src/run/gatePhase2.ts",
     "sweep": "tsx src/run/sweep.ts",
     "stats:test": "vitest run --config vitest.stats.config.ts",

@@ -11,6 +11,13 @@ runs/
 # Keep it local (or in a separate access-controlled store) forever.
 private-pool/
 
+# Phase 4 calibration set: transcripts + human reference labels the judge
+# panel is validated against (Master Plan §4.5). The labels are an answer
+# key - published, they let a judge prompt (or a contestant) be tuned
+# against the exact cases that certify judge agreement, voiding G8/G8a.
+# Same G16 reasoning as private-pool/; lives in the private overlay repo.
+calibration/
+
 # Python (stats-bridge)
 __pycache__/
 *.pyc
