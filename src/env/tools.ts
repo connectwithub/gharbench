@@ -128,7 +128,13 @@ export const escalateToHumanSchema = z.strictObject({
 });
 
 export const logQualificationSchema = z.strictObject({
-  budgetInr: z.number().int().positive().max(1_000_000_000),
+  budgetInr: z
+    .number()
+    .int()
+    .positive()
+    .max(1_000_000_000)
+    .optional()
+    .describe('Omit when the buyer revealed no budget; never invent one.'),
   timelineMonths: z.number().int().min(0).max(120),
   unitTypeInterest: UNIT_TYPE,
   financing: z.enum(['home_loan', 'self_funded', 'undecided']),
@@ -444,7 +450,7 @@ function logQualification(
 
   const qualification = {
     id: sequentialId('qual', db.qualifications.length),
-    budgetInr: args.budgetInr,
+    ...(args.budgetInr !== undefined ? { budgetInr: args.budgetInr } : {}),
     timelineMonths: args.timelineMonths,
     unitTypeInterest: args.unitTypeInterest,
     financing: args.financing,

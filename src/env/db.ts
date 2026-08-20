@@ -175,7 +175,8 @@ export interface Escalation {
 
 export interface Qualification {
   id: string;
-  budgetInr: number;
+  /** Absent when the buyer never revealed a budget (L1.6: never invented). */
+  budgetInr?: number;
   timelineMonths: number;
   unitTypeInterest: UnitType;
   financing: 'home_loan' | 'self_funded' | 'undecided';
