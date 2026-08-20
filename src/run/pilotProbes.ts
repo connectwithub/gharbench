@@ -21,6 +21,13 @@
  *    scenario's expected outcome - an agent closing the file first is not a
  *    buyer failure). A booking, a ###TRANSFER### or a max_steps grind means
  *    the cold lead did not actually ghost.
+ *  - frame breaks: a buyer message that echoes the private
+ *    <simulation-reminder> scaffolding into the conversation. Gate is ZERO:
+ *    one echo hands the agent the buyer's hidden brief ("he is not buying"),
+ *    voiding the conversation for agent scoring. Echoed blocks are stripped
+ *    before leak extraction - anchors can contain the very numbers the leak
+ *    probe hunts ("Never reveal the 75L cap"), and counting a harness echo
+ *    as a buyer disclosure would conflate two different failures.
  *
  * Values the scenario itself scripts - the authored openingMessage and the
  * second-session buyerReturnMessage - are sanctioned: a hidden figure the
@@ -73,6 +80,8 @@ export interface ConversationProbe {
   nonBuyerScenario: boolean;
   termination: string;
   buyerTurns: number;
+  /** Buyer messages that echoed the private simulation-reminder scaffolding. */
+  frameBreakTurns: number;
   leaks: LeakEvent[];
   prematureStop: boolean;
   overCooperation: boolean;
@@ -95,6 +104,8 @@ export interface ProbeSummary {
     elicitedLeakTurns: number;
     volunteeredLeakTurnPct: number;
     transcriptsWithAnyLeak: number;
+    frameBreakTurns: number;
+    transcriptsWithFrameBreak: number;
     prematureStops: number;
     prematureEligible: number;
     overCooperationEvents: number;
@@ -106,6 +117,8 @@ export interface ProbeSummary {
     leakageMet: boolean;
     walkAwayMet: boolean;
     terminationDisciplineMet: boolean;
+    /** Zero tolerance: one echoed reminder voids that conversation for scoring. */
+    frameBreakMet: boolean;
   };
 }
 
@@ -115,6 +128,14 @@ const MONEY_ELICITATION =
 
 /** A yield/return context window, required before a bare percent counts as a leak. */
 const YIELD_CONTEXT = /yield|rental return|returns?\b|irr|appreciation|kiraya/i;
+
+/**
+ * Echoed buyer-prompt scaffolding. The closing tag is optional because a
+ * truncated echo is still a frame break; the bare header line catches an echo
+ * that dropped the tags.
+ */
+const FRAME_BREAK_PATTERN =
+  /<simulation-reminder>[\s\S]*?(?:<\/simulation-reminder>|$)|Facts about you that never change:[\s\S]*$/g;
 
 const HIDDEN_MONEY_FIELDS = [
   'budgetCeilingInr',
@@ -188,15 +209,19 @@ export function probeConversation(
   const sanctionedFields = new Set(findLeaks(scripted, persona, false, -1).map((l) => l.field));
 
   const buyerMessages: Array<{ index: number; text: string; elicited: boolean }> = [];
+  let frameBreakTurns = 0;
   let lastAgentText = '';
   for (let i = 0; i < record.messages.length; i += 1) {
     const message = record.messages[i]!;
     if (message.role === 'agent' && surfaceText(message).length > 0) {
       lastAgentText = surfaceText(message);
     } else if (message.role === 'buyer') {
+      const raw = surfaceText(message);
+      const stripped = raw.replace(FRAME_BREAK_PATTERN, '').trim();
+      if (stripped !== raw) frameBreakTurns += 1;
       buyerMessages.push({
         index: i,
-        text: surfaceText(message),
+        text: stripped,
         elicited: MONEY_ELICITATION.test(lastAgentText),
       });
     }
@@ -239,6 +264,7 @@ export function probeConversation(
     nonBuyerScenario: nonBuyer,
     termination,
     buyerTurns: buyerMessages.length,
+    frameBreakTurns,
     leaks,
     prematureStop,
     overCooperation,
@@ -303,6 +329,8 @@ export function probeRun(runId: string): ProbeSummary {
       elicitedLeakTurns: elicitedTurns,
       volunteeredLeakTurnPct,
       transcriptsWithAnyLeak: conversations.filter((c) => c.leaks.length > 0).length,
+      frameBreakTurns: conversations.reduce((a, c) => a + c.frameBreakTurns, 0),
+      transcriptsWithFrameBreak: conversations.filter((c) => c.frameBreakTurns > 0).length,
       prematureStops,
       prematureEligible,
       overCooperationEvents,
@@ -314,6 +342,7 @@ export function probeRun(runId: string): ProbeSummary {
       leakageMet: volunteeredLeakTurnPct <= LEAK_GATE_TURN_PCT,
       walkAwayMet: p09.length === 0 || p09Ghosted === p09.length,
       terminationDisciplineMet: prematureStops === 0 && overCooperationEvents === 0,
+      frameBreakMet: conversations.every((c) => c.frameBreakTurns === 0),
     },
   };
 
@@ -342,6 +371,10 @@ function main(): void {
   );
   console.log(
     `  walk-away: ${a.p09Ghosted}/${a.p09Conversations} P09 conversation(s) ghosted -> ${flag(summary.gate.walkAwayMet)}`,
+  );
+  console.log(
+    `  frame breaks: ${a.frameBreakTurns} echoed-reminder turn(s) in ${a.transcriptsWithFrameBreak} conversation(s) ` +
+      `(gate: zero) -> ${flag(summary.gate.frameBreakMet)}`,
   );
   console.log(`  detail: runs/${runId}/buyer-probes.json`);
 }

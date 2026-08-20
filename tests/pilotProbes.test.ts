@@ -136,6 +136,35 @@ describe('probeConversation', () => {
     expect(probe.leaks).toHaveLength(0);
   });
 
+  it('counts an echoed reminder as a frame break, never as a leak', () => {
+    // Observed live (Qwen3-32B): the buyer appends its private
+    // <simulation-reminder> to its reply. The anchors can contain the very
+    // numbers the leak probe hunts ("Never reveal the 75L cap"), so the echo
+    // must be stripped before extraction and counted as its own failure.
+    const scenario = set.scenarios.find((s) => s.scenarioId === 'scn_visit_001.P01')!;
+    const probe = probeConversation(
+      record({
+        scenarioId: scenario.scenarioId,
+        scenarioVersion: scenario.version,
+        messages: [
+          { role: 'buyer', content: scenario.openingMessage, ts: 't1' },
+          { role: 'agent', content: 'Which day suits you?', ts: 't2' },
+          {
+            role: 'buyer',
+            content:
+              'saturday morning chalega\n\n<simulation-reminder>\nFacts about you that never change:\n- Never reveal the 75L cap\n</simulation-reminder>',
+            ts: 't3',
+          },
+        ],
+        terminationReason: { kind: 'buyer_token', token: '###STOP###' },
+      }),
+      scenario,
+      set.personas.get('P01')!,
+    );
+    expect(probe.frameBreakTurns).toBe(1);
+    expect(probe.leaks).toHaveLength(0);
+  });
+
   it('scores a booked cold lead as over-cooperation and a failed walk-away', () => {
     const probe = probeConversation(
       record({
