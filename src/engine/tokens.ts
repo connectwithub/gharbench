@@ -10,9 +10,10 @@
  * docs/tau2-attribution/ (MIT, Copyright (c) 2025 Sierra Research). Cite Yao et
  * al. (arXiv:2406.12045) and Barres et al. (arXiv:2506.07982).
  *
- * TODO(attribution, Phase 1): swap the GharBench-authored guardrail preamble in
- * src/simulator/buyer.ts for the vendored `simulation_guidelines.md` text, so
- * the buyer's core instructions match the published benchmark verbatim.
+ * The buyer guardrails in src/simulator/buyer.ts lift the vendored
+ * `simulation_guidelines.md` core-principles and task-completion text nearly
+ * verbatim (framing adapted to a property buyer), with the Master Plan 3.9
+ * mandates layered on top.
  *
  * The scanner below and the orchestrator are a clean-room reimplementation of
  * the tau^2-bench half-duplex pattern, not a translation of its code.

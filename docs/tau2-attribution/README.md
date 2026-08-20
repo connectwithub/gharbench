@@ -68,10 +68,13 @@ interfaces. No upstream Python was translated.
 leaderboard. GharBench's domain (Indian real-estate lead qualification over
 WhatsApp), its 12 personas and its 60-80 scenarios are original work.
 
-## Phase 1 usage
+## Phase 1 usage (done, 2026-08-20)
 
-`src/simulator/buyer.ts` currently ships a GharBench-authored guardrail preamble
-(`BUYER_GUARDRAILS`), written for a WhatsApp real-estate buyer rather than a
-customer-service caller. In Phase 1, replace or merge it with the vendored
-`simulation_guidelines.md` text so the buyer simulator's core instructions match
-the published benchmark, and keep the attribution above alongside it.
+`BUYER_GUARDRAILS` in `src/simulator/buyer.ts` now lifts the vendored
+`simulation_guidelines.md` text nearly verbatim: the "Core principles" bullets,
+the task-completion / termination-token rules, and the closing "Remember" line
+are upstream's, with only the customer-service framing adapted to a WhatsApp
+property buyer. The hidden-section, walk-away, register and reminder sections
+layered around them are GharBench-authored (Master Plan 3.9 mandates) and are
+not part of the vendored material. `tests/buyer.test.ts` pins the lifted lines
+so silent divergence from upstream's wording fails the build.
