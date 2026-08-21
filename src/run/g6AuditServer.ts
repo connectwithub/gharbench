@@ -126,11 +126,33 @@ interface ServedConversation {
   personaId: string;
   family: string;
   language: string;
+  difficulty: string;
+  maxSteps: number;
   terminationReason: unknown;
+  /** Who ended the conversation - the single fact both false pilot criticals misread. */
+  terminationSource: 'buyer' | 'agent' | 'harness' | 'error';
+  groundTruth: { expectedOutcome: string; expectedLeadScore?: string; mustHold: string[] };
   openingMessage: string;
   activeTrapIds: string[];
+  armedTraps: { id: string; type: string; triggerTurn: number; script: string; correctAgentResponse: string }[];
+  walkAwayTriggers: string[];
+  budgetCeilingInr: number | null;
   buyerSystemPrompt: string;
-  messages: { role: string; content: string; toolName?: string }[];
+  /** `t` matches the judge transcript numbering ([tN | role] over non-empty surface messages). */
+  messages: { role: string; content: string; toolName?: string; t?: number }[];
+}
+
+function terminationSource(reason: ConversationRecord['terminationReason']): ServedConversation['terminationSource'] {
+  switch (reason.kind) {
+    case 'buyer_token':
+      return 'buyer';
+    case 'flow_ending_tool':
+      return 'agent';
+    case 'max_steps':
+      return 'harness';
+    default:
+      return 'error';
+  }
 }
 
 function serveConversation(record: ConversationRecord): ServedConversation {
@@ -140,26 +162,52 @@ function serveConversation(record: ConversationRecord): ServedConversation {
   const persona = set.personas.get(scenario.personaId);
   if (!persona) throw new Error(`persona ${scenario.personaId} not found`);
   // Tool-role surfaces are empty in the transcript; the call names live in
-  // toolEvents in emission order, so pair them up positionally.
+  // toolEvents in emission order, so pair them up positionally. Judge turn
+  // numbers count only non-empty non-tool messages, mirroring
+  // projectMessages() + renderTranscript() so a note's "t4" and a judge's
+  // evidence "t4" point at the same message.
   const callNames = record.toolEvents.filter((e) => e.type === 'call').map((e) => e.toolName);
   let toolIdx = 0;
+  let judgeTurn = 0;
   const messages = record.messages.map((m) => {
     if (m.role === 'tool') {
       const toolName = callNames[toolIdx] ?? 'tool';
       toolIdx += 1;
       return { role: m.role, content: '', toolName };
     }
-    return { role: m.role, content: m.content };
+    if (m.content.trim().length === 0) return { role: m.role, content: m.content };
+    judgeTurn += 1;
+    return { role: m.role, content: m.content, t: judgeTurn };
   });
+  const armed = new Set(scenario.activeTrapIds);
   return {
     conversationId: record.conversationId,
     scenarioId: record.scenarioId,
     personaId: scenario.personaId,
     family: scenario.family,
     language: scenario.language,
+    difficulty: scenario.difficulty,
+    maxSteps: scenario.maxSteps,
     terminationReason: record.terminationReason,
+    terminationSource: terminationSource(record.terminationReason),
+    groundTruth: {
+      expectedOutcome: scenario.groundTruth.expectedOutcome,
+      ...(scenario.groundTruth.expectedLeadScore ? { expectedLeadScore: scenario.groundTruth.expectedLeadScore } : {}),
+      mustHold: [...scenario.groundTruth.mustHold],
+    },
     openingMessage: scenario.openingMessage,
     activeTrapIds: scenario.activeTrapIds,
+    armedTraps: persona.hidden.traps
+      .filter((t) => armed.has(t.id))
+      .map((t) => ({
+        id: t.id,
+        type: t.type,
+        triggerTurn: t.triggerTurn,
+        script: t.script,
+        correctAgentResponse: t.correctAgentResponse,
+      })),
+    walkAwayTriggers: [...persona.hidden.behavioralControls.walkAwayTriggers],
+    budgetCeilingInr: persona.hidden.economics.budgetCeilingInr ?? null,
     buyerSystemPrompt: buildBuyerSystemPrompt(persona, scenario),
     messages,
   };
@@ -194,6 +242,7 @@ export function startG6Server(runId: string): void {
           conversationId: r.conversationId,
           scenarioId: r.scenarioId,
           turns: r.messages.filter((m) => m.role === 'buyer').length,
+          endedBy: terminationSource(r.terminationReason),
           mark: audit.entries[r.conversationId] ?? null,
         }))
         .sort((a, b) => (a.scenarioId < b.scenarioId ? -1 : a.scenarioId > b.scenarioId ? 1 : 0));

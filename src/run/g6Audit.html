@@ -24,8 +24,17 @@
   .dot { width: 10px; height: 10px; border-radius: 50%; align-self: center; flex-shrink: 0; background: #37444d; }
   .dot.clean { background: var(--ok); } .dot.minor { background: var(--warn); } .dot.critical { background: var(--bad); }
   #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-  #head { padding: 10px 20px; background: var(--panel2); font-size: 13px; display: flex; gap: 16px; flex-wrap: wrap; align-items: baseline; }
+  #head { padding: 10px 20px; background: var(--panel2); font-size: 13px; }
   #head .k { color: var(--muted); }
+  #headTop { display: flex; gap: 16px; flex-wrap: wrap; align-items: baseline; }
+  #headOutcome { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+  .chip { padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; background: #0f171c; border: 1px solid #37444d; }
+  .chip.expected { border-color: var(--accent); color: var(--accent); }
+  .chip.endedBuyer { border-color: var(--ok); color: var(--ok); }
+  .chip.endedAgent { border-color: #53a6ef; color: #53a6ef; }
+  .chip.endedHarness { border-color: var(--warn); color: var(--warn); }
+  .chip.endedError { border-color: var(--bad); color: var(--bad); }
+  #headHint { font-size: 11px; color: var(--muted); }
   #cols { flex: 1; display: flex; overflow: hidden; }
   #chat { flex: 1.2; overflow-y: auto; padding: 18px 22px; }
   .bubble { max-width: 72%; margin: 4px 0; padding: 7px 11px; border-radius: 8px; white-space: pre-wrap; word-wrap: break-word; }
@@ -33,7 +42,14 @@
   .agent { background: var(--agent); margin-right: auto; border-top-left-radius: 2px; }
   .roleTag { font-size: 10px; color: var(--muted); margin: 8px 0 0; }
   .roleTag.right { text-align: right; }
+  .roleTag b { color: var(--accent); font-weight: 600; }
   .toolLine { text-align: center; color: var(--muted); font-size: 11px; margin: 6px 0; font-style: italic; }
+  .sysLine { text-align: center; color: var(--warn); font-size: 11px; margin: 8px 0; }
+  .refList { font-size: 12px; margin: 4px 0 8px; padding-left: 18px; }
+  .refList li { margin-bottom: 3px; }
+  .refKey { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; margin: 10px 0 2px; }
+  .trapCard { background: #0f171c; border: 1px solid #37444d; border-radius: 6px; padding: 8px 10px; font-size: 12px; margin: 4px 0; }
+  .trapCard .k { color: var(--muted); }
   .scripted { outline: 1px dashed var(--warn); }
   .scriptedNote { font-size: 10px; color: var(--warn); text-align: right; margin: 0; }
   #right { flex: 1; min-width: 380px; max-width: 520px; border-left: 1px solid #222d34; overflow-y: auto; padding: 14px 18px; background: var(--panel); }
@@ -64,7 +80,11 @@
     <div id="cols">
       <div id="chat"></div>
       <div id="right">
-        <details open id="rubricBox">
+        <details open id="refBox">
+          <summary>Scenario reference (what SHOULD happen)</summary>
+          <div id="refContent"></div>
+        </details>
+        <details id="rubricBox">
           <summary>What to check (the rubric)</summary>
           <ul class="checklist">
             <li><b>Judge the BUYER only, against its card.</b> Agent mistakes are not deviations. The question is: did the simulator follow its instructions and stay humanly plausible?</li>
@@ -96,7 +116,7 @@
         </fieldset>
         <fieldset>
           <legend>note (quote the offending turn for anything non-clean)</legend>
-          <textarea id="note"></textarea>
+          <textarea id="note" placeholder='reference turns by number, e.g. "t4: invented a phone number"'></textarea>
         </fieldset>
         <button id="save" disabled>Save &amp; next</button><span id="saveMsg"></span>
       </div>
@@ -128,20 +148,50 @@ async function refreshList(selectId) {
   for (const item of r.list) {
     const div = document.createElement('div');
     div.className = 'convItem' + (item.conversationId === selectId ? ' active' : '');
-    div.innerHTML = `<span><span class="sid">${esc(item.scenarioId)}</span><br/><span class="turns">${item.turns} buyer turns${item.mark ? ' · ' + item.mark.verdict : ''}</span></span><span class="dot ${item.mark ? item.mark.verdict : ''}"></span>`;
+    div.innerHTML = `<span><span class="sid">${esc(item.scenarioId)}</span><br/><span class="turns">${item.turns} buyer turns · ended: ${esc(item.endedBy)}${item.mark ? ' · ' + item.mark.verdict : ''}</span></span><span class="dot ${item.mark ? item.mark.verdict : ''}"></span>`;
     div.onclick = () => load(item.conversationId);
     list.appendChild(div);
+  }
+}
+
+function inr(v) {
+  if (v == null) return null;
+  return v >= 1e7 ? '₹' + (v / 1e7).toFixed(2).replace(/\.?0+$/, '') + ' cr'
+                  : '₹' + (v / 1e5).toFixed(1).replace(/\.0$/, '') + ' lakh';
+}
+
+const ENDED = {
+  buyer: { cls: 'endedBuyer', label: 'ended by BUYER (token)' },
+  agent: { cls: 'endedAgent', label: 'ended by AGENT (flow-ending tool)' },
+  harness: { cls: 'endedHarness', label: 'ended by HARNESS (max steps)' },
+  error: { cls: 'endedError', label: 'ended by ERROR' },
+};
+
+function renderReference(c) {
+  const box = document.getElementById('refContent');
+  box.innerHTML = '';
+  const add = (html) => { const d = document.createElement('div'); d.innerHTML = html; box.appendChild(d); };
+  add(`<p class="refKey">must hold (agent-side ground truth)</p><ul class="refList">${c.groundTruth.mustHold.map((m) => `<li>${esc(m)}</li>`).join('')}</ul>`);
+  if (c.budgetCeilingInr != null) add(`<p class="refKey">buyer's hidden budget ceiling</p><p style="font-size:13px;margin:2px 0 8px">${esc(inr(c.budgetCeilingInr))} (never volunteered; moves only if the card says so)</p>`);
+  if (c.walkAwayTriggers.length) add(`<p class="refKey">walk-away triggers (buyer must disengage when one fires)</p><ul class="refList">${c.walkAwayTriggers.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>`);
+  for (const t of c.armedTraps) {
+    add(`<div class="trapCard"><b>${esc(t.id)}</b> <span class="k">(${esc(t.type)}, sprung on or after buyer turn ${t.triggerTurn})</span><br/><span class="k">buyer script:</span> ${esc(t.script)}<br/><span class="k">correct agent response:</span> ${esc(t.correctAgentResponse)}</div>`);
   }
 }
 
 async function load(id) {
   const c = await (await fetch('/api/conversation/' + encodeURIComponent(id))).json();
   current = c;
+  const ended = ENDED[c.terminationSource] ?? ENDED.error;
   document.getElementById('head').innerHTML =
-    `<b>${esc(c.scenarioId)}</b><span class="k">persona</span>${esc(c.personaId)}<span class="k">family</span>${esc(c.family)}<span class="k">lang</span>${esc(c.language)}` +
-    (c.activeTrapIds.length ? `<span class="k">traps</span>${esc(c.activeTrapIds.join(', '))}` : '');
+    `<div id="headTop"><b>${esc(c.scenarioId)}</b><span class="k">persona</span>${esc(c.personaId)}<span class="k">family</span>${esc(c.family)}<span class="k">difficulty</span>${esc(c.difficulty)}<span class="k">lang</span>${esc(c.language)}<span class="k">max steps</span>${c.maxSteps}` +
+    (c.activeTrapIds.length ? `<span class="k">traps armed</span>${esc(c.activeTrapIds.join(', '))}` : '') +
+    `</div><div id="headOutcome">` +
+    `<span class="chip expected">expected: ${esc(c.groundTruth.expectedOutcome)}${c.groundTruth.expectedLeadScore ? ' (' + esc(c.groundTruth.expectedLeadScore) + ')' : ''}</span>` +
+    `<span class="chip ${ended.cls}">${esc(ended.label)}</span>` +
+    `<span id="headHint">only a BUYER ending can be a premature stop; agent and harness endings are never buyer deviations</span></div>`;
+  renderReference(c);
   document.getElementById('prompt').textContent = c.buyerSystemPrompt;
-  document.getElementById('promptBox').open = true;
   const chat = document.getElementById('chat');
   chat.innerHTML = '';
   let firstBuyer = true;
@@ -153,10 +203,18 @@ async function load(id) {
       chat.appendChild(t);
       continue;
     }
+    if (m.role === 'system') {
+      const s = document.createElement('div');
+      s.className = 'sysLine';
+      s.textContent = (m.t ? 't' + m.t + ' · ' : '') + 'system: ' + m.content;
+      chat.appendChild(s);
+      continue;
+    }
+    if (!m.content.trim()) continue;
     const isBuyer = m.role === 'buyer';
     const tag = document.createElement('div');
     tag.className = 'roleTag' + (isBuyer ? ' right' : '');
-    tag.textContent = isBuyer ? 'buyer (audit this)' : 'agent';
+    tag.innerHTML = `<b>t${m.t}</b> · ` + (isBuyer ? 'buyer (audit this)' : 'agent');
     chat.appendChild(tag);
     const b = document.createElement('div');
     b.className = 'bubble ' + (isBuyer ? 'buyer' : 'agent');
@@ -173,7 +231,7 @@ async function load(id) {
   }
   const term = document.createElement('div');
   term.className = 'term';
-  term.textContent = 'terminated: ' + JSON.stringify(c.terminationReason);
+  term.textContent = ended.label + ' — raw: ' + JSON.stringify(c.terminationReason) + ' | scenario expected: ' + c.groundTruth.expectedOutcome;
   chat.appendChild(term);
   chat.scrollTop = 0;
 

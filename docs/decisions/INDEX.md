@@ -3,10 +3,11 @@
 Generated from `decisions.jsonl` — do not edit by hand.
 Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 
-19 decisions.
+20 decisions.
 
 ## By date
 
+- **ADR-0021** (2026-08-21) — [Buyer guardrails hardened with an anti-repetition mandate after the G6 pilot audit](ADR-0021-anti-repetition-guardrail-after-g6-audit.md)
 - **ADR-0014** (2026-08-20) — [Personas are public; scenarios are persona-bound instance files split at authoring time](ADR-0014-personas-are-public-scenarios-are-persona-bound-instance-files.md)
 - **ADR-0015** (2026-08-20) — [Layer-1 checks fire only on quotable, context-anchored evidence](ADR-0015-checks-fire-only-on-quotable-context-anchored-evidence.md)
 - **ADR-0016** (2026-08-20) — [OpenRouter routing is not behaviour-neutral: pin the host, use the chat surface](ADR-0016-openrouter-routing-is-not-behaviour-neutral.md)
@@ -40,6 +41,10 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 - ADR-0015 — [Layer-1 checks fire only on quotable, context-anchored evidence](ADR-0015-checks-fire-only-on-quotable-context-anchored-evidence.md)
 - ADR-0019 — [Judge scaffolding: offline-first, quote-then-verdict enforced structurally, polarity normalised once](ADR-0019-judge-scaffold-offline-first-quote-then-verdict-structural.md)
 - ADR-0020 — [Phases 6-10 scaffolded machine-first: every gate is code before any run is paid for](ADR-0020-phase6-10-scaffolding-machine-side-complete.md)
+
+### `buyer`
+
+- ADR-0021 — [Buyer guardrails hardened with an anti-repetition mandate after the G6 pilot audit](ADR-0021-anti-repetition-guardrail-after-g6-audit.md)
 
 ### `buyer-simulator`
 
@@ -81,6 +86,7 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 - ADR-0015 — [Layer-1 checks fire only on quotable, context-anchored evidence](ADR-0015-checks-fire-only-on-quotable-context-anchored-evidence.md)
 - ADR-0017 — [Buyer probes: frame breaks are zero-tolerance, scripted values are sanctioned, the human leg runs blind](ADR-0017-buyer-probes-frame-breaks-and-the-blind-human-leg.md)
 - ADR-0020 — [Phases 6-10 scaffolded machine-first: every gate is code before any run is paid for](ADR-0020-phase6-10-scaffolding-machine-side-complete.md)
+- ADR-0021 — [Buyer guardrails hardened with an anti-repetition mandate after the G6 pilot audit](ADR-0021-anti-repetition-guardrail-after-g6-audit.md)
 
 ### `harness`
 
@@ -102,6 +108,10 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 - ADR-0017 — [Buyer probes: frame breaks are zero-tolerance, scripted values are sanctioned, the human leg runs blind](ADR-0017-buyer-probes-frame-breaks-and-the-blind-human-leg.md)
 - ADR-0019 — [Judge scaffolding: offline-first, quote-then-verdict enforced structurally, polarity normalised once](ADR-0019-judge-scaffold-offline-first-quote-then-verdict-structural.md)
 - ADR-0020 — [Phases 6-10 scaffolded machine-first: every gate is code before any run is paid for](ADR-0020-phase6-10-scaffolding-machine-side-complete.md)
+
+### `prompt`
+
+- ADR-0021 — [Buyer guardrails hardened with an anti-repetition mandate after the G6 pilot audit](ADR-0021-anti-repetition-guardrail-after-g6-audit.md)
 
 ### `provider`
 
@@ -126,6 +136,10 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 ### `scoring`
 
 - ADR-0020 — [Phases 6-10 scaffolded machine-first: every gate is code before any run is paid for](ADR-0020-phase6-10-scaffolding-machine-side-complete.md)
+
+### `simulator`
+
+- ADR-0021 — [Buyer guardrails hardened with an anti-repetition mandate after the G6 pilot audit](ADR-0021-anti-repetition-guardrail-after-g6-audit.md)
 
 ### `stack`
 

@@ -38,6 +38,7 @@ describe('BUYER_GUARDRAILS', () => {
     expect(BUYER_GUARDRAILS).toContain('say "not now" and stop');
     expect(BUYER_GUARDRAILS).toContain('never ask another question');
     expect(BUYER_GUARDRAILS).toContain('<simulation-reminder>');
+    expect(BUYER_GUARDRAILS).toContain('Never re-send a message you have already sent');
     for (const token of ['###STOP###', '###TRANSFER###', '###OUT-OF-SCOPE###']) {
       expect(BUYER_GUARDRAILS).toContain(token);
     }
