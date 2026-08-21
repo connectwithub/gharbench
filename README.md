@@ -8,17 +8,20 @@ The agent has six typed tools and a grounding document set. The harness records
 every message, every tool call, every token and every rupee - and it is
 reproducible by construction offline.
 
-> **Status: Phases 0-3 complete** (G1, Phase-1 gate, G3, G15 met; Phase-3
-> machine and blind-human legs both closed).
+> **Status: Phases 0-3 complete** (G1, Phase-1 gate, G3, G15 and the G6
+> pilot audit met; Phase-3 machine and blind-human legs both closed).
 > The engine is wired end to end and provable by a $0 offline run. The
 > benchmark content is in: the grounding corpus (v2, derived and
 > drift-checked), all **12 persona cards**, and **150 scenario instances
 > across 74 base situations** (105 public here; the held-out ~30% lives
-> outside this repo, per the contamination-control design).
+> outside this repo, per the contamination-control design - so
+> `pnpm gate:phase1` run from this repo alone reports the public slice and
+> says `PRIVATE POOL NOT PRESENT`, rather than the full-pool MET verdict).
 > The **L1.1-L1.13 deterministic checks** catch 20/20 seeded violations with
-> zero false fires (`pnpm gate:phase2`), and the **buyer simulator passed its
-> validation pilot** - see
-> [Buyer-simulator pilot](#buyer-simulator-pilot-phase-3). The judge panel is
+> zero false fires (`pnpm gate:phase2`), and the **buyer simulator passed
+> both its validation pilot and its instruction-deviation audit** - see
+> [Buyer-simulator pilot](#buyer-simulator-pilot-phase-3) and the
+> [G6 audit](#post-pilot-instruction-deviation-audit-g6). The judge panel is
 > Phase 5. See [Roadmap](#roadmap).
 >
 > Figures from live provider runs are reported here, not shipped as artefacts -
@@ -41,7 +44,7 @@ tools, logging and telemetry, three times, and fails the build if the three
 transcripts are not byte-identical.
 
 ```sh
-pnpm test        # 115 unit tests
+pnpm test        # 375 unit tests
 pnpm typecheck
 pnpm lint
 ```
@@ -277,10 +280,13 @@ src/
   providers/    model-ref to LanguageModel registry, cache wiring
   telemetry/    cost meter, price table
   logging/      transcript writer, run manifest
-  metrics/      pass^k
-  run/          smoke (offline) and smoke:live
+  checks/       the L1.1-L1.13 deterministic checks
+  judge/        judge panel - prompts, polarity, aggregation (Phase 5)
+  metrics/      pass^k, composite scoring, confidence intervals
+  run/          smoke, sweep, gates, probes, calibration + G6 audit tooling
 stats-bridge/   Python - agreement statistics only, nowhere else
-data/           tiny, obviously-fictional mock project
+data/           corpus v2, 12 personas, public scenarios, judge rubric
+docs/decisions/ ADRs - the reasoning behind every non-obvious call
 ```
 
 ## Buyer-simulator pilot (Phase 3)
@@ -334,12 +340,57 @@ to be behaviour-neutral (one host rejects every buyer-opener conversation), so
 sweeps now pin the upstream host (`@DeepInfra`), talk to gateways over chat
 completions, and retry infra-errored conversations once from a fresh clone.
 
+### Post-pilot instruction-deviation audit (G6)
+
+The blind review above asked _does this read as human?_ A second, open-card
+audit asked the stricter question: **did the buyer follow its instructions?**
+All 20 primary-run transcripts (235B buyer) were manually audited against the
+exact buyer system prompt each conversation ran with, reconstructed and pinned
+by the manifest's buyer-prompt hash. The tool is in this repo -
+`pnpm audit:g6 --run=<runId>` serves every conversation next to that prompt,
+the scenario's expected outcome, armed traps and walk-away triggers, and
+records per-conversation verdicts - so any reviewer can run the identical
+audit on a sweep of their own.
+
+**Result: 16 clean / 4 minor / 0 critical - a 20% deviation rate, inside the
+published ≤22% band (critical ≤6%, met at 0%). G6 is met.** Single rater; the
+marks file is a run artefact, so like the rest it is reported here, not
+shipped. The four minors are disclosed in full:
+
+- **two fabrication slips** - the buyer addressed the agent by the buyer's
+  own name (scn_budget_003.P01), and invented a phone number the scenario
+  never provided (scn_trap_002.P03);
+- **two repetition loops** - one buyer re-sent its previous message twice
+  (scn_hing_005.P03); another re-sent the same message five consecutive turns
+  while repeatedly leaking its client-scouting frame (scn_trap_003.P10).
+
+What changed because of the audit is recorded in
+[ADR-0021](docs/decisions/ADR-0021-anti-repetition-guardrail-after-g6-audit.md):
+
+- one **anti-repetition line** added to the GharBench-authored register
+  section of the buyer guardrails (test-pinned; the tau2-lifted sections stay
+  byte-faithful to the vendored guidelines);
+- **deliberately no new line for the fabrication slips** - the violated
+  instruction already exists, and restating it dilutes the prompt without
+  evidence a restatement helps;
+- a **rater-process finding**: both initially-marked criticals were withdrawn
+  on card review - one was the agent's own `escalate_to_human` (the
+  scenario's expected outcome), the other a scripted walk-away. The audit UI
+  now shows the termination source and expected outcome prominently (only a
+  _buyer_ ending can be a premature stop), and the same affordances carry
+  into the Phase 7 rater instructions.
+
+Provenance: the guardrail change alters the buyer prompt hash, so the pilot
+figures above belong to the pre-ADR-0021 prompt. Every manifest records
+`buyerPromptSha256`, which keeps the two prompt generations distinguishable;
+Phase 6 runs use the hardened prompt.
+
 ## Roadmap
 
 - [x] **Phase 0** - TS engine scaffold, orchestrator, tools, telemetry, G1
 - [x] **Phase 1** - corpus v2, 12 personas, 150 scenario instances (gate MET)
 - [x] **Phase 2** - Layer-1 checks L1.1-L1.13; G3 20/20 caught, 0 false fires; G15
-- [x] **Phase 3** - buyer-simulator pilot (machine gates + blind human review)
+- [x] **Phase 3** - buyer-simulator pilot (machine gates + blind human review + G6 instruction-deviation audit, all met)
 - [ ] **Phase 4+** - calibration set, judge panel, composite scoring, the
       scored run and the paper
 
