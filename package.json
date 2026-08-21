@@ -48,7 +48,8 @@
     "stats:test": "vitest run --config vitest.stats.config.ts",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "decisions:index": "node scripts/decisions-index.mjs docs/decisions && node scripts/decisions-index.mjs docs/decisions-private"
+    "decisions:index": "node scripts/decisions-index.mjs docs/decisions && node scripts/decisions-index.mjs docs/decisions-private",
+    "audit:g6": "tsx src/run/g6AuditServer.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "3.0.104",

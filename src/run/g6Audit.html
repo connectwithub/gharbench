@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>G6 simulator-deviation audit</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root {
+    --bg: #0b141a; --panel: #111b21; --panel2: #202c33; --text: #e9edef;
+    --muted: #8696a0; --accent: #00a884; --buyer: #005c4b; --agent: #202c33;
+    --warn: #f5a623; --bad: #ef5350; --ok: #00a884;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.45 system-ui, sans-serif; background: var(--bg); color: var(--text); display: flex; height: 100vh; }
+  #sidebar { width: 280px; min-width: 280px; background: var(--panel); border-right: 1px solid #222d34; overflow-y: auto; }
+  #sidebar h1 { font-size: 18px; padding: 14px 16px 4px; margin: 0; }
+  #summary { padding: 4px 16px 10px; color: var(--muted); font-size: 12px; border-bottom: 1px solid #222d34; white-space: pre-line; }
+  .convItem { padding: 10px 16px; cursor: pointer; border-bottom: 1px solid #1a242b; display: flex; justify-content: space-between; gap: 8px; }
+  .convItem:hover { background: var(--panel2); }
+  .convItem.active { background: var(--panel2); }
+  .convItem.active .sid { color: var(--accent); font-weight: 600; }
+  .convItem .sid { font-size: 13px; }
+  .convItem .turns { color: var(--muted); font-size: 11px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; align-self: center; flex-shrink: 0; background: #37444d; }
+  .dot.clean { background: var(--ok); } .dot.minor { background: var(--warn); } .dot.critical { background: var(--bad); }
+  #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  #head { padding: 10px 20px; background: var(--panel2); font-size: 13px; display: flex; gap: 16px; flex-wrap: wrap; align-items: baseline; }
+  #head .k { color: var(--muted); }
+  #cols { flex: 1; display: flex; overflow: hidden; }
+  #chat { flex: 1.2; overflow-y: auto; padding: 18px 22px; }
+  .bubble { max-width: 72%; margin: 4px 0; padding: 7px 11px; border-radius: 8px; white-space: pre-wrap; word-wrap: break-word; }
+  .buyer { background: var(--buyer); margin-left: auto; border-top-right-radius: 2px; }
+  .agent { background: var(--agent); margin-right: auto; border-top-left-radius: 2px; }
+  .roleTag { font-size: 10px; color: var(--muted); margin: 8px 0 0; }
+  .roleTag.right { text-align: right; }
+  .toolLine { text-align: center; color: var(--muted); font-size: 11px; margin: 6px 0; font-style: italic; }
+  .scripted { outline: 1px dashed var(--warn); }
+  .scriptedNote { font-size: 10px; color: var(--warn); text-align: right; margin: 0; }
+  #right { flex: 1; min-width: 380px; max-width: 520px; border-left: 1px solid #222d34; overflow-y: auto; padding: 14px 18px; background: var(--panel); }
+  details { margin-bottom: 10px; }
+  summary { cursor: pointer; color: var(--accent); font-size: 13px; }
+  pre { background: #0f171c; border: 1px solid #222d34; padding: 10px; font-size: 11px; white-space: pre-wrap; word-wrap: break-word; max-height: 45vh; overflow-y: auto; border-radius: 6px; }
+  .checklist { font-size: 12px; color: var(--muted); margin: 0 0 12px; padding-left: 18px; }
+  .checklist li { margin-bottom: 4px; }
+  .checklist b { color: var(--text); }
+  fieldset { border: 1px solid #222d34; border-radius: 8px; margin: 0 0 12px; }
+  legend { font-size: 12px; color: var(--muted); padding: 0 6px; }
+  label.opt { display: block; padding: 3px 0; font-size: 13px; cursor: pointer; }
+  textarea { width: 100%; min-height: 60px; background: #0f171c; color: var(--text); border: 1px solid #222d34; border-radius: 6px; padding: 8px; font: inherit; font-size: 13px; }
+  button { background: var(--accent); color: #0b141a; font-weight: 600; border: 0; border-radius: 6px; padding: 9px 18px; cursor: pointer; font-size: 14px; }
+  button:disabled { background: #37444d; color: var(--muted); cursor: default; }
+  #saveMsg { font-size: 12px; color: var(--muted); margin-left: 10px; }
+  .term { text-align: center; color: var(--muted); font-size: 12px; margin-top: 14px; border-top: 1px dashed #222d34; padding-top: 8px; }
+</style>
+</head>
+<body>
+  <div id="sidebar">
+    <h1>G6 deviation audit</h1>
+    <div id="summary">loading…</div>
+    <div id="list"></div>
+  </div>
+  <div id="main">
+    <div id="head"><span class="k">select a conversation</span></div>
+    <div id="cols">
+      <div id="chat"></div>
+      <div id="right">
+        <details open id="rubricBox">
+          <summary>What to check (the rubric)</summary>
+          <ul class="checklist">
+            <li><b>Judge the BUYER only, against its card.</b> Agent mistakes are not deviations. The question is: did the simulator follow its instructions and stay humanly plausible?</li>
+            <li><b>Frame break</b> — any hint of simulation: reminder text echoed, "as an AI", meta-talk about instructions, a termination token mid-message. Always <b>critical</b>.</li>
+            <li><b>Persona contradiction</b> — budget, family, job, timeline or preference that contradicts the card or its own earlier turns. Critical if it changes the outcome.</li>
+            <li><b>Volunteered hidden info</b> — announces its budget ceiling, walk-away trigger or trap intent without the agent eliciting it. (Gradual disclosure when asked is CORRECT.)</li>
+            <li><b>Ignored walk-away</b> — a card trigger fired but the buyer stayed warm and kept asking questions. After deciding to leave, asking another question is a deviation.</li>
+            <li><b>Premature stop</b> — ###STOP### with no cause in the card or conversation (esp. within ~4 turns). A scripted ghost/disengage (P09, cold leads) is CORRECT, not premature.</li>
+            <li><b>Over-cooperation</b> — hidden reservation values move because the agent was persuasive; instant agreement the persona should resist; dumping every qualification detail unasked in one gush.</li>
+            <li><b>Non-sequitur</b> — replies to something never said, ignores a direct question repeatedly, or reacts to tool activity it cannot see.</li>
+            <li><b>Register mismatch</b> — formal corporate prose from a casual Hinglish persona (or vice versa); "no one writes like that" text. Terse, typos, emoji, topic hops are all REALISTIC and fine.</li>
+            <li><b>Scenario instruction missed</b> — an explicit scenario behaviour (ghost after N turns, second-session return line, trap script) that did not happen.</li>
+            <li>The dashed-outline opening message is <b>scripted</b> (sanctioned, ADR-0017) — never judge its wording.</li>
+            <li><b>minor</b> = odd but wouldn't change how the conversation unfolds. <b>critical</b> = breaks the evaluation: frame break, wrong facts, ignored trigger, unearned concession.</li>
+          </ul>
+        </details>
+        <details id="promptBox">
+          <summary>Buyer's instructions (system prompt — the ground truth)</summary>
+          <pre id="prompt"></pre>
+        </details>
+        <fieldset>
+          <legend>verdict</legend>
+          <label class="opt"><input type="radio" name="verdict" value="clean" /> clean — followed its card, humanly plausible</label>
+          <label class="opt"><input type="radio" name="verdict" value="minor" /> minor deviation — odd, outcome unchanged</label>
+          <label class="opt"><input type="radio" name="verdict" value="critical" /> critical deviation — breaks the evaluation</label>
+        </fieldset>
+        <fieldset id="tagBox">
+          <legend>deviation tags (required unless clean)</legend>
+        </fieldset>
+        <fieldset>
+          <legend>note (quote the offending turn for anything non-clean)</legend>
+          <textarea id="note"></textarea>
+        </fieldset>
+        <button id="save" disabled>Save &amp; next</button><span id="saveMsg"></span>
+      </div>
+    </div>
+  </div>
+<script>
+const TAGS = ['frame_break','persona_contradiction','volunteered_hidden_info','ignored_walkaway','premature_stop','over_cooperation','non_sequitur','register_mismatch','scenario_instruction_missed','other'];
+let order = [], current = null;
+
+const tagBox = document.getElementById('tagBox');
+for (const t of TAGS) {
+  const l = document.createElement('label');
+  l.className = 'opt';
+  l.innerHTML = `<input type="checkbox" value="${t}" /> ${t.replace(/_/g, ' ')}`;
+  tagBox.appendChild(l);
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+async function refreshList(selectId) {
+  const r = await (await fetch('/api/conversations')).json();
+  order = r.list.map((x) => x.conversationId);
+  const s = r.summary;
+  const gate = s.met === true ? 'MET' : s.met === false ? 'EXCEEDED' : 'in progress';
+  document.getElementById('summary').textContent =
+    `${r.runId}\n${s.audited}/${s.total} audited · ${s.deviating} deviating (ceiling ${s.deviationCeiling}) · ${s.critical} critical (ceiling ${s.criticalCeiling})\nG6: ${gate}`;
+  const list = document.getElementById('list');
+  list.innerHTML = '';
+  for (const item of r.list) {
+    const div = document.createElement('div');
+    div.className = 'convItem' + (item.conversationId === selectId ? ' active' : '');
+    div.innerHTML = `<span><span class="sid">${esc(item.scenarioId)}</span><br/><span class="turns">${item.turns} buyer turns${item.mark ? ' · ' + item.mark.verdict : ''}</span></span><span class="dot ${item.mark ? item.mark.verdict : ''}"></span>`;
+    div.onclick = () => load(item.conversationId);
+    list.appendChild(div);
+  }
+}
+
+async function load(id) {
+  const c = await (await fetch('/api/conversation/' + encodeURIComponent(id))).json();
+  current = c;
+  document.getElementById('head').innerHTML =
+    `<b>${esc(c.scenarioId)}</b><span class="k">persona</span>${esc(c.personaId)}<span class="k">family</span>${esc(c.family)}<span class="k">lang</span>${esc(c.language)}` +
+    (c.activeTrapIds.length ? `<span class="k">traps</span>${esc(c.activeTrapIds.join(', '))}` : '');
+  document.getElementById('prompt').textContent = c.buyerSystemPrompt;
+  document.getElementById('promptBox').open = true;
+  const chat = document.getElementById('chat');
+  chat.innerHTML = '';
+  let firstBuyer = true;
+  for (const m of c.messages) {
+    if (m.role === 'tool') {
+      const t = document.createElement('div');
+      t.className = 'toolLine';
+      t.textContent = `⚙ ${m.toolName} (invisible to buyer)`;
+      chat.appendChild(t);
+      continue;
+    }
+    const isBuyer = m.role === 'buyer';
+    const tag = document.createElement('div');
+    tag.className = 'roleTag' + (isBuyer ? ' right' : '');
+    tag.textContent = isBuyer ? 'buyer (audit this)' : 'agent';
+    chat.appendChild(tag);
+    const b = document.createElement('div');
+    b.className = 'bubble ' + (isBuyer ? 'buyer' : 'agent');
+    b.textContent = m.content;
+    if (isBuyer && firstBuyer && m.content.trim() === c.openingMessage.trim()) {
+      b.classList.add('scripted');
+      const n = document.createElement('p');
+      n.className = 'scriptedNote';
+      n.textContent = 'scripted opening — do not judge';
+      chat.appendChild(b); chat.appendChild(n); firstBuyer = false; continue;
+    }
+    if (isBuyer) firstBuyer = false;
+    chat.appendChild(b);
+  }
+  const term = document.createElement('div');
+  term.className = 'term';
+  term.textContent = 'terminated: ' + JSON.stringify(c.terminationReason);
+  chat.appendChild(term);
+  chat.scrollTop = 0;
+
+  // restore any existing mark
+  const listResp = await (await fetch('/api/conversations')).json();
+  const mark = listResp.list.find((x) => x.conversationId === id)?.mark;
+  for (const el of document.querySelectorAll('input[name=verdict]')) el.checked = mark ? el.value === mark.verdict : false;
+  for (const el of tagBox.querySelectorAll('input')) el.checked = mark ? mark.deviations.includes(el.value) : false;
+  document.getElementById('note').value = mark ? mark.note : '';
+  document.getElementById('save').disabled = false;
+  document.getElementById('saveMsg').textContent = mark ? 'previously saved' : '';
+  refreshList(id);
+}
+
+document.getElementById('save').onclick = async () => {
+  const verdict = document.querySelector('input[name=verdict]:checked')?.value;
+  if (!verdict) { document.getElementById('saveMsg').textContent = 'pick a verdict'; return; }
+  const deviations = [...tagBox.querySelectorAll('input:checked')].map((el) => el.value);
+  if (verdict !== 'clean' && deviations.length === 0) { document.getElementById('saveMsg').textContent = 'tag the deviation'; return; }
+  if (verdict === 'clean' && deviations.length > 0) { document.getElementById('saveMsg').textContent = 'clean = no tags'; return; }
+  const body = { conversationId: current.conversationId, verdict, deviations, note: document.getElementById('note').value, auditedAt: new Date().toISOString() };
+  const r = await fetch('/api/mark', { method: 'POST', body: JSON.stringify(body) });
+  if (!r.ok) { document.getElementById('saveMsg').textContent = 'save failed: ' + (await r.text()); return; }
+  document.getElementById('saveMsg').textContent = 'saved ✓';
+  const idx = order.indexOf(current.conversationId);
+  const next = order[idx + 1];
+  if (next) load(next); else refreshList(current.conversationId);
+};
+
+refreshList(null);
+</script>
+</body>
+</html>
