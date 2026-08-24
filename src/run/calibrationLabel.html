@@ -231,12 +231,16 @@
         white-space: pre-wrap;
         word-wrap: break-word;
       }
+      /* The AGENT is the graded party, so it carries the highlight colour;
+         the buyer is context and stays muted grey. (Deliberately the reverse
+         of WhatsApp's own-message green.) */
       .buyer .bubble {
-        background: var(--out);
+        background: var(--in);
+        color: #b8c4ca;
       }
       .agent .bubble {
-        background: var(--in);
-        color: #cfd8dc;
+        background: var(--out);
+        border-left: 3px solid var(--acc);
       }
       .system .bubble {
         background: transparent;
@@ -621,7 +625,7 @@
               'li',
               null,
               e('b', null, 'You are grading the agent'),
-              ' — the grey bubbles on the left. The buyer (green, right) is a simulated customer and is not being graded.',
+              ' — the green-highlighted bubbles on the left. The buyer (grey, right) is a simulated customer and is not being graded.',
             ),
             e(
               'li',
@@ -838,7 +842,7 @@
               e(
                 'span',
                 { className: 'legend' },
-                'grade the agent (grey, left) — the buyer (green) is context only',
+                'grade the agent (green, left) — the buyer (grey) is context only',
               ),
             ),
             e(
