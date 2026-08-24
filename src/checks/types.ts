@@ -50,6 +50,14 @@ export interface CheckResult {
 
 export interface CheckReport {
   conversationId: string;
+  /**
+   * The transcript record's contestantId. Conversation ids are only
+   * scenario#trial - identical across contestants in a multi-contestant
+   * sweep - so a report is unambiguous only with this field. Optional for
+   * checks.jsonl files written before it existed; readers fall back to
+   * conversationId alone when it is unique in the file.
+   */
+  contestantId?: string;
   scenarioId: string;
   runIndex: number;
   /** Results for exactly the scenario's declared-applicable checks (D2). */

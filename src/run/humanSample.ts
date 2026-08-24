@@ -26,7 +26,7 @@ import { pathToFileURL } from 'node:url';
 import { TRANSCRIPT_FILENAME, readTranscripts } from '../logging/transcript.js';
 import { calibrationCaseSchema, type CalibrationCase } from './calibrationCase.js';
 import { preliminaryBand, projectMessages } from './calibrationBuild.js';
-import { readCheckReports } from './judgeRun.js';
+import { readCheckReports } from './checkReports.js';
 import { REPO_ROOT, loadScenarioSet } from './scenarioSet.js';
 import { N5_FAMILIES } from './sweep.js';
 
@@ -126,7 +126,7 @@ export function collectCandidates(runIds: readonly string[]): SampleCandidate[] 
         scenarioId: record.scenarioId,
         family: scenario.family,
         language: scenario.language,
-        band: preliminaryBand(checks.get(record.conversationId)),
+        band: preliminaryBand(checks.get(record.contestantId, record.conversationId)),
         judgeApplicability: scenario.judgeApplicability,
         messages: projectMessages(record),
       });
@@ -181,7 +181,9 @@ function main(): void {
   const sample = selectSample(candidates, size);
   const { written, byFamily } = writeSample(sample);
 
-  console.log(`human-validation sample: ${written} conversation(s) from ${candidates.length} candidates`);
+  console.log(
+    `human-validation sample: ${written} conversation(s) from ${candidates.length} candidates`,
+  );
   for (const [family, n] of Object.entries(byFamily).sort()) {
     const isN5 = N5_FAMILIES.has(family);
     console.log(

@@ -32,7 +32,10 @@ export function xorshift32(seed: number): () => number {
     state ^= state >>> 17;
     state ^= state << 5;
     state >>>= 0;
-    return state / 0xffffffff;
+    // Divide by 2^32 (not 2^32-1): state 0xFFFFFFFF is on the xorshift orbit,
+    // and /0xffffffff would return exactly 1.0 there - an out-of-bounds
+    // resample index downstream. This keeps the contract [0, 1).
+    return state / 0x100000000;
   };
 }
 
@@ -59,7 +62,9 @@ export function bootstrapMeanCi(
   }
   means.sort((a, b) => a - b);
   const alpha = (1 - level) / 2;
+  // Order statistic over n-1 (floor(q*n) is biased one sample high at the
+  // upper tail and degrades to [min, max] at small resample counts).
   const at = (q: number): number =>
-    means[Math.min(means.length - 1, Math.max(0, Math.floor(q * means.length)))] ?? mean;
+    means[Math.min(means.length - 1, Math.max(0, Math.round(q * (means.length - 1))))] ?? mean;
   return { lower: at(alpha), upper: at(1 - alpha), mean };
 }

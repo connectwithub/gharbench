@@ -20,6 +20,7 @@ import { pathToFileURL } from 'node:url';
 
 import type { CheckReport } from '../checks/types.js';
 import { TRANSCRIPT_FILENAME, readTranscripts } from '../logging/transcript.js';
+import { readCheckReports } from './checkReports.js';
 import {
   CALIBRATION_DIR,
   CASES_DIR,
@@ -65,15 +66,7 @@ export function buildCasesFromRun(runId: string): BuildSummary {
   const transcriptPath = join(runDir, TRANSCRIPT_FILENAME);
   if (!existsSync(transcriptPath)) throw new Error(`No ${TRANSCRIPT_FILENAME} in runs/${runId}`);
 
-  const checksPath = join(runDir, 'checks.jsonl');
-  const checksByConversation = new Map<string, CheckReport>();
-  if (existsSync(checksPath)) {
-    for (const line of readFileSync(checksPath, 'utf8').split('\n')) {
-      if (!line.trim()) continue;
-      const report = JSON.parse(line) as CheckReport;
-      checksByConversation.set(report.conversationId, report);
-    }
-  }
+  const checks = readCheckReports(runDir);
 
   const manifest = JSON.parse(readFileSync(join(runDir, 'sweep-manifest.json'), 'utf8')) as {
     contestants: Array<{ requestedRef: string }>;
@@ -112,7 +105,7 @@ export function buildCasesFromRun(runId: string): BuildSummary {
     const calCase: CalibrationCase = {
       caseId: `cal_real_${contestantSlug}_${slug(record.conversationId)}`,
       source: 'real',
-      band: preliminaryBand(checksByConversation.get(record.conversationId)),
+      band: preliminaryBand(checks.get(record.contestantId, record.conversationId)),
       family: scenario.family,
       language: scenario.language,
       provenance: {
@@ -127,10 +120,15 @@ export function buildCasesFromRun(runId: string): BuildSummary {
 
     const parsed = calibrationCaseSchema.safeParse(calCase);
     if (!parsed.success) {
-      summary.skipped.push(`${record.conversationId} (schema: ${parsed.error.message.slice(0, 80)})`);
+      summary.skipped.push(
+        `${record.conversationId} (schema: ${parsed.error.message.slice(0, 80)})`,
+      );
       continue;
     }
-    writeFileSync(join(CASES_DIR, `${calCase.caseId}.json`), JSON.stringify(calCase, null, 2) + '\n');
+    writeFileSync(
+      join(CASES_DIR, `${calCase.caseId}.json`),
+      JSON.stringify(calCase, null, 2) + '\n',
+    );
     summary.written += 1;
     summary.byBand[calCase.band] = (summary.byBand[calCase.band] ?? 0) + 1;
     summary.byFamily[calCase.family] = (summary.byFamily[calCase.family] ?? 0) + 1;
@@ -155,10 +153,7 @@ export function writeCalibrationManifest(): Record<string, unknown> {
     if (c.provenance) byKey(`contestant:${c.provenance.contestantRef}`);
   }
   const manifest = { totalCases: files.length, strata, updatedAt: new Date().toISOString() };
-  writeFileSync(
-    join(CALIBRATION_DIR, 'manifest.json'),
-    JSON.stringify(manifest, null, 2) + '\n',
-  );
+  writeFileSync(join(CALIBRATION_DIR, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
   return manifest;
 }
 

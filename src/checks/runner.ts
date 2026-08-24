@@ -21,6 +21,7 @@ export function runChecks(ctx: CheckContext): CheckReport {
 
   return {
     conversationId: ctx.record.conversationId,
+    contestantId: ctx.record.contestantId,
     scenarioId: ctx.scenario.scenarioId,
     runIndex: ctx.record.runIndex,
     results,

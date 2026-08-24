@@ -714,6 +714,7 @@
         const [anchors, setAnchors] = React.useState({});
         const [note, setNote] = React.useState('');
         const [savedFlash, setSavedFlash] = React.useState(false);
+        const [saveError, setSaveError] = React.useState(null);
         const [guideOpen, setGuideOpen] = React.useState(true);
         const [refData, setRefData] = React.useState(null);
 
@@ -769,16 +770,30 @@
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ alias, binary, anchors, note: note || undefined }),
-          }).then((r) => {
-            if (r.ok) {
-              setLabeled(new Set([...labeled, alias]));
-              setSavedFlash(true);
-              setTimeout(() => setSavedFlash(false), 1200);
-              const nextOpen = order.findIndex((a, j) => j > idx && !labeled.has(a) && a !== alias);
-              if (nextOpen !== -1) setIdx(nextOpen);
-              else if (idx < order.length - 1) setIdx(idx + 1);
-            }
-          });
+          })
+            .then((r) => {
+              if (r.ok) {
+                setSaveError(null);
+                setLabeled(new Set([...labeled, alias]));
+                setSavedFlash(true);
+                setTimeout(() => setSavedFlash(false), 1200);
+                const nextOpen = order.findIndex(
+                  (a, j) => j > idx && !labeled.has(a) && a !== alias,
+                );
+                if (nextOpen !== -1) setIdx(nextOpen);
+                else if (idx < order.length - 1) setIdx(idx + 1);
+              } else {
+                // A silent non-ok response loses the case's answers without the
+                // rater ever knowing - surface it and stay on the case.
+                return r
+                  .json()
+                  .catch(() => ({}))
+                  .then((b) =>
+                    setSaveError((b && b.error) || 'save failed (HTTP ' + r.status + ')'),
+                  );
+              }
+            })
+            .catch(() => setSaveError('save failed: labeler server unreachable'));
         };
 
         // Per-item buttons. CP items are violation-worded: the stored value 'met'
@@ -959,6 +974,13 @@
               'div',
               { className: 'nav' },
               savedFlash ? e('span', { className: 'saved' }, 'saved ✓') : null,
+              saveError
+                ? e(
+                    'span',
+                    { className: 'saved', style: { color: '#c0392b' } },
+                    'NOT SAVED: ' + saveError,
+                  )
+                : null,
               e(
                 'button',
                 { className: 'btn ghost', disabled: idx === 0, onClick: () => setIdx(idx - 1) },

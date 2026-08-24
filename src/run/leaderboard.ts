@@ -40,8 +40,9 @@ import {
 } from '../metrics/composite.js';
 import { passPowerK, type TaskOutcome } from '../metrics/passk.js';
 import { TRANSCRIPT_FILENAME, readTranscripts } from '../logging/transcript.js';
+import { readCheckReports } from './checkReports.js';
 import { loadJudgments } from './judgeAgreement.js';
-import { DIMENSIONS, readCheckReports, runCaseId, type StoredJudgment } from './judgeRun.js';
+import { DIMENSIONS, runCaseId, type StoredJudgment } from './judgeRun.js';
 import { REPO_ROOT, loadScenarioSet } from './scenarioSet.js';
 import type { JudgeDimension } from './judgeItems.js';
 
@@ -59,7 +60,7 @@ export interface ScoredConversation {
   family: string;
   language: string;
   activeTrapIds: string[];
-  status: 'scored' | 'gated' | 'unjudged';
+  status: 'scored' | 'gated' | 'unjudged' | 'unchecked';
   sub: SubScores | null;
   /** Unblended dimension inputs, kept for the D1 0.67/0.33 ablation. */
   dims: { fact: DimRaw; sales: DimRaw; qual: DimRaw } | null;
@@ -122,7 +123,11 @@ export function panelDimension(
   return { fraction: scored > 0 ? met / scored : null, anchor, flagged };
 }
 
-export function scoreRun(runId: string): ScoredConversation[] {
+export function scoreRun(
+  runId: string,
+  // Injectable so a multi-run board loads/validates the ~150-scenario set once.
+  set: ReturnType<typeof loadScenarioSet> = loadScenarioSet({ includePrivate: true }),
+): ScoredConversation[] {
   const runDir = join(REPO_ROOT, 'runs', runId);
   const transcriptPath = join(runDir, TRANSCRIPT_FILENAME);
   if (!existsSync(transcriptPath)) throw new Error(`No ${TRANSCRIPT_FILENAME} in runs/${runId}`);
@@ -135,7 +140,6 @@ export function scoreRun(runId: string): ScoredConversation[] {
     byCase.set(j.caseId, bucket);
   }
 
-  const set = loadScenarioSet({ includePrivate: true });
   const scenarioById = new Map(set.scenarios.map((s) => [s.scenarioId, s]));
 
   const out: ScoredConversation[] = [];
@@ -143,7 +147,7 @@ export function scoreRun(runId: string): ScoredConversation[] {
     if (record.terminationReason.kind === 'error') continue;
     const scenario = scenarioById.get(record.scenarioId);
     if (!scenario) continue;
-    const report: CheckReport | undefined = checks.get(record.conversationId);
+    const report: CheckReport | undefined = checks.get(record.contestantId, record.conversationId);
 
     const base = {
       runId,
@@ -155,10 +159,18 @@ export function scoreRun(runId: string): ScoredConversation[] {
       activeTrapIds: scenario.activeTrapIds,
     };
 
+    // No Layer-1 report -> coverage debt, never a free prog=1.0 with the
+    // hard-fail gate bypassed (a stale checks.jsonl after a resumed sweep
+    // would otherwise score its new conversations as programmatically perfect).
+    if (report === undefined) {
+      out.push({ ...base, status: 'unchecked', sub: null, dims: null, hardFailSources: [] });
+      continue;
+    }
+
     // ProgScore (D2): declared applicable NON-compliance checks only.
-    const nonC = report?.results.filter((r) => !r.cTagged) ?? [];
+    const nonC = report.results.filter((r) => !r.cTagged);
     const prog = nonC.length > 0 ? nonC.filter((r) => r.passed).length / nonC.length : 1;
-    const l1HardFail = report?.gatesJudging ?? false;
+    const l1HardFail = report.gatesJudging;
 
     if (l1HardFail) {
       out.push({
@@ -166,7 +178,7 @@ export function scoreRun(runId: string): ScoredConversation[] {
         status: 'gated',
         sub: { hardFail: true, prog, fact: 0, sales: 0, qual: 0 },
         dims: null,
-        hardFailSources: report?.hardFails ?? [],
+        hardFailSources: report.hardFails,
       });
       continue;
     }
@@ -178,12 +190,20 @@ export function scoreRun(runId: string): ScoredConversation[] {
         .filter((j) => j.dimension === dimension && j.outcome.kind === 'verdict')
         .map((j) => (j.outcome as { kind: 'verdict'; verdict: JudgeVerdict }).verdict);
 
-    if (DIMENSIONS.some((d) => verdictsFor(d).length === 0)) {
+    // Panel minimum is 2 usable verdicts per dimension (aggregateBinary and
+    // aggregateAnchor both return "no signal" below that). A conversation
+    // with 0-1 verdicts on any dimension is coverage debt: scoring it would
+    // silently turn "the panel told us nothing" into 0.0 sub-scores.
+    if (DIMENSIONS.some((d) => verdictsFor(d).length < 2)) {
       out.push({ ...base, status: 'unjudged', sub: null, dims: null, hardFailSources: [] });
       continue;
     }
 
-    const fact = panelDimension(verdictsFor('factuality'), 'factuality', scenario.judgeApplicability.factuality);
+    const fact = panelDimension(
+      verdictsFor('factuality'),
+      'factuality',
+      scenario.judgeApplicability.factuality,
+    );
     const sales = panelDimension(
       verdictsFor('salesEffectiveness'),
       'salesEffectiveness',
@@ -200,12 +220,24 @@ export function scoreRun(runId: string): ScoredConversation[] {
       scenario.judgeApplicability.compliance,
     );
 
+    // A null blend means the panel produced no usable signal for that
+    // dimension (every item unscored, no anchors). Unless the conversation is
+    // hard-failed by the panel anyway (composite 0 regardless), that is
+    // coverage debt, not a measured zero.
+    const factScore = blendSubScore(fact.fraction, fact.anchor);
+    const salesScore = blendSubScore(sales.fraction, sales.anchor);
+    const qualScore = blendSubScore(qual.fraction, qual.anchor);
+    if ((factScore === null || salesScore === null || qualScore === null) && !compliance.flagged) {
+      out.push({ ...base, status: 'unjudged', sub: null, dims: null, hardFailSources: [] });
+      continue;
+    }
+
     const sub: SubScores = {
       hardFail: compliance.flagged,
       prog,
-      fact: blendSubScore(fact.fraction, fact.anchor) ?? 0,
-      sales: blendSubScore(sales.fraction, sales.anchor) ?? 0,
-      qual: blendSubScore(qual.fraction, qual.anchor) ?? 0,
+      fact: factScore ?? 0,
+      sales: salesScore ?? 0,
+      qual: qualScore ?? 0,
     };
     out.push({
       ...base,
@@ -238,6 +270,7 @@ export interface LeaderboardEntry {
   conversations: number;
   gated: number;
   unjudged: number;
+  unchecked: number;
   hardFailRate: number | null;
   macroV1: number | null;
   microV1: number | null;
@@ -259,7 +292,9 @@ export interface Leaderboard {
   hardFailByTrap: Record<string, Record<string, number>>;
 }
 
-function readCostPerConversation(runIds: readonly string[]): Map<string, { usd: number; n: number }> {
+function readCostPerConversation(
+  runIds: readonly string[],
+): Map<string, { usd: number; n: number }> {
   const out = new Map<string, { usd: number; n: number }>();
   for (const runId of runIds) {
     const path = join(REPO_ROOT, 'runs', runId, 'costs.json');
@@ -278,7 +313,8 @@ function readCostPerConversation(runIds: readonly string[]): Map<string, { usd: 
 }
 
 export function buildLeaderboard(runIds: readonly string[]): Leaderboard {
-  const scored = runIds.flatMap((r) => scoreRun(r));
+  const set = loadScenarioSet({ includePrivate: true });
+  const scored = runIds.flatMap((r) => scoreRun(r, set));
   const byContestant = new Map<string, ScoredConversation[]>();
   for (const c of scored) {
     const bucket = byContestant.get(c.contestantId) ?? [];
@@ -298,114 +334,124 @@ export function buildLeaderboard(runIds: readonly string[]): Leaderboard {
     return m;
   };
 
-  const entries: LeaderboardEntry[] = [...byContestant.entries()].sort().map(([contestantId, convs]) => {
-    const usable = convs.filter((c) => c.sub !== null);
-    const byFamily = subsByFamilyOf(convs);
-    const macroOf = (w: Parameters<typeof composite>[1]): number | null =>
-      macroMean(new Map([...byFamily.entries()].map(([f, subs]) => [f, subs.map((s) => composite(s, w))])));
+  const entries: LeaderboardEntry[] = [...byContestant.entries()]
+    .sort()
+    .map(([contestantId, convs]) => {
+      const usable = convs.filter((c) => c.sub !== null);
+      const byFamily = subsByFamilyOf(convs);
+      const macroOf = (w: Parameters<typeof composite>[1]): number | null =>
+        macroMean(
+          new Map(
+            [...byFamily.entries()].map(([f, subs]) => [f, subs.map((s) => composite(s, w))]),
+          ),
+        );
 
-    // pass^k per family under D4, macro-averaged (D6); pass^4/5 = n=5 subset.
-    const perFamily: Record<string, FamilyRow> = {};
-    for (const [family, subs] of [...byFamily.entries()].sort()) {
-      const familyConvs = usable.filter((c) => c.family === family);
-      const byInstance = new Map<string, { successes: number; trials: number }>();
-      for (const c of familyConvs) {
-        const inst = byInstance.get(c.scenarioId) ?? { successes: 0, trials: 0 };
-        inst.trials += 1;
-        if (c.sub && d4Success(c.sub)) inst.successes += 1;
-        byInstance.set(c.scenarioId, inst);
+      // pass^k per family under D4, macro-averaged (D6); pass^4/5 = n=5 subset.
+      const perFamily: Record<string, FamilyRow> = {};
+      for (const [family, subs] of [...byFamily.entries()].sort()) {
+        const familyConvs = usable.filter((c) => c.family === family);
+        const byInstance = new Map<string, { successes: number; trials: number }>();
+        for (const c of familyConvs) {
+          const inst = byInstance.get(c.scenarioId) ?? { successes: 0, trials: 0 };
+          inst.trials += 1;
+          if (c.sub && d4Success(c.sub)) inst.successes += 1;
+          byInstance.set(c.scenarioId, inst);
+        }
+        const outcomes: TaskOutcome[] = [...byInstance.entries()]
+          .sort()
+          .map(([taskId, o]) => ({ taskId, ...o }));
+        const minTrials = Math.min(...outcomes.map((o) => o.trials), Infinity);
+        const passK: Record<string, number | null> = {};
+        for (const k of [1, 3, 4, 5]) {
+          passK[`pass^${k}`] =
+            outcomes.length > 0 && minTrials >= k ? passPowerK(outcomes, k).value : null;
+        }
+        const successes = familyConvs.filter((c) => c.sub && d4Success(c.sub)).length;
+        const v1Values = subs.map((s) => composite(s, V_WEIGHTS.V1));
+        perFamily[family] = {
+          conversations: familyConvs.length,
+          meanV1: microMean(v1Values),
+          bootstrapCi: bootstrapMeanCi(v1Values),
+          successRate: familyConvs.length > 0 ? successes / familyConvs.length : null,
+          wilson: familyConvs.length > 0 ? wilsonInterval(successes, familyConvs.length) : null,
+          passK,
+        };
       }
-      const outcomes: TaskOutcome[] = [...byInstance.entries()]
-        .sort()
-        .map(([taskId, o]) => ({ taskId, ...o }));
-      const minTrials = Math.min(...outcomes.map((o) => o.trials), Infinity);
-      const passK: Record<string, number | null> = {};
-      for (const k of [1, 3, 4, 5]) {
-        passK[`pass^${k}`] =
-          outcomes.length > 0 && minTrials >= k ? passPowerK(outcomes, k).value : null;
-      }
-      const successes = familyConvs.filter((c) => c.sub && d4Success(c.sub)).length;
-      const v1Values = subs.map((s) => composite(s, V_WEIGHTS.V1));
-      perFamily[family] = {
-        conversations: familyConvs.length,
-        meanV1: microMean(v1Values),
-        bootstrapCi: bootstrapMeanCi(v1Values),
-        successRate: familyConvs.length > 0 ? successes / familyConvs.length : null,
-        wilson: familyConvs.length > 0 ? wilsonInterval(successes, familyConvs.length) : null,
-        passK,
-      };
-    }
 
-    // V6: per-family weights, then macro.
-    const v6 = macroMean(
-      new Map(
-        [...byFamily.entries()].map(([f, subs]) => [
-          f,
-          subs.map((s) => composite(s, v6WeightsFor(f))),
-        ]),
-      ),
-    );
-
-    const langMean = (language: string): number | null =>
-      microMean(
-        usable
-          .filter((c) => c.language === language)
-          .map((c) => composite(c.sub as SubScores, V_WEIGHTS.V1)),
+      // V6: per-family weights, then macro.
+      const v6 = macroMean(
+        new Map(
+          [...byFamily.entries()].map(([f, subs]) => [
+            f,
+            subs.map((s) => composite(s, v6WeightsFor(f))),
+          ]),
+        ),
       );
-    const english = langMean('english');
-    const hinglish = langMean('hinglish');
 
-    const d4At = (threshold: number): number | null => {
-      const withSub = usable.filter((c) => c.sub);
-      if (withSub.length === 0) return null;
-      return withSub.filter((c) => d4Success(c.sub as SubScores, threshold)).length / withSub.length;
-    };
+      const langMean = (language: string): number | null =>
+        microMean(
+          usable
+            .filter((c) => c.language === language)
+            .map((c) => composite(c.sub as SubScores, V_WEIGHTS.V1)),
+        );
+      const english = langMean('english');
+      const hinglish = langMean('hinglish');
 
-    // Transcript ids look like "contestant:<ref>"; costs.json keys the bare ref.
-    const cost = costByRef.get(contestantId) ?? costByRef.get(contestantId.replace(/^contestant:/, ''));
-    return {
-      contestantId,
-      conversations: convs.length,
-      gated: convs.filter((c) => c.status === 'gated').length,
-      unjudged: convs.filter((c) => c.status === 'unjudged').length,
-      hardFailRate:
-        usable.length > 0 ? usable.filter((c) => c.sub?.hardFail).length / usable.length : null,
-      macroV1: macroOf(V_WEIGHTS.V1),
-      microV1: microMean(usable.map((c) => composite(c.sub as SubScores, V_WEIGHTS.V1))),
-      variants: {
-        V2: macroOf(V_WEIGHTS.V2),
-        V3: macroOf(V_WEIGHTS.V3),
-        V4: macroOf(V_WEIGHTS.V4),
-        V6: v6,
-      },
-      // D1 ablation: V1 recomputed with the 0.67/0.33 binary-heavy blend.
-      blendAblationV1: macroMean(
-        (() => {
-          const m = new Map<string, number[]>();
-          for (const c of usable) {
-            const sub = reblend(c, 0.67);
-            if (!sub) continue;
-            const bucket = m.get(c.family) ?? [];
-            bucket.push(composite(sub, V_WEIGHTS.V1));
-            m.set(c.family, bucket);
-          }
-          return m;
-        })(),
-      ),
-      wfSweep: Object.fromEntries(
-        WF_SWEEP_STEPS.map((wf) => [wf.toFixed(2), macroOf(weightsAtWf(wf))]),
-      ),
-      v5Keys: v5Keys(byFamily),
-      perFamily,
-      hinglishGap: {
-        english,
-        hinglish,
-        delta: english !== null && hinglish !== null ? english - hinglish : null,
-      },
-      costPerConversation: cost && cost.n > 0 ? cost.usd / cost.n : null,
-      d4Sensitivity: { '0.60': d4At(0.6), '0.70': d4At(0.7), '0.80': d4At(0.8) },
-    };
-  });
+      const d4At = (threshold: number): number | null => {
+        const withSub = usable.filter((c) => c.sub);
+        if (withSub.length === 0) return null;
+        return (
+          withSub.filter((c) => d4Success(c.sub as SubScores, threshold)).length / withSub.length
+        );
+      };
+
+      // Transcript ids look like "contestant:<ref>"; costs.json keys the bare ref.
+      const cost =
+        costByRef.get(contestantId) ?? costByRef.get(contestantId.replace(/^contestant:/, ''));
+      return {
+        contestantId,
+        conversations: convs.length,
+        gated: convs.filter((c) => c.status === 'gated').length,
+        unjudged: convs.filter((c) => c.status === 'unjudged').length,
+        unchecked: convs.filter((c) => c.status === 'unchecked').length,
+        hardFailRate:
+          usable.length > 0 ? usable.filter((c) => c.sub?.hardFail).length / usable.length : null,
+        macroV1: macroOf(V_WEIGHTS.V1),
+        microV1: microMean(usable.map((c) => composite(c.sub as SubScores, V_WEIGHTS.V1))),
+        variants: {
+          V2: macroOf(V_WEIGHTS.V2),
+          V3: macroOf(V_WEIGHTS.V3),
+          V4: macroOf(V_WEIGHTS.V4),
+          V6: v6,
+        },
+        // D1 ablation: V1 recomputed with the 0.67/0.33 binary-heavy blend.
+        blendAblationV1: macroMean(
+          (() => {
+            const m = new Map<string, number[]>();
+            for (const c of usable) {
+              const sub = reblend(c, 0.67);
+              if (!sub) continue;
+              const bucket = m.get(c.family) ?? [];
+              bucket.push(composite(sub, V_WEIGHTS.V1));
+              m.set(c.family, bucket);
+            }
+            return m;
+          })(),
+        ),
+        wfSweep: Object.fromEntries(
+          WF_SWEEP_STEPS.map((wf) => [wf.toFixed(2), macroOf(weightsAtWf(wf))]),
+        ),
+        v5Keys: v5Keys(byFamily),
+        perFamily,
+        hinglishGap: {
+          english,
+          hinglish,
+          delta: english !== null && hinglish !== null ? english - hinglish : null,
+        },
+        costPerConversation: cost && cost.n > 0 ? cost.usd / cost.n : null,
+        d4Sensitivity: { '0.60': d4At(0.6), '0.70': d4At(0.7), '0.80': d4At(0.8) },
+      };
+    });
 
   // D7 pairwise robustness over every contestant pair.
   const robustPairs: Leaderboard['robustPairs'] = [];
@@ -464,7 +510,7 @@ function main(): void {
     console.log(
       `${e.contestantId.padEnd(30)} macro=${fmt(e.macroV1)} micro=${fmt(e.microV1)} ` +
         `hard-fail=${fmt(e.hardFailRate)} $${e.costPerConversation?.toFixed(4) ?? '-'}/conv ` +
-        `(${e.conversations} convs, ${e.gated} gated, ${e.unjudged} unjudged)`,
+        `(${e.conversations} convs, ${e.gated} gated, ${e.unjudged} unjudged, ${e.unchecked} unchecked)`,
     );
   }
   const robust = board.robustPairs.filter((p) => p.verdict !== 'non-separable').length;
@@ -473,7 +519,15 @@ function main(): void {
   );
   const unjudged = board.entries.reduce((a, e) => a + e.unjudged, 0);
   if (unjudged > 0) {
-    console.log(`COVERAGE DEBT: ${unjudged} non-gated conversation(s) lack judgments - run pnpm judge:run first.`);
+    console.log(
+      `COVERAGE DEBT: ${unjudged} non-gated conversation(s) lack judgments - run pnpm judge:run first.`,
+    );
+  }
+  const unchecked = board.entries.reduce((a, e) => a + e.unchecked, 0);
+  if (unchecked > 0) {
+    console.log(
+      `COVERAGE DEBT: ${unchecked} conversation(s) lack Layer-1 reports - run pnpm checks --run=<runId> first.`,
+    );
   }
   console.log(`written: ${outPath}`);
 }

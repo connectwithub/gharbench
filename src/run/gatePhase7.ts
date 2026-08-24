@@ -35,7 +35,12 @@ import {
   type BridgeFn,
 } from './judgeAgreement.js';
 import { DIMENSIONS, loadCalibrationCases, runCaseId, type StoredJudgment } from './judgeRun.js';
-import { HUMAN_VALIDATION_DIR, HV_CASES_DIR, HV_MAPPING_FILE, N5_FAMILY_FLOOR } from './humanSample.js';
+import {
+  HUMAN_VALIDATION_DIR,
+  HV_CASES_DIR,
+  HV_MAPPING_FILE,
+  N5_FAMILY_FLOOR,
+} from './humanSample.js';
 import { isNonBuyerScenario } from './pilotProbes.js';
 import { REPO_ROOT, loadScenarioSet } from './scenarioSet.js';
 import { N5_FAMILIES } from './sweep.js';
@@ -60,7 +65,12 @@ const RECALL_FLOOR = 0.9;
 const MIN_ALPHA_UNITS = 30;
 
 interface HvMapping {
-  [caseId: string]: { runId: string; conversationId: string; contestantId: string; scenarioId: string };
+  [caseId: string]: {
+    runId: string;
+    conversationId: string;
+    contestantId: string;
+    scenarioId: string;
+  };
 }
 
 /** Human-human Krippendorff alpha over binary units (ties = missing). */
@@ -86,10 +96,11 @@ export function humanHumanAlpha(
       return labelToPass(itemId, value) ? 1 : 0;
     });
   }
-  const coveredUnits = unitKeys.filter((_, i) =>
-    Object.values(raters).filter((r) => r[i] !== null).length >= 2,
+  const coveredUnits = unitKeys.filter(
+    (_, i) => Object.values(raters).filter((r) => r[i] !== null).length >= 2,
   ).length;
-  if (coveredUnits === 0 || Object.keys(raters).length < 2) return { alpha: null, units: coveredUnits };
+  if (coveredUnits === 0 || Object.keys(raters).length < 2)
+    return { alpha: null, units: coveredUnits };
   return { alpha: bridge(raters, 'nominal').krippendorff_alpha, units: coveredUnits };
 }
 
@@ -124,7 +135,11 @@ export function evaluatePhase7Gate(bridge: BridgeFn = pythonBridge): Phase7Repor
   const cases = existsSync(HV_CASES_DIR) ? loadCalibrationCases(HV_CASES_DIR) : [];
   const byFamily: Record<string, number> = {};
   for (const c of cases) byFamily[c.family] = (byFamily[c.family] ?? 0) + 1;
-  floor('sample built (~200 conversations)', cases.length >= 150 && cases.length <= 250, `${cases.length} cases`);
+  floor(
+    'sample built (~200 conversations)',
+    cases.length >= 150 && cases.length <= 250,
+    `${cases.length} cases`,
+  );
   for (const family of [...N5_FAMILIES].sort()) {
     const n = byFamily[family] ?? 0;
     floor(`sample ${family} >= ${N5_FAMILY_FLOOR} (I9)`, n >= N5_FAMILY_FLOOR, `${n} sampled`);
@@ -144,7 +159,11 @@ export function evaluatePhase7Gate(bridge: BridgeFn = pythonBridge): Phase7Repor
 
   // G11 human-human alpha.
   if (cases.length === 0 || raters.length < 2) {
-    floor(`G11 human-human alpha >= ${ALPHA_FLOOR}`, false, 'not computed (need the labeled sample)');
+    floor(
+      `G11 human-human alpha >= ${ALPHA_FLOOR}`,
+      false,
+      'not computed (need the labeled sample)',
+    );
   } else {
     const { alpha, units } = humanHumanAlpha(cases, labelsByRater, bridge);
     floor(
@@ -153,7 +172,9 @@ export function evaluatePhase7Gate(bridge: BridgeFn = pythonBridge): Phase7Repor
       alpha === null ? 'not computed' : `alpha=${alpha.toFixed(3)} over ${units} units`,
     );
     if (alpha !== null) {
-      info.push(`G11 target >= ${ALPHA_TARGET}: ${alpha >= ALPHA_TARGET ? 'met' : 'not met'} (${alpha.toFixed(3)})`);
+      info.push(
+        `G11 target >= ${ALPHA_TARGET}: ${alpha >= ALPHA_TARGET ? 'met' : 'not met'} (${alpha.toFixed(3)})`,
+      );
     }
   }
 
@@ -163,14 +184,33 @@ export function evaluatePhase7Gate(bridge: BridgeFn = pythonBridge): Phase7Repor
     : {};
   const judgments = rekeyJudgments(mapping);
   if (cases.length === 0 || judgments.length === 0 || raters.length < 3) {
-    floor(`G8 reconfirmed on sample (kappa >= ${KAPPA_FLOOR} per dimension)`, false,
-      judgments.length === 0 ? 'no panel judgments for the sampled runs (pnpm judge:run)' : 'need 3 raters');
+    floor(
+      `G8 reconfirmed on sample (kappa >= ${KAPPA_FLOOR} per dimension)`,
+      false,
+      judgments.length === 0
+        ? 'no panel judgments for the sampled runs (pnpm judge:run)'
+        : 'need 3 raters',
+    );
     floor(`G9 reconfirmed on sample (violation recall >= ${RECALL_FLOOR})`, false, 'not computed');
   } else {
     const judgeRefs = [...new Set(judgments.map((j) => j.judgeRef))].sort();
     const { binaries } = assembleUnits(cases, judgments, judgeRefs);
     const allIds = new Set(cases.map((c) => c.caseId));
     const humanRef = adjudicatedReference(labelsByRater, allIds);
+
+    // Completeness prerequisite (mirrors gate:phase5): a unit with no usable
+    // panel verdict silently drops out of BOTH the G8 kappa and the G9 recall
+    // denominators, so partial judging - e.g. hard-fail-gated conversations
+    // that judge:run skips but the sample still contains - would measure
+    // agreement on the cleanest slice and inflate recall. Count the drops and
+    // fail loudly instead.
+    const uncovered = binaries.filter((u) => u.panelPass === null).length;
+    floor(
+      'panel coverage complete on sampled units (G8/G9 denominators honest)',
+      uncovered === 0,
+      `${uncovered}/${binaries.length} sampled unit(s) lack a usable panel verdict` +
+        (uncovered > 0 ? ' - G8/G9 below are computed on the covered subset only' : ''),
+    );
     for (const dimension of DIMENSIONS) {
       const units = binaries.filter((u) => u.dimension === dimension);
       const agreement = binaryAgreement(units, humanRef, bridge);
@@ -194,7 +234,9 @@ export function evaluatePhase7Gate(bridge: BridgeFn = pythonBridge): Phase7Repor
     floor(
       `G9 violation recall >= ${RECALL_FLOOR} vs human-adjudicated (sample)`,
       total > 0 && caught / total >= RECALL_FLOOR,
-      total === 0 ? 'no human-adjudicated violations in the sample' : `${caught}/${total} caught (${(caught / total).toFixed(3)})`,
+      total === 0
+        ? 'no human-adjudicated violations in the sample'
+        : `${caught}/${total} caught (${(caught / total).toFixed(3)})`,
     );
   }
 
@@ -245,7 +287,8 @@ export function evaluatePhase7Gate(bridge: BridgeFn = pythonBridge): Phase7Repor
 
 function main(): void {
   const report = evaluatePhase7Gate();
-  for (const f of report.floors) console.log(`${f.met ? 'MET  ' : 'UNMET'}  ${f.name}  (${f.detail})`);
+  for (const f of report.floors)
+    console.log(`${f.met ? 'MET  ' : 'UNMET'}  ${f.name}  (${f.detail})`);
   if (report.info.length > 0) console.log('');
   for (const line of report.info) console.log(`info: ${line}`);
   console.log(`\nphase 7 gate: ${report.met ? 'MET' : 'UNMET'}`);

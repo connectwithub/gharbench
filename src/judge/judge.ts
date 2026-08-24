@@ -12,11 +12,7 @@
 import { generateText } from 'ai';
 
 import { sha256 } from '../env/db.js';
-import {
-  cacheCallOptions,
-  resolveModel,
-  supportsSamplingParams,
-} from '../providers/registry.js';
+import { cacheCallOptions, resolveModel, supportsSamplingParams } from '../providers/registry.js';
 import { meterCall, type CostMeter } from '../telemetry/cost.js';
 import type { JudgeDimension, JudgeItems } from '../run/judgeItems.js';
 import { anchorsFor, buildJudgeSystem, buildJudgeUser, type JudgeCaseInput } from './prompt.js';
@@ -56,10 +52,15 @@ export async function judgeCase(opts: {
   for (const retryUser of [
     user,
     // Retry once, with the reason. This changes the request suffix only; the
-    // cached system prefix is unaffected.
+    // cached system prefix is unaffected. A transport failure (call_failed)
+    // produced no reply at all, so that retry re-sends the plain prompt -
+    // telling the judge its non-existent "previous reply was invalid" primes
+    // apologies and fragments instead of the full JSON.
     () =>
-      `${user}\n\nYour previous reply was invalid: ${lastDetail}\n` +
-      'Reply again with ONLY the corrected JSON object.',
+      lastCode === 'call_failed'
+        ? user
+        : `${user}\n\nYour previous reply was invalid: ${lastDetail}\n` +
+          'Reply again with ONLY the corrected JSON object.',
   ]) {
     attempts += 1;
     let raw: string;
@@ -70,9 +71,21 @@ export async function judgeCase(opts: {
       lastDetail = err instanceof Error ? err.message : String(err);
       continue;
     }
-    const parsed = parseJudgeOutput(dimension, input.applicableItems, anchorIds, input.messages, raw);
+    const parsed = parseJudgeOutput(
+      dimension,
+      input.applicableItems,
+      anchorIds,
+      input.messages,
+      raw,
+    );
     if (parsed.ok) {
-      return { caseId: input.caseId, dimension, attempts, promptSha, outcome: { kind: 'verdict', verdict: parsed.verdict } };
+      return {
+        caseId: input.caseId,
+        dimension,
+        attempts,
+        promptSha,
+        outcome: { kind: 'verdict', verdict: parsed.verdict },
+      };
     }
     lastCode = parsed.code;
     lastDetail = parsed.detail;

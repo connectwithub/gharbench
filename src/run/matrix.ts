@@ -20,7 +20,7 @@
 
 import { pathToFileURL } from 'node:url';
 
-import type { ScenarioConfig } from '../engine/scenario.js';
+import { SCENARIO_FAMILIES, type ScenarioConfig } from '../engine/scenario.js';
 import { JUDGE_PANEL } from '../judge/panel.js';
 import { parseModelRef } from '../providers/registry.js';
 import { estimateCostUsd } from '../telemetry/prices.js';
@@ -57,12 +57,16 @@ export function planMatrix(
   }
 
   const floors: MatrixPlan['floors'] = [];
-  for (const [family, b] of Object.entries(byFamily).sort()) {
+  // Iterate the FULL family constant (as gate:phase1 does), never just the
+  // families present in the selection: a family with zero selected instances
+  // must produce an UNMET floor, not silently no floor at all.
+  for (const family of SCENARIO_FAMILIES) {
     const min = family === 'hinglish_variant' ? 30 : 20;
+    const b = byFamily[family];
     floors.push({
       name: `family ${family} >= ${min} instances (I9)`,
-      met: b.instances >= min,
-      detail: `${b.instances} instances x n=${b.trials}`,
+      met: (b?.instances ?? 0) >= min,
+      detail: b ? `${b.instances} instances x n=${b.trials}` : '0 instances',
     });
   }
   const total = scenarios.length;
@@ -142,15 +146,20 @@ function main(): void {
         : ''),
   );
   for (const [family, b] of Object.entries(plan.byFamily).sort()) {
-    console.log(`  ${family.padEnd(22)} ${String(b.instances).padStart(3)} x n=${b.trials} = ${b.conversations}`);
+    console.log(
+      `  ${family.padEnd(22)} ${String(b.instances).padStart(3)} x n=${b.trials} = ${b.conversations}`,
+    );
   }
   console.log('');
-  for (const f of plan.floors) console.log(`${f.met ? 'MET  ' : 'UNMET'}  ${f.name}  (${f.detail})`);
+  for (const f of plan.floors)
+    console.log(`${f.met ? 'MET  ' : 'UNMET'}  ${f.name}  (${f.detail})`);
   for (const w of plan.familyWarnings) console.log(`WARN family separation: ${w}`);
   for (const c of plan.perContestant) {
     console.log(
       `  ${c.ref}: ${c.conversations} conversations, ` +
-        (c.estUsd !== null ? `~$${c.estUsd.toFixed(2)} list-price` : 'UNPRICED (verify before running)'),
+        (c.estUsd !== null
+          ? `~$${c.estUsd.toFixed(2)} list-price`
+          : 'UNPRICED (verify before running)'),
     );
   }
   console.log(

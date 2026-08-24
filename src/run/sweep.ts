@@ -91,6 +91,9 @@ export function parseSweepArgs(argv: readonly string[]): SweepOptions {
         break;
       case '--max-usd':
         maxUsd = Number.parseFloat(value);
+        // NaN compares false against every spend - the cap would be silently
+        // disabled on a real-money sweep ("--max-usd=$50" must not run uncapped).
+        if (!Number.isFinite(maxUsd)) throw new Error(`--max-usd needs a number, got "${value}"`);
         break;
       case '--dry-run':
         dryRun = true;
@@ -131,6 +134,44 @@ export function selectScenarios(
   const missing = [...wanted].filter((id) => !picked.some((s) => s.scenarioId === id));
   if (missing.length > 0) throw new Error(`Unknown scenario ids: ${missing.join(', ')}`);
   return picked;
+}
+
+/** Sum two attempts' cost summaries so a retried conversation reports both. */
+function addCostSummaries(a: CostSummary, b: CostSummary): CostSummary {
+  const byModel: CostSummary['byModel'] = structuredClone(a.byModel);
+  for (const [model, m] of Object.entries(b.byModel)) {
+    const t = (byModel[model] ??= {
+      calls: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+      usd: 0,
+      unpricedCalls: 0,
+      cacheHits: 0,
+    });
+    t.calls += m.calls;
+    t.inputTokens += m.inputTokens;
+    t.outputTokens += m.outputTokens;
+    t.cacheReadTokens += m.cacheReadTokens;
+    t.cacheWriteTokens += m.cacheWriteTokens;
+    t.usd += m.usd;
+    t.unpricedCalls += m.unpricedCalls;
+    t.cacheHits += m.cacheHits;
+  }
+  return {
+    calls: a.calls + b.calls,
+    inputTokens: a.inputTokens + b.inputTokens,
+    outputTokens: a.outputTokens + b.outputTokens,
+    cacheReadTokens: a.cacheReadTokens + b.cacheReadTokens,
+    cacheWriteTokens: a.cacheWriteTokens + b.cacheWriteTokens,
+    totalTokens: a.totalTokens + b.totalTokens,
+    totalUsd: a.totalUsd + b.totalUsd,
+    unpricedCalls: a.unpricedCalls + b.unpricedCalls,
+    cacheHits: a.cacheHits + b.cacheHits,
+    latencyMsTotal: a.latencyMsTotal + b.latencyMsTotal,
+    byModel,
+  };
 }
 
 interface Job {
@@ -236,7 +277,9 @@ async function main(): Promise<void> {
 
         // A conversation that dies on a provider/network error is an infra
         // casualty, not data: retry once from a fresh clone. Both attempts'
-        // costs are counted; the retry is logged so a flaky window is visible.
+        // costs are counted - merged into the conversation's summary so
+        // costs.json (and G12's $/conv on top of it) sees the real spend,
+        // not just the surviving attempt.
         let { record, summary } = await runOnce();
         let retried = false;
         if (record.terminationReason.kind === 'error') {
@@ -244,9 +287,10 @@ async function main(): Promise<void> {
             `retry ${job.contestantRef} :: ${record.conversationId} after error: ` +
               record.terminationReason.message.slice(0, 120),
           );
-          spentUsd += summary.totalUsd;
+          const failedAttempt = summary;
           retried = true;
           ({ record, summary } = await runOnce());
+          summary = addCostSummaries(failedAttempt, summary);
         }
         spentUsd += summary.totalUsd;
         console.log(

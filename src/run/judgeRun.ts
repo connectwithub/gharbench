@@ -28,14 +28,13 @@ import { pathToFileURL } from 'node:url';
 
 import pLimit from 'p-limit';
 
-import type { CheckReport } from '../checks/types.js';
 import { sha256 } from '../env/db.js';
 import { judgeCase, modelJudgeCaller, type JudgeCaseResult } from '../judge/judge.js';
 import { JUDGE_PANEL, judgeSlug } from '../judge/panel.js';
 import { buildJudgeSystem, buildJudgeUser, type JudgeCaseInput } from '../judge/prompt.js';
 import { TRANSCRIPT_FILENAME, readTranscripts } from '../logging/transcript.js';
 import { parseModelRef } from '../providers/registry.js';
-import { CostMeter } from '../telemetry/cost.js';
+import { CostMeter, isPriceKnown } from '../telemetry/cost.js';
 import { estimateCostUsd } from '../telemetry/prices.js';
 import {
   CALIBRATION_DIR,
@@ -44,6 +43,7 @@ import {
   type CalibrationCase,
 } from './calibrationCase.js';
 import { projectMessages } from './calibrationBuild.js';
+import { readCheckReports, type CheckReportIndex } from './checkReports.js';
 import { SLICE_FILE } from './calibrationSlice.js';
 import { loadJudgeItems, type JudgeDimension, type JudgeItems } from './judgeItems.js';
 import { REPO_ROOT, loadScenarioSet } from './scenarioSet.js';
@@ -111,23 +111,16 @@ export function loadCalibrationCases(casesDir: string = CASES_DIR): CalibrationC
     });
 }
 
-export function readCheckReports(runDir: string): Map<string, CheckReport> {
-  const out = new Map<string, CheckReport>();
-  const path = join(runDir, 'checks.jsonl');
-  if (!existsSync(path)) return out;
-  for (const line of readFileSync(path, 'utf8').split('\n')) {
-    if (!line.trim()) continue;
-    const report = JSON.parse(line) as CheckReport;
-    out.set(report.conversationId, report);
-  }
-  return out;
-}
-
 const slug = (s: string): string => s.toLowerCase().replace(/[^a-z0-9_.-]/g, '-');
 
-/** Case id for a run conversation - unique across contestants in one run. */
+/**
+ * Case id for a run conversation - unique across contestants in one run.
+ * The full ref (minus the `contestant:` role prefix) is slugged: taking only
+ * the last path segment would collide `openai/gpt-x` with `openrouter/openai/gpt-x`,
+ * silently handing one contestant's verdicts to the other.
+ */
 export function runCaseId(contestantId: string, conversationId: string): string {
-  return `${slug(contestantId.split('/').pop() ?? contestantId)}_${slug(conversationId)}`;
+  return `${slug(contestantId.replace(/^contestant:/, ''))}_${slug(conversationId)}`;
 }
 
 /** Judgeables from the stored calibration set (Phase 5). */
@@ -135,7 +128,9 @@ function loadCalibrationJudgeables(sliceOnly: boolean, caseIds: readonly string[
   let cases = loadCalibrationCases();
   if (sliceOnly) {
     if (!existsSync(SLICE_FILE)) throw new Error('run pnpm calibration:slice first');
-    const allowed = new Set((JSON.parse(readFileSync(SLICE_FILE, 'utf8')) as { ids: string[] }).ids);
+    const allowed = new Set(
+      (JSON.parse(readFileSync(SLICE_FILE, 'utf8')) as { ids: string[] }).ids,
+    );
     cases = cases.filter((c) => allowed.has(c.caseId));
   }
   if (caseIds.length > 0) {
@@ -145,7 +140,7 @@ function loadCalibrationJudgeables(sliceOnly: boolean, caseIds: readonly string[
 
   const set = loadScenarioSet();
   const scenarioById = new Map(set.scenarios.map((s) => [s.scenarioId, s]));
-  const checksCache = new Map<string, Map<string, CheckReport>>();
+  const checksCache = new Map<string, CheckReportIndex>();
 
   return cases.map((c) => {
     const j: Judgeable = {
@@ -169,7 +164,7 @@ function loadCalibrationJudgeables(sliceOnly: boolean, caseIds: readonly string[
         reports = readCheckReports(join(REPO_ROOT, 'runs', c.provenance.runId));
         checksCache.set(c.provenance.runId, reports);
       }
-      const report = reports.get(c.provenance.conversationId);
+      const report = reports.get(c.provenance.contestantRef, c.provenance.conversationId);
       if (report !== undefined) j.programmaticResults = report;
     }
     return j;
@@ -180,15 +175,19 @@ function loadCalibrationJudgeables(sliceOnly: boolean, caseIds: readonly string[
  * Judgeables from a sweep's transcripts (Phase 6). Applies the gating rule:
  * error terminations and hard-fail-gated conversations are excluded.
  */
-export function loadRunJudgeables(
-  runId: string,
-): { judgeables: Judgeable[]; gated: number; skipped: string[] } {
+export function loadRunJudgeables(runId: string): {
+  judgeables: Judgeable[];
+  gated: number;
+  skipped: string[];
+} {
   const runDir = join(REPO_ROOT, 'runs', runId);
   const transcriptPath = join(runDir, TRANSCRIPT_FILENAME);
   if (!existsSync(transcriptPath)) throw new Error(`No ${TRANSCRIPT_FILENAME} in runs/${runId}`);
   const checks = readCheckReports(runDir);
   if (checks.size === 0) {
-    throw new Error(`No checks.jsonl in runs/${runId} - run pnpm checks --run=${runId} first (the gating rule needs it).`);
+    throw new Error(
+      `No checks.jsonl in runs/${runId} - run pnpm checks --run=${runId} first (the gating rule needs it).`,
+    );
   }
 
   const set = loadScenarioSet({ includePrivate: true });
@@ -207,7 +206,7 @@ export function loadRunJudgeables(
       skipped.push(`${record.conversationId} (scenario not in set)`);
       continue;
     }
-    const report = checks.get(record.conversationId);
+    const report = checks.get(record.contestantId, record.conversationId);
     if (report?.gatesJudging) {
       gated += 1;
       continue; // composite already 0: judging spend on it is wasted money
@@ -276,6 +275,9 @@ function parseArgs(argv: string[]): CliOptions {
         options.force = true;
         break;
       case '--run':
+        // '' is falsy and would silently fall into calibration mode - the
+        // whole panel budget spent on the wrong work source.
+        if (!value) throw new Error('--run needs a value: --run=<runId>');
         options.runId = value;
         break;
       case '--cases':
@@ -297,6 +299,10 @@ function parseArgs(argv: string[]): CliOptions {
         break;
       case '--max-usd':
         options.maxUsd = Number.parseFloat(value);
+        // NaN compares false forever - the cap would be silently disabled.
+        if (!Number.isFinite(options.maxUsd)) {
+          throw new Error(`--max-usd needs a number, got "${value}"`);
+        }
         break;
       case '--concurrency':
         options.concurrency = Number.parseInt(value, 10);
@@ -394,6 +400,18 @@ async function main(): Promise<void> {
         '; caching reduces the real figure. No API calls made.',
     );
     return;
+  }
+
+  // The cap compares meter.totalUsd, and unpriced calls add $0 to it - say so
+  // loudly rather than letting the operator believe the ceiling covers them.
+  if (options.maxUsd !== undefined) {
+    const unpricedRefs = options.judges.filter((ref) => !isPriceKnown(parseModelRef(ref).modelId));
+    if (unpricedRefs.length > 0) {
+      console.warn(
+        `WARNING: --max-usd cannot see spend on unpriced judge(s) ${unpricedRefs.join(', ')} - ` +
+          'their calls bill $0 against the cap until src/telemetry/prices.ts knows them.',
+      );
+    }
   }
 
   const meter = new CostMeter();

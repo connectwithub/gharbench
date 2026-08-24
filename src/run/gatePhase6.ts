@@ -94,7 +94,8 @@ export function evaluatePhase6Gate(
           ? ` - CAUTION ${costs.aggregate.unpricedCalls} unpriced call(s) understate this`
           : ''),
     );
-    const cacheRate = costs.aggregate.calls > 0 ? costs.aggregate.cacheHits / costs.aggregate.calls : 0;
+    const cacheRate =
+      costs.aggregate.calls > 0 ? costs.aggregate.cacheHits / costs.aggregate.calls : 0;
     floor(
       `G12 cache lever engaged (hit rate >= ${minCacheRate})`,
       cacheRate >= minCacheRate,
@@ -102,19 +103,36 @@ export function evaluatePhase6Gate(
     );
   }
 
+  // The G13 floor is pushed on EVERY path (ADR-0007: a gate states only what
+  // it proves). An empty scoreRun() result - e.g. every record's scenario
+  // missing because private-pool/ is absent on this machine - must fail the
+  // floor, never skip it and let the two G12 floors carry a MET verdict.
   let scored: ScoredConversation[] = [];
+  let scoreError: string | undefined;
   try {
     scored = scoreRun(runId);
   } catch (err) {
-    floor('G13 per-instance variance not anomalous', false, err instanceof Error ? err.message : String(err));
+    scoreError = err instanceof Error ? err.message : String(err);
+  }
+  if (scoreError !== undefined) {
+    floor('G13 per-instance variance not anomalous', false, scoreError);
+  } else if (scored.length === 0) {
+    floor(
+      'G13 per-instance variance not anomalous',
+      false,
+      `no scorable conversations in runs/${runId} - transcripts empty, all error-terminated, ` +
+        'or scenarios missing from the loaded set (is private-pool/ present?)',
+    );
   }
   if (scored.length > 0) {
-    const unjudged = scored.filter((c) => c.status === 'unjudged').length;
+    const unjudged = scored.filter(
+      (c) => c.status === 'unjudged' || c.status === 'unchecked',
+    ).length;
     if (unjudged > 0) {
       floor(
         'G13 per-instance variance not anomalous',
         false,
-        `not computable: ${unjudged} conversation(s) unjudged - run pnpm judge:run --run=${runId}`,
+        `not computable: ${unjudged} conversation(s) unjudged/unchecked - run pnpm checks + pnpm judge:run --run=${runId}`,
       );
     } else {
       const flags = varianceFlags(scored);
@@ -129,7 +147,11 @@ export function evaluatePhase6Gate(
 
     // G6: the deterministic transcript sample for the human deviation audit.
     const sample = [...scored]
-      .sort((a, b) => hashOrder(a.conversationId + a.contestantId) - hashOrder(b.conversationId + b.contestantId))
+      .sort(
+        (a, b) =>
+          hashOrder(a.conversationId + a.contestantId) -
+          hashOrder(b.conversationId + b.contestantId),
+      )
       .slice(0, AUDIT_SAMPLE_SIZE);
     info.push(
       `G6 deviation-audit sample (human step, ~16-22% band): ` +
@@ -157,7 +179,8 @@ function main(): void {
     ...(assumed !== undefined ? { assumedUsdPerConv: assumed } : {}),
     ...(minCacheRate !== undefined ? { minCacheRate } : {}),
   });
-  for (const f of report.floors) console.log(`${f.met ? 'MET  ' : 'UNMET'}  ${f.name}  (${f.detail})`);
+  for (const f of report.floors)
+    console.log(`${f.met ? 'MET  ' : 'UNMET'}  ${f.name}  (${f.detail})`);
   for (const line of report.info) console.log(`info: ${line}`);
   console.log(`\nphase 6 gate (${runId}): ${report.met ? 'MET' : 'UNMET'}`);
   if (!report.met) process.exitCode = 1;

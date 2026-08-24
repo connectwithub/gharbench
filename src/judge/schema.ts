@@ -92,19 +92,45 @@ export type ParseJudgeOutcome =
   | { ok: true; verdict: JudgeVerdict }
   | { ok: false; code: 'no_json' | 'schema_violation'; detail: string };
 
-/** Last '{'-to-'}' JSON block, tolerating prose and code fences around it. */
+/**
+ * The final JSON object in the reply, tolerating prose and code fences around
+ * it. The prompt asks for reasoning BEFORE the JSON, so the preamble may
+ * contain braces (echoed templates, per-item scratch like `{verdict: ...}`);
+ * candidate '{' positions are tried in order until one parses to the last '}'.
+ */
 function extractJson(raw: string): string | undefined {
   const stripped = raw.replace(/```(?:json)?/g, '');
-  const start = stripped.indexOf('{');
   const end = stripped.lastIndexOf('}');
-  if (start === -1 || end <= start) return undefined;
-  return stripped.slice(start, end + 1);
+  if (end === -1) return undefined;
+  for (
+    let start = stripped.indexOf('{');
+    start !== -1 && start < end;
+    start = stripped.indexOf('{', start + 1)
+  ) {
+    const candidate = stripped.slice(start, end + 1);
+    try {
+      JSON.parse(candidate);
+      return candidate;
+    } catch {
+      // A brace in the pre-JSON reasoning; try the next one.
+    }
+  }
+  return undefined;
 }
 
 const normalise = (s: string): string => s.replace(/\s+/g, ' ').trim().toLowerCase();
 
+/**
+ * The no-evidence token, matched robustly: the prompt specifies the literal
+ * NONE, but judges emit 'none', 'NONE.', 'N/A' etc., and an exact-string test
+ * would let those variants smuggle an unevidenced VIOLATION past the
+ * quote-then-verdict rule (and then substring-search the transcript for the
+ * word "none").
+ */
+const isNoEvidence = (evidence: string): boolean => /^(?:none|n\/?a)[.!]?$/i.test(evidence.trim());
+
 function findEvidence(evidence: string, transcript: string): boolean | null {
-  if (evidence === 'NONE') return null;
+  if (isNoEvidence(evidence)) return null;
   return normalise(transcript).includes(normalise(evidence));
 }
 
@@ -144,12 +170,15 @@ export function parseJudgeOutput(
     if (!parsed.success) {
       return { ok: false, code: 'schema_violation', detail: parsed.error.message };
     }
-    const mismatch = idSetMismatch(applicableItems, parsed.data.items.map((i) => i.id));
+    const mismatch = idSetMismatch(
+      applicableItems,
+      parsed.data.items.map((i) => i.id),
+    );
     if (mismatch) return { ok: false, code: 'schema_violation', detail: mismatch };
 
     // Quote-then-verdict, enforced: no quote, no violation.
     for (const item of parsed.data.items) {
-      if (item.verdict === 'VIOLATION' && item.evidence === 'NONE') {
+      if (item.verdict === 'VIOLATION' && isNoEvidence(item.evidence)) {
         return {
           ok: false,
           code: 'schema_violation',
@@ -184,7 +213,10 @@ export function parseJudgeOutput(
   if (!parsed.success) {
     return { ok: false, code: 'schema_violation', detail: parsed.error.message };
   }
-  const mismatch = idSetMismatch(applicableItems, parsed.data.items.map((i) => i.id));
+  const mismatch = idSetMismatch(
+    applicableItems,
+    parsed.data.items.map((i) => i.id),
+  );
   if (mismatch) return { ok: false, code: 'schema_violation', detail: mismatch };
   const anchorMismatch = idSetMismatch(
     expectedAnchorIds,

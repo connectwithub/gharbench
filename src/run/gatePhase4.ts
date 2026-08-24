@@ -17,6 +17,7 @@ import {
   calibrationLabelSchema,
   type CalibrationCase,
 } from './calibrationCase.js';
+import { SLICE_FILE } from './calibrationSlice.js';
 
 export interface Phase4Floor {
   name: string;
@@ -87,11 +88,7 @@ export function evaluatePhase4Gate(rater = 'self'): Phase4Report {
     floors.push({ name, met, detail });
   };
 
-  floor(
-    'set size 100-300',
-    cases.length >= 100 && cases.length <= 300,
-    `${cases.length} cases`,
-  );
+  floor('set size 100-300', cases.length >= 100 && cases.length <= 300, `${cases.length} cases`);
   for (const family of FAMILIES) {
     const n = byFamily[family] ?? 0;
     floor(`family ${family} >= 10`, n >= 10, `${n} cases`);
@@ -103,11 +100,24 @@ export function evaluatePhase4Gate(rater = 'self'): Phase4Report {
       (byBand['known_pass'] ?? 0) > 0,
     JSON.stringify(byBand),
   );
-  const unlabeled = cases.filter((c) => !labeledIds.has(c.caseId)).length;
+  // Non-author raters are served ONLY the 50-case slice by the labeler
+  // (calibrationLabelServer, §4.5/I6), so their completeness floor must use
+  // the slice as its denominator - against the full set it would sit
+  // permanently UNMET at 50/136 with all assigned work done.
+  let expected = cases;
+  let scope = 'case';
+  if (rater !== 'self' && existsSync(SLICE_FILE)) {
+    const allowed = new Set(
+      (JSON.parse(readFileSync(SLICE_FILE, 'utf8')) as { ids: string[] }).ids,
+    );
+    expected = cases.filter((c) => allowed.has(c.caseId));
+    scope = 'slice case';
+  }
+  const unlabeled = expected.filter((c) => !labeledIds.has(c.caseId)).length;
   floor(
-    `every case labeled by "${rater}"`,
-    cases.length > 0 && unlabeled === 0,
-    `${cases.length - unlabeled}/${cases.length} labeled`,
+    `every ${scope} labeled by "${rater}"`,
+    expected.length > 0 && unlabeled === 0,
+    `${expected.length - unlabeled}/${expected.length} labeled`,
   );
 
   return {

@@ -62,7 +62,7 @@ function shuffledCaseIds(rater: string, casesDir: string): string[] {
     ids = ids.filter((id) => allowed.has(id));
   }
   let h = 2166136261;
-  for (const ch of rater) h = (h ^ ch.charCodeAt(0)) * 16777619;
+  for (const ch of rater) h = ((h ^ ch.charCodeAt(0)) * 16777619) >>> 0;
   const keyed = ids.map((id) => {
     let k = h >>> 0;
     for (const ch of id) k = ((k ^ ch.charCodeAt(0)) * 16777619) >>> 0;
@@ -149,6 +149,15 @@ export function startServer(rater: string, baseDir: string = CALIBRATION_DIR): v
   const rubric = loadJudgeItems();
   let reference: ReturnType<typeof buildReference> | undefined;
 
+  // Computed ONCE at startup, for two reasons: a missing slice file fails
+  // here with its intended message instead of killing the process on the
+  // rater's first request; and the alias->id mapping is frozen for the
+  // session - recomputing it per request from a live readdirSync means a
+  // concurrent calibration:build/slice shifts every position and a POSTed
+  // alias silently writes the rater's answers onto a DIFFERENT case.
+  const order = shuffledCaseIds(rater, casesDir);
+  const { toAlias, toId } = aliasCaseIds(order);
+
   const server = createServer((req, res) => {
     const url = new URL(req.url ?? '/', `http://localhost:${PORT}`);
     const json = (status: number, body: unknown): void => {
@@ -156,106 +165,111 @@ export function startServer(rater: string, baseDir: string = CALIBRATION_DIR): v
       res.end(JSON.stringify(body));
     };
 
-    if (req.method === 'GET' && url.pathname === '/api/cases') {
-      const order = shuffledCaseIds(rater, casesDir);
-      const { toAlias } = aliasCaseIds(order);
-      const labeled = readdirSync(labelsDir)
-        .filter((f) => f.endsWith('.json'))
-        .map((f) => toAlias.get(f.replace(/\.json$/, '')))
-        .filter((a): a is string => a !== undefined);
-      json(200, { rater, order: order.map((id) => toAlias.get(id)), labeled });
-      return;
-    }
-
-    if (req.method === 'GET' && url.pathname.startsWith('/api/case/')) {
-      const alias = url.pathname.slice('/api/case/'.length);
-      const order = shuffledCaseIds(rater, casesDir);
-      const caseId = aliasCaseIds(order).toId.get(alias);
-      const path = caseId !== undefined ? join(casesDir, `${caseId}.json`) : '';
-      if (caseId === undefined || !existsSync(path)) {
-        json(404, { error: 'no such case' });
+    try {
+      if (req.method === 'GET' && url.pathname === '/api/cases') {
+        const labeled = readdirSync(labelsDir)
+          .filter((f) => f.endsWith('.json'))
+          .map((f) => toAlias.get(f.replace(/\.json$/, '')))
+          .filter((a): a is string => a !== undefined);
+        json(200, { rater, order: order.map((id) => toAlias.get(id)), labeled });
         return;
       }
-      const raw = JSON.parse(readFileSync(path, 'utf8')) as CalibrationCase;
-      const labelPath = join(labelsDir, `${caseId}.json`);
-      // The stored label carries the real caseId; hand back only the answers.
-      const existing = existsSync(labelPath)
-        ? (JSON.parse(readFileSync(labelPath, 'utf8')) as {
-            binary: unknown;
-            anchors: unknown;
-            note?: unknown;
-          })
-        : null;
-      json(200, {
-        alias,
-        case: redactCase(raw),
-        existingLabel: existing
-          ? { binary: existing.binary, anchors: existing.anchors, note: existing.note ?? '' }
-          : null,
-      });
-      return;
-    }
 
-    if (req.method === 'GET' && url.pathname === '/api/rubric') {
-      json(200, rubric);
-      return;
-    }
-
-    if (req.method === 'GET' && url.pathname === '/api/reference') {
-      reference ??= buildReference();
-      json(200, reference);
-      return;
-    }
-
-    if (req.method === 'POST' && url.pathname === '/api/label') {
-      let body = '';
-      req.on('data', (c) => (body += c));
-      req.on('end', () => {
-        try {
-          const posted = JSON.parse(body) as {
-            alias?: string;
-            binary?: unknown;
-            anchors?: unknown;
-            note?: string;
-          };
-          const order = shuffledCaseIds(rater, casesDir);
-          const caseId =
-            posted.alias !== undefined ? aliasCaseIds(order).toId.get(posted.alias) : undefined;
-          if (caseId === undefined) {
-            json(400, { error: `unknown case alias ${posted.alias ?? '(none)'}` });
-            return;
-          }
-          // The client never sees the real id; the full label (real caseId,
-          // rater, timestamp) is assembled here so the stored file keeps the
-          // shape every downstream consumer already expects.
-          const parsed = calibrationLabelSchema.safeParse({
-            caseId,
-            rater,
-            labeledAt: new Date().toISOString(),
-            binary: posted.binary,
-            anchors: posted.anchors,
-            ...(posted.note !== undefined && posted.note !== '' ? { note: posted.note } : {}),
-          });
-          if (!parsed.success) {
-            json(400, { error: parsed.error.message });
-            return;
-          }
-          writeFileSync(
-            join(labelsDir, `${parsed.data.caseId}.json`),
-            JSON.stringify(parsed.data, null, 2) + '\n',
-          );
-          json(200, { ok: true });
-        } catch {
-          json(400, { error: 'bad json' });
+      if (req.method === 'GET' && url.pathname.startsWith('/api/case/')) {
+        const alias = url.pathname.slice('/api/case/'.length);
+        const caseId = toId.get(alias);
+        const path = caseId !== undefined ? join(casesDir, `${caseId}.json`) : '';
+        if (caseId === undefined || !existsSync(path)) {
+          json(404, { error: 'no such case' });
+          return;
         }
-      });
-      return;
-    }
+        const raw = JSON.parse(readFileSync(path, 'utf8')) as CalibrationCase;
+        const labelPath = join(labelsDir, `${caseId}.json`);
+        // The stored label carries the real caseId; hand back only the answers.
+        const existing = existsSync(labelPath)
+          ? (JSON.parse(readFileSync(labelPath, 'utf8')) as {
+              binary: unknown;
+              anchors: unknown;
+              note?: unknown;
+            })
+          : null;
+        json(200, {
+          alias,
+          case: redactCase(raw),
+          existingLabel: existing
+            ? { binary: existing.binary, anchors: existing.anchors, note: existing.note ?? '' }
+            : null,
+        });
+        return;
+      }
 
-    // default: the UI
-    const html = readFileSync(join(REPO_ROOT, 'src', 'run', 'calibrationLabel.html'), 'utf8');
-    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-    res.end(html);
+      if (req.method === 'GET' && url.pathname === '/api/rubric') {
+        json(200, rubric);
+        return;
+      }
+
+      if (req.method === 'GET' && url.pathname === '/api/reference') {
+        reference ??= buildReference();
+        json(200, reference);
+        return;
+      }
+
+      if (req.method === 'POST' && url.pathname === '/api/label') {
+        let body = '';
+        req.on('data', (c) => (body += c));
+        req.on('end', () => {
+          // Parse failures are the client's fault (400); anything after that -
+          // e.g. a failed disk write - is the server's (500), and must not be
+          // mislabeled 'bad json' while the rater's answers are lost.
+          let posted: { alias?: string; binary?: unknown; anchors?: unknown; note?: string };
+          try {
+            posted = JSON.parse(body) as typeof posted;
+          } catch {
+            json(400, { error: 'bad json' });
+            return;
+          }
+          try {
+            const caseId = posted.alias !== undefined ? toId.get(posted.alias) : undefined;
+            if (caseId === undefined) {
+              json(400, { error: `unknown case alias ${posted.alias ?? '(none)'}` });
+              return;
+            }
+            // The client never sees the real id; the full label (real caseId,
+            // rater, timestamp) is assembled here so the stored file keeps the
+            // shape every downstream consumer already expects.
+            const parsed = calibrationLabelSchema.safeParse({
+              caseId,
+              rater,
+              labeledAt: new Date().toISOString(),
+              binary: posted.binary,
+              anchors: posted.anchors,
+              ...(posted.note !== undefined && posted.note !== '' ? { note: posted.note } : {}),
+            });
+            if (!parsed.success) {
+              json(400, { error: parsed.error.message });
+              return;
+            }
+            writeFileSync(
+              join(labelsDir, `${parsed.data.caseId}.json`),
+              JSON.stringify(parsed.data, null, 2) + '\n',
+            );
+            json(200, { ok: true });
+          } catch (err) {
+            json(500, { error: err instanceof Error ? err.message : String(err) });
+          }
+        });
+        return;
+      }
+
+      // default: the UI
+      const html = readFileSync(join(REPO_ROOT, 'src', 'run', 'calibrationLabel.html'), 'utf8');
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      res.end(html);
+    } catch (err) {
+      // A sync throw here would otherwise take down the whole labeler
+      // mid-session (node treats it as an uncaughtException).
+      json(500, { error: err instanceof Error ? err.message : String(err) });
+    }
   });
 
   server.listen(PORT, '127.0.0.1', () => {
