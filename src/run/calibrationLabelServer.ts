@@ -237,12 +237,24 @@ export function startServer(rater: string, baseDir: string = CALIBRATION_DIR): v
             }
             // The client never sees the real id; the full label (real caseId,
             // rater, timestamp) is assembled here so the stored file keeps the
-            // shape every downstream consumer already expects.
+            // shape every downstream consumer already expects. Binary answers
+            // are filtered to the items this case actually asks - a UI
+            // navigation race once left a stale key from the previous case in
+            // the posted state, and an un-asked answer must never be stored.
+            const caseRaw = JSON.parse(
+              readFileSync(join(casesDir, `${caseId}.json`), 'utf8'),
+            ) as CalibrationCase;
+            const asked = new Set(Object.values(caseRaw.judgeApplicability).flat());
+            const binary = Object.fromEntries(
+              Object.entries((posted.binary ?? {}) as Record<string, unknown>).filter(([k]) =>
+                asked.has(k),
+              ),
+            );
             const parsed = calibrationLabelSchema.safeParse({
               caseId,
               rater,
               labeledAt: new Date().toISOString(),
-              binary: posted.binary,
+              binary,
               anchors: posted.anchors,
               ...(posted.note !== undefined && posted.note !== '' ? { note: posted.note } : {}),
             });
