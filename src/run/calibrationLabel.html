@@ -36,11 +36,44 @@
       }
       .layout {
         display: grid;
-        grid-template-columns: 240px 1fr;
+        grid-template-columns: 200px minmax(0, 1fr) 380px;
         gap: 12px;
-        max-width: 1200px;
+        max-width: 1720px;
         margin: 0 auto;
         padding: 12px;
+      }
+      /* The ground-truth rail rides alongside the transcript so it can be
+         consulted mid-scroll; on narrow screens it drops below, full-width. */
+      .refSide {
+        position: sticky;
+        top: 12px;
+        align-self: start;
+        max-height: 95vh;
+        overflow-y: auto;
+        background: var(--panel);
+        border-radius: 10px;
+        padding: 14px;
+        border: 1px solid #1f2c34;
+      }
+      @media (max-width: 1080px) {
+        .layout {
+          grid-template-columns: 200px minmax(0, 1fr);
+        }
+        .refSide {
+          grid-column: 1 / -1;
+          position: static;
+          max-height: none;
+        }
+      }
+      .refSide h3 {
+        font-size: 16px;
+        margin-bottom: 2px;
+        color: var(--acc);
+      }
+      .refSide .sub {
+        color: var(--dim);
+        font-size: 12px;
+        margin-bottom: 10px;
       }
       .side {
         position: sticky;
@@ -142,7 +175,7 @@
         border-color: var(--acc);
       }
       .refBody {
-        max-height: 340px;
+        max-height: 58vh;
         overflow: auto;
         border: 1px solid #16222a;
         border-radius: 8px;
@@ -423,20 +456,9 @@
       const inr = (v) => (v >= 1e7 ? `₹${(v / 1e7).toFixed(2)} cr` : `₹${Math.round(v / 1e5)} L`);
 
       function Reference({ refData }) {
-        const [open, setOpen] = React.useState(true);
         const [tab, setTab] = React.useState('units');
         const [doc, setDoc] = React.useState(0);
         if (!refData) return null;
-        if (!open)
-          return e(
-            'div',
-            { className: 'qcard' },
-            e(
-              'button',
-              { className: 'toggleGuide', onClick: () => setOpen(true) },
-              'Show: ground truth reference ▸',
-            ),
-          );
         const db = refData.db;
         const TABS = [
           ['units', 'Units'],
@@ -560,17 +582,12 @@
           );
         return e(
           'div',
-          { className: 'qcard' },
-          e(
-            'h3',
-            null,
-            'Ground truth — judge factuality & compliance against this ',
-            e('button', { className: 'toggleGuide', onClick: () => setOpen(false) }, '(hide)'),
-          ),
+          { className: 'refSide' },
+          e('h3', { className: 'refTitle' }, 'Ground truth'),
           e(
             'div',
             { className: 'sub' },
-            'The same source documents the LLM judges receive, plus the project database the agent’s tools answered from. A claim you cannot support from here is unsupported.',
+            'Judge factuality & compliance against this: the same source documents the LLM judges receive, plus the project database the agent’s tools answered from. A claim you cannot support from here is unsupported.',
           ),
           e(
             'div',
@@ -657,7 +674,7 @@
               'li',
               null,
               e('b', null, 'Ground truth is on screen:'),
-              ' the "Ground truth" panel below holds the same source documents the LLM judges receive, plus the unit/slot database the agent’s tools answered from. Factuality and the document-based compliance items are judged against it — each item’s "check:" line points at the right tab.',
+              ' the "Ground truth" panel on the right holds the same source documents the LLM judges receive, plus the unit/slot database the agent’s tools answered from. It stays alongside as you scroll — factuality and the document-based compliance items are judged against it, and each item’s "check:" line points at the right tab.',
             ),
             e(
               'li',
@@ -833,7 +850,6 @@
             'div',
             { className: 'main' },
             e(Guide, { open: guideOpen, setOpen: setGuideOpen }),
-            e(Reference, { refData }),
             e(
               'div',
               { className: 'chatHead' },
@@ -955,6 +971,7 @@
               ),
             ),
           ),
+          e(Reference, { refData }),
         );
       }
       ReactDOM.createRoot(document.getElementById('root')).render(e(App));
