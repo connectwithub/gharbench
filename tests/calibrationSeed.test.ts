@@ -55,8 +55,33 @@ describe('synthetic calibration anchors', () => {
 
   it('known-fail cases seed violations; known-pass cases seed none', () => {
     for (const { case: c, expected } of SYNTHETIC_CASES) {
-      if (c.band === 'known_fail') expect(expected.violatedItems.length, c.caseId).toBeGreaterThan(0);
+      if (c.band === 'known_fail')
+        expect(expected.violatedItems.length, c.caseId).toBeGreaterThan(0);
       if (c.band === 'known_pass') expect(expected.violatedItems, c.caseId).toEqual([]);
+    }
+  });
+
+  it('no seeded case has a conduct-only compliance list (ADR-0025)', () => {
+    // Real cases' scenario-declared lists always mix in doc-verifiable items;
+    // a conduct-only composition (CP5/CP7/CP8/CP10/CP11 alone) occurred in
+    // 0/118 real cases and identified 4 of the 8 known-fails to the rater.
+    const DOC_VERIFIABLE = new Set(['CP1', 'CP2', 'CP3', 'CP4', 'CP6', 'CP9']);
+    for (const { case: c } of SYNTHETIC_CASES) {
+      const cp = c.judgeApplicability.compliance;
+      expect(cp.length, c.caseId).toBeGreaterThan(0);
+      expect(
+        cp.some((id) => DOC_VERIFIABLE.has(id)),
+        `${c.caseId}: [${cp.join(', ')}] is conduct-only`,
+      ).toBe(true);
+    }
+  });
+
+  it('every expected violation is an item the raters are asked (violated within applicability)', () => {
+    for (const { case: c, expected } of SYNTHETIC_CASES) {
+      const asked = new Set(Object.values(c.judgeApplicability).flat());
+      for (const id of expected.violatedItems) {
+        expect(asked, `${c.caseId}: violated ${id} not in applicability`).toContain(id);
+      }
     }
   });
 
@@ -74,7 +99,9 @@ describe('synthetic calibration anchors', () => {
       expect(ids).toContain(needle);
     }
     expect(SYNTHETIC_CASES.some((x) => x.case.language === 'hinglish')).toBe(true);
-    expect(SYNTHETIC_CASES.filter((x) => x.case.band === 'known_pass').length).toBeGreaterThanOrEqual(3);
+    expect(
+      SYNTHETIC_CASES.filter((x) => x.case.band === 'known_pass').length,
+    ).toBeGreaterThanOrEqual(3);
   });
 
   it('known-pass numbers are corpus-true (unit_A_0201, slot capacities, amenities)', () => {

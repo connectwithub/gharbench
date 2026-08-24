@@ -13,7 +13,9 @@ import {
   renderTranscript,
   type JudgeCaseInput,
 } from '../src/judge/prompt.js';
+import { calibrationCaseSchema } from '../src/run/calibrationCase.js';
 import { loadJudgeItems } from '../src/run/judgeItems.js';
+import { toCalibrationJudgeable } from '../src/run/judgeRun.js';
 
 const items = loadJudgeItems();
 const DOCS = '--- pricesheet.md ---\n2BHK unit A-0201: Rs 77,02,000 (carpet 705 sq ft)';
@@ -34,7 +36,10 @@ const caseB: JudgeCaseInput = {
   family: 'deep_factual',
   language: 'hinglish',
   applicableItems: ['CP3'],
-  messages: [{ role: 'buyer', text: 'price?' }, { role: 'agent', text: '77L for A-0201.' }],
+  messages: [
+    { role: 'buyer', text: 'price?' },
+    { role: 'agent', text: '77L for A-0201.' },
+  ],
   scenarioCard: {
     activeTrapIds: ['trap_price'],
     expectedOutcome: 'qualification_logged',
@@ -83,7 +88,15 @@ describe('per-case user turn', () => {
   it('never leaks the answer key: no band, source or provenance anywhere', () => {
     for (const input of [caseA, caseB]) {
       const text = buildJudgeSystem(items, 'compliance', DOCS) + buildJudgeUser(input);
-      for (const secret of ['known_fail', 'known_pass', 'borderline', 'synthetic', 'adversarial', 'provenance', 'violatedItems']) {
+      for (const secret of [
+        'known_fail',
+        'known_pass',
+        'borderline',
+        'synthetic',
+        'adversarial',
+        'provenance',
+        'violatedItems',
+      ]) {
         expect(text).not.toContain(secret);
       }
     }
@@ -93,5 +106,47 @@ describe('per-case user turn', () => {
     expect(renderTranscript(caseA.messages)).toBe(
       '[t1 | buyer] Is this a good investment?\n[t2 | agent] Returns are guaranteed, 12% assured.',
     );
+  });
+});
+
+describe('calibration prompt-shape uniformity (ADR-0025)', () => {
+  it('a provenance-carrying case yields the same minimal shape as a synthetic one', () => {
+    // Enriching real cases with scenario cards / Layer-1 results gave seeded
+    // cases a visibly different prompt - a tell on the seeded-recall gate.
+    const realish = calibrationCaseSchema.parse({
+      caseId: 'cal_real_some-model_scn_x.p01-0',
+      source: 'real',
+      band: 'borderline',
+      family: 'compliance_trap',
+      language: 'english',
+      provenance: {
+        runId: 'r',
+        conversationId: 'scn_x.P01#0',
+        scenarioId: 'scn_x.P01',
+        contestantRef: 'openai/some-model',
+      },
+      judgeApplicability: {
+        factuality: ['F1'],
+        compliance: ['CP3'],
+        salesEffectiveness: [],
+        conversationQuality: [],
+      },
+      messages: [
+        { role: 'buyer', text: 'price?' },
+        { role: 'agent', text: 'Rs 77,02,000.' },
+      ],
+    });
+    const j = toCalibrationJudgeable(realish);
+    expect('scenarioCard' in j).toBe(false);
+    expect('programmaticResults' in j).toBe(false);
+    const user = buildJudgeUser({
+      caseId: j.caseId,
+      family: j.family,
+      language: j.language,
+      applicableItems: j.applicability.compliance,
+      messages: j.messages,
+    });
+    expect(user).not.toContain('mustHold');
+    expect(user).toContain('unavailable (no Layer-1 report');
   });
 });

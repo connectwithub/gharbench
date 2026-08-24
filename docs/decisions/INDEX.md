@@ -3,13 +3,14 @@
 Generated from `decisions.jsonl` — do not edit by hand.
 Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 
-23 decisions.
+24 decisions.
 
 ## By date
 
 - **ADR-0022** (2026-08-24) — [Calibration labeler hardened: opaque case aliases and violation-polarity buttons](ADR-0022-labeler-blindness-aliases-and-polarity-ui.md)
 - **ADR-0023** (2026-08-24) — [The labeler shows the judge's source documents and the gold DB](ADR-0023-labeler-ground-truth-reference.md)
 - **ADR-0024** (2026-08-24) — [Pre-run pipeline hardening: contestant-aware check reports and gate completeness floors](ADR-0024-prerun-pipeline-hardening.md)
+- **ADR-0025** (2026-08-24) — [Calibration judging: uniform prompt shape and no conduct-only item lists](ADR-0025-calibration-blindness-uniform-prompt.md)
 - **ADR-0021** (2026-08-21) — [Buyer guardrails hardened with an anti-repetition mandate after the G6 pilot audit](ADR-0021-anti-repetition-guardrail-after-g6-audit.md)
 - **ADR-0014** (2026-08-20) — [Personas are public; scenarios are persona-bound instance files split at authoring time](ADR-0014-personas-are-public-scenarios-are-persona-bound-instance-files.md)
 - **ADR-0015** (2026-08-20) — [Layer-1 checks fire only on quotable, context-anchored evidence](ADR-0015-checks-fire-only-on-quotable-context-anchored-evidence.md)
@@ -48,6 +49,7 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 ### `blindness`
 
 - ADR-0022 — [Calibration labeler hardened: opaque case aliases and violation-polarity buttons](ADR-0022-labeler-blindness-aliases-and-polarity-ui.md)
+- ADR-0025 — [Calibration judging: uniform prompt shape and no conduct-only item lists](ADR-0025-calibration-blindness-uniform-prompt.md)
 
 ### `buyer`
 
@@ -68,6 +70,7 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 
 - ADR-0022 — [Calibration labeler hardened: opaque case aliases and violation-polarity buttons](ADR-0022-labeler-blindness-aliases-and-polarity-ui.md)
 - ADR-0023 — [The labeler shows the judge's source documents and the gold DB](ADR-0023-labeler-ground-truth-reference.md)
+- ADR-0025 — [Calibration judging: uniform prompt shape and no conduct-only item lists](ADR-0025-calibration-blindness-uniform-prompt.md)
 
 ### `checks`
 
@@ -118,6 +121,7 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 
 - ADR-0022 — [Calibration labeler hardened: opaque case aliases and violation-polarity buttons](ADR-0022-labeler-blindness-aliases-and-polarity-ui.md)
 - ADR-0023 — [The labeler shows the judge's source documents and the gold DB](ADR-0023-labeler-ground-truth-reference.md)
+- ADR-0025 — [Calibration judging: uniform prompt shape and no conduct-only item lists](ADR-0025-calibration-blindness-uniform-prompt.md)
 
 ### `judge-panel`
 
@@ -141,6 +145,7 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 ### `prompt`
 
 - ADR-0021 — [Buyer guardrails hardened with an anti-repetition mandate after the G6 pilot audit](ADR-0021-anti-repetition-guardrail-after-g6-audit.md)
+- ADR-0025 — [Calibration judging: uniform prompt shape and no conduct-only item lists](ADR-0025-calibration-blindness-uniform-prompt.md)
 
 ### `provider`
 

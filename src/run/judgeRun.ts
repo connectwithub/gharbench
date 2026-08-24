@@ -43,7 +43,7 @@ import {
   type CalibrationCase,
 } from './calibrationCase.js';
 import { projectMessages } from './calibrationBuild.js';
-import { readCheckReports, type CheckReportIndex } from './checkReports.js';
+import { readCheckReports } from './checkReports.js';
 import { SLICE_FILE } from './calibrationSlice.js';
 import { loadJudgeItems, type JudgeDimension, type JudgeItems } from './judgeItems.js';
 import { REPO_ROOT, loadScenarioSet } from './scenarioSet.js';
@@ -138,37 +138,29 @@ function loadCalibrationJudgeables(sliceOnly: boolean, caseIds: readonly string[
     cases = cases.filter((c) => wanted.has(c.caseId));
   }
 
-  const set = loadScenarioSet();
-  const scenarioById = new Map(set.scenarios.map((s) => [s.scenarioId, s]));
-  const checksCache = new Map<string, CheckReportIndex>();
+  return cases.map(toCalibrationJudgeable);
+}
 
-  return cases.map((c) => {
-    const j: Judgeable = {
-      caseId: c.caseId,
-      family: c.family,
-      language: c.language,
-      applicability: c.judgeApplicability,
-      messages: c.messages,
-    };
-    if (c.provenance) {
-      const scenario = scenarioById.get(c.provenance.scenarioId);
-      if (scenario) {
-        j.scenarioCard = {
-          activeTrapIds: scenario.activeTrapIds,
-          expectedOutcome: scenario.groundTruth.expectedOutcome,
-          mustHold: scenario.groundTruth.mustHold,
-        };
-      }
-      let reports = checksCache.get(c.provenance.runId);
-      if (!reports) {
-        reports = readCheckReports(join(REPO_ROOT, 'runs', c.provenance.runId));
-        checksCache.set(c.provenance.runId, reports);
-      }
-      const report = reports.get(c.provenance.contestantRef, c.provenance.conversationId);
-      if (report !== undefined) j.programmaticResults = report;
-    }
-    return j;
-  });
+/**
+ * ADR-0025: calibration judging uses ONE uniform prompt shape for every case
+ * - no scenario card, no Layer-1 results - regardless of provenance. Real
+ * cases could carry both (the pilot-era code attached them), which gave the
+ * 18 seeded cases a visibly different prompt (no card, "PROGRAMMATIC RESULTS
+ * unavailable") - a 100%-accurate tell on exactly the seeded-recall
+ * measurement. The minimal shape also matches the human labeler's
+ * information set (transcript + rubric + source documents), which is the
+ * right basis for G8 agreement. Run-mode judging (loadRunJudgeables) keeps
+ * card + Layer-1: every run conversation has them, so that shape is uniform
+ * too. Never re-add per-provenance enrichment here.
+ */
+export function toCalibrationJudgeable(c: CalibrationCase): Judgeable {
+  return {
+    caseId: c.caseId,
+    family: c.family,
+    language: c.language,
+    applicability: c.judgeApplicability,
+    messages: c.messages,
+  };
 }
 
 /**
