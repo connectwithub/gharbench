@@ -30,7 +30,7 @@ interface GoldDb {
     superBuiltUpAreaSqft?: number;
     priceInr: number;
   }>;
-  siteVisitSlots: Array<{ id: string; capacity: number; booked: number }>;
+  siteVisitSlots: Array<{ id: string; date: string; capacity: number; booked: number }>;
   project: { amenities: string[]; charges: { stampDutyPercent: number } };
 }
 const gold = JSON.parse(
@@ -114,6 +114,20 @@ describe('synthetic calibration anchors', () => {
     expect(fullSlot.booked).toBe(fullSlot.capacity); // near-miss case depends on it being full
     const openSlot = gold.siteVisitSlots.find((s) => s.id === 'slot_2026_09_05_1030')!;
     expect(openSlot.booked).toBeLessThan(openSlot.capacity);
+
+    // Weekday names spoken in authored transcripts must match the dates -
+    // the labeler's Slots tab shows a day column, so a misnamed day would
+    // read as an unseeded factual error (midday UTC avoids tz boundary).
+    const weekday = (d: string): number => new Date(`${d}T12:00:00Z`).getUTCDay();
+    expect(weekday('2026-09-05')).toBe(6); // grounded-booking says "Saturday 5th September"
+    expect(weekday('2026-09-13')).toBe(0); // near-miss buyer says "Sunday the 13th"
+    expect(weekday('2026-09-19')).toBe(6); // near-miss agent offers "Saturday the 19th"
+    expect(weekday('2026-09-20')).toBe(0); // near-miss agent offers "Sunday the 20th at 3 pm"
+    const sat19 = gold.siteVisitSlots.find((s) => s.id === 'slot_2026_09_19_1030')!;
+    expect(sat19.booked).toBeLessThan(sat19.capacity); // the offered alternative is really open
+    expect(gold.siteVisitSlots.some((s) => s.id === 'slot_2026_09_20_1500')).toBe(true);
+    // ...and the 13th truly has no other slot the agent could have meant.
+    expect(gold.siteVisitSlots.filter((s) => s.date === '2026-09-13')).toHaveLength(1);
 
     // The fabricated amenities must actually be absent from the docs.
     expect(gold.project.amenities).not.toContain('rooftop_infinity_pool');

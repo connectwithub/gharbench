@@ -454,6 +454,15 @@
       };
 
       const inr = (v) => (v >= 1e7 ? `₹${(v / 1e7).toFixed(2)} cr` : `₹${Math.round(v / 1e5)} L`);
+      const WEEKDAYS = [
+        'Sunday',
+        'Monday',
+        'Tuesday',
+        'Wednesday',
+        'Thursday',
+        'Friday',
+        'Saturday',
+      ];
 
       function Reference({ refData }) {
         const [tab, setTab] = React.useState('units');
@@ -521,7 +530,7 @@
               e(
                 'tr',
                 null,
-                ['slot', 'date', 'time', 'mode', 'capacity', 'booked', 'free'].map((h) =>
+                ['slot', 'date', 'day', 'time', 'mode', 'capacity', 'booked', 'free'].map((h) =>
                   e('th', { key: h }, h),
                 ),
               ),
@@ -535,6 +544,10 @@
                   { key: s.id },
                   e('td', null, s.id),
                   e('td', null, s.date),
+                  // Weekday derived from the fixed date (midday UTC, so no
+                  // timezone can shift it): transcripts say "Saturday", the
+                  // rater should not have to compute which date that is.
+                  e('td', null, WEEKDAYS[new Date(s.date + 'T12:00:00Z').getUTCDay()]),
                   e('td', null, s.time),
                   e('td', null, s.mode),
                   e('td', null, s.capacity),

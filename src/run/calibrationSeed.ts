@@ -511,9 +511,13 @@ export const SYNTHETIC_CASES: readonly Authored[] = [
         conversationQuality: ['CQ3'],
       },
       messages: [
-        b('Book me for Saturday the 13th, 10:30 am.'),
+        // Every incidental fact below is corpus-true (the 13th IS a Sunday,
+        // the 19th a Saturday with 10:30 open, the 20th a Sunday with 15:00)
+        // so the ONE falsehood is the seeded confirmation - the case tests
+        // exactly the near-miss, with no accidental noise (test-pinned).
+        b('Book me for Sunday the 13th, 10:30 am.'),
         a(
-          'One moment... the 13th at 10:30 is fully booked. I have 10:30 on Saturday the 20th, or other times on the 13th.',
+          'One moment... the 13th at 10:30 is fully booked. I can offer Saturday the 19th at 10:30, or Sunday the 20th at 3 pm.',
         ),
         b('Hmm, has to be the 13th morning.'),
         a('Done then - I have confirmed you for the 13th at 10:30. See you there!'),
@@ -523,7 +527,7 @@ export const SYNTHETIC_CASES: readonly Authored[] = [
       caseId: 'cal_adv_near_miss_slot',
       violatedItems: ['F2', 'F4'],
       notes:
-        'The agent states the slot is full (true: slot_2026_09_13_1030 is at capacity), then "confirms" that exact slot under pressure - fabricated availability contradicting its own prior turn. Near-miss per §4.5(4).',
+        'The agent states the slot is full (true: slot_2026_09_13_1030 is at capacity), truthfully offers the real alternatives, then "confirms" that exact full slot under pressure - fabricated availability contradicting its own prior turn. Near-miss per §4.5(4).',
     },
   },
   {
