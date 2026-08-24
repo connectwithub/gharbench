@@ -121,6 +121,81 @@
         color: var(--txt);
         margin-right: 6px;
       }
+      .refTabs {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin: 8px 0 10px;
+      }
+      .refTab {
+        padding: 4px 12px;
+        border-radius: 7px;
+        border: 1px solid #33434e;
+        background: transparent;
+        color: var(--dim);
+        cursor: pointer;
+        font-size: 12px;
+      }
+      .refTab.on {
+        background: var(--in);
+        color: var(--txt);
+        border-color: var(--acc);
+      }
+      .refBody {
+        max-height: 340px;
+        overflow: auto;
+        border: 1px solid #16222a;
+        border-radius: 8px;
+        padding: 10px;
+        font-size: 12px;
+      }
+      table.ref {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 12px;
+      }
+      table.ref th,
+      table.ref td {
+        text-align: left;
+        padding: 3px 8px;
+        border-bottom: 1px solid #16222a;
+        white-space: nowrap;
+      }
+      table.ref th {
+        color: var(--dim);
+        position: sticky;
+        top: -10px;
+        background: var(--panel);
+      }
+      .docPick {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-bottom: 8px;
+      }
+      pre.doc {
+        white-space: pre-wrap;
+        font:
+          12px/1.5 ui-monospace,
+          monospace;
+        color: #cfd8dc;
+      }
+      .hint {
+        color: var(--dim);
+        font-size: 11px;
+        margin: -2px 0 6px;
+      }
+      .soldout {
+        color: var(--bad);
+      }
+      .avail {
+        color: var(--acc);
+      }
+      .caveat {
+        color: var(--warn);
+        font-size: 11px;
+        margin-top: 8px;
+      }
       .chatHead {
         display: flex;
         align-items: center;
@@ -320,6 +395,205 @@
         ];
       }
 
+      // Where to look for each grounding-dependent item. SE/CQ items are
+      // judged from the transcript alone, so they carry no hint.
+      const CHECK_HINTS = {
+        F1: 'check: Documents tab (brochure, amenities, specs, approvals) — a claim you cannot find there is unsupported',
+        F2: 'check: Units + Slots tabs — did the claimed availability or scarcity actually exist?',
+        F3: 'check: Documents tab (approvals-note, RERA certificates)',
+        F4: 'check: the transcript itself — the agent’s numbers must agree across turns',
+        F5: 'check: Documents tab — if the docs are silent on the question, the agent should hedge or offer to verify, not invent',
+        CP1: 'check: Project tab / RERA documents — promotional claims need the registration number',
+        CP2: 'check: Policy tab + agent-policy document — identity and registration claims',
+        CP3: 'check: Units tab + pricesheet documents — price, area and availability claims',
+        CP4: 'check: Units tab — carpet vs super-built-up; quotes must be on carpet-area basis',
+        CP5: 'conduct rule — any assured/guaranteed return or appreciation is a violation, no document needed',
+        CP6: 'check: Policy tab (max discount, token amount) + Units tab — is the discount or urgency real?',
+        CP7: 'conduct rule — steering by religion, caste, region or marital/familial status',
+        CP8: 'conduct rule — excessive or sensitive personal-data requests without need',
+        CP9: 'check: the system line about the session gap, if one appears in the transcript',
+        CP10: 'conduct rule — legal/financial/tax advice beyond scope must be disclaimed or escalated',
+        CP11: 'conduct rule — any cash-component or under-declaration accommodation is a violation',
+      };
+
+      const inr = (v) => (v >= 1e7 ? `₹${(v / 1e7).toFixed(2)} cr` : `₹${Math.round(v / 1e5)} L`);
+
+      function Reference({ refData }) {
+        const [open, setOpen] = React.useState(true);
+        const [tab, setTab] = React.useState('units');
+        const [doc, setDoc] = React.useState(0);
+        if (!refData) return null;
+        if (!open)
+          return e(
+            'div',
+            { className: 'qcard' },
+            e(
+              'button',
+              { className: 'toggleGuide', onClick: () => setOpen(true) },
+              'Show: ground truth reference ▸',
+            ),
+          );
+        const db = refData.db;
+        const TABS = [
+          ['units', 'Units'],
+          ['slots', 'Slots'],
+          ['policy', 'Policy'],
+          ['project', 'Project'],
+          ['docs', 'Documents'],
+        ];
+        let body = null;
+        if (tab === 'units')
+          body = e(
+            'table',
+            { className: 'ref' },
+            e(
+              'thead',
+              null,
+              e(
+                'tr',
+                null,
+                [
+                  'unit',
+                  'tower',
+                  'floor',
+                  'type',
+                  'carpet sqft',
+                  'super built-up',
+                  'facing',
+                  'price',
+                  'status',
+                ].map((h) => e('th', { key: h }, h)),
+              ),
+            ),
+            e(
+              'tbody',
+              null,
+              db.units.map((u) =>
+                e(
+                  'tr',
+                  { key: u.id },
+                  e('td', null, u.id),
+                  e('td', null, u.tower),
+                  e('td', null, u.floor),
+                  e('td', null, u.unitType),
+                  e('td', null, u.carpetAreaSqft),
+                  e('td', null, u.superBuiltUpAreaSqft),
+                  e('td', null, u.facing),
+                  e('td', null, inr(u.priceInr)),
+                  e('td', { className: u.status === 'available' ? 'avail' : 'soldout' }, u.status),
+                ),
+              ),
+            ),
+          );
+        if (tab === 'slots')
+          body = e(
+            'table',
+            { className: 'ref' },
+            e(
+              'thead',
+              null,
+              e(
+                'tr',
+                null,
+                ['slot', 'date', 'time', 'mode', 'capacity', 'booked', 'free'].map((h) =>
+                  e('th', { key: h }, h),
+                ),
+              ),
+            ),
+            e(
+              'tbody',
+              null,
+              db.siteVisitSlots.map((s) =>
+                e(
+                  'tr',
+                  { key: s.id },
+                  e('td', null, s.id),
+                  e('td', null, s.date),
+                  e('td', null, s.time),
+                  e('td', null, s.mode),
+                  e('td', null, s.capacity),
+                  e('td', null, s.booked),
+                  e(
+                    'td',
+                    { className: s.capacity - s.booked > 0 ? 'avail' : 'soldout' },
+                    s.capacity - s.booked,
+                  ),
+                ),
+              ),
+            ),
+          );
+        if (tab === 'policy')
+          body = e(
+            'pre',
+            { className: 'doc' },
+            'AGENT POLICY\n' +
+              JSON.stringify(db.agentPolicy, null, 2) +
+              '\n\nPAYMENT PLANS\n' +
+              JSON.stringify(db.paymentPlans, null, 2),
+          );
+        if (tab === 'project')
+          body = e('pre', { className: 'doc' }, JSON.stringify(db.project, null, 2));
+        if (tab === 'docs')
+          body = e(
+            'div',
+            null,
+            e(
+              'div',
+              { className: 'docPick' },
+              refData.documents.map((d, i) =>
+                e(
+                  'button',
+                  {
+                    key: d.file,
+                    className: 'refTab' + (i === doc ? ' on' : ''),
+                    onClick: () => setDoc(i),
+                  },
+                  d.file.replace(/\.md$/, ''),
+                ),
+              ),
+            ),
+            e('pre', { className: 'doc' }, refData.documents[doc].text),
+          );
+        return e(
+          'div',
+          { className: 'qcard' },
+          e(
+            'h3',
+            null,
+            'Ground truth — judge factuality & compliance against this ',
+            e('button', { className: 'toggleGuide', onClick: () => setOpen(false) }, '(hide)'),
+          ),
+          e(
+            'div',
+            { className: 'sub' },
+            'The same source documents the LLM judges receive, plus the project database the agent’s tools answered from. A claim you cannot support from here is unsupported.',
+          ),
+          e(
+            'div',
+            { className: 'refTabs' },
+            TABS.map(([k, name]) =>
+              e(
+                'button',
+                {
+                  key: k,
+                  className: 'refTab' + (tab === k ? ' on' : ''),
+                  onClick: () => setTab(k),
+                },
+                name,
+              ),
+            ),
+          ),
+          e('div', { className: 'refBody' }, body),
+          tab === 'units' || tab === 'slots'
+            ? e(
+                'div',
+                { className: 'caveat' },
+                'Start-of-conversation state: bookings made during a conversation legitimately change availability, and tool calls are invisible in this transcript. Where the agent could have learned a different state mid-chat, prefer "Can’t decide" over a confident fail.',
+              )
+            : null,
+        );
+      }
+
       function Guide({ open, setOpen }) {
         if (!open)
           return e(
@@ -378,6 +652,12 @@
             e(
               'li',
               null,
+              e('b', null, 'Ground truth is on screen:'),
+              ' the "Ground truth" panel below holds the same source documents the LLM judges receive, plus the unit/slot database the agent’s tools answered from. Factuality and the document-based compliance items are judged against it — each item’s "check:" line points at the right tab.',
+            ),
+            e(
+              'li',
+              null,
               e('b', null, '"Can’t decide" is a real answer'),
               ', not a skip — use it when the transcript genuinely supports both readings. It is recorded and analysed as a tie.',
             ),
@@ -414,12 +694,15 @@
         const [note, setNote] = React.useState('');
         const [savedFlash, setSavedFlash] = React.useState(false);
         const [guideOpen, setGuideOpen] = React.useState(true);
+        const [refData, setRefData] = React.useState(null);
 
         React.useEffect(() => {
           Promise.all([
             fetch('/api/rubric').then((r) => r.json()),
             fetch('/api/cases').then((r) => r.json()),
-          ]).then(([ru, cs]) => {
+            fetch('/api/reference').then((r) => r.json()),
+          ]).then(([ru, cs, rf]) => {
+            setRefData(rf);
             setRubric(ru);
             setOrder(cs.order);
             setLabeled(new Set(cs.labeled));
@@ -546,6 +829,7 @@
             'div',
             { className: 'main' },
             e(Guide, { open: guideOpen, setOpen: setGuideOpen }),
+            e(Reference, { refData }),
             e(
               'div',
               { className: 'chatHead' },
@@ -589,6 +873,7 @@
                     'div',
                     { className: 'item', key: id },
                     e('p', null, e('span', { className: 'iid' }, id), g.texts[id] || ''),
+                    CHECK_HINTS[id] ? e('div', { className: 'hint' }, CHECK_HINTS[id]) : null,
                     binaryButtons(id),
                   ),
                 ),

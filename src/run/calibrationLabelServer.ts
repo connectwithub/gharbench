@@ -96,11 +96,58 @@ export function redactCase(raw: CalibrationCase): Record<string, unknown> {
   };
 }
 
+/**
+ * Ground-truth reference for the rater (ADR-0023): the SAME source documents
+ * the judges get verbatim in their system block (byte-parity with judgeRun's
+ * loadSourceDocuments is test-pinned), plus a digest of the gold DB the
+ * agent's tools answered from - units, site-visit slots, agent policy,
+ * project facts.
+ * Grounding items (F1-F5, several CP) are unanswerable without this; the
+ * corpus is identical for every case, so showing it leaks nothing about any
+ * case's band, source or provenance.
+ */
+export function buildReference(): {
+  documents: { file: string; text: string }[];
+  db: {
+    project: unknown;
+    agentPolicy: unknown;
+    paymentPlans: unknown;
+    units: unknown[];
+    siteVisitSlots: unknown[];
+  };
+} {
+  const docsDir = join(REPO_ROOT, 'data', 'corpus', 'documents');
+  const documents = readdirSync(docsDir)
+    .filter((f) => f.endsWith('.md'))
+    .sort()
+    .map((f) => ({ file: f, text: readFileSync(join(docsDir, f), 'utf8').trim() }));
+  const gold = JSON.parse(
+    readFileSync(join(REPO_ROOT, 'data', 'corpus', 'project.json'), 'utf8'),
+  ) as {
+    project: unknown;
+    agentPolicy: unknown;
+    paymentPlans: unknown;
+    units: unknown[];
+    siteVisitSlots: unknown[];
+  };
+  return {
+    documents,
+    db: {
+      project: gold.project,
+      agentPolicy: gold.agentPolicy,
+      paymentPlans: gold.paymentPlans,
+      units: gold.units,
+      siteVisitSlots: gold.siteVisitSlots,
+    },
+  };
+}
+
 export function startServer(rater: string, baseDir: string = CALIBRATION_DIR): void {
   const casesDir = baseDir === CALIBRATION_DIR ? CASES_DIR : join(baseDir, 'cases');
   const labelsDir = join(baseDir, 'labels', rater);
   mkdirSync(labelsDir, { recursive: true });
   const rubric = loadJudgeItems();
+  let reference: ReturnType<typeof buildReference> | undefined;
 
   const server = createServer((req, res) => {
     const url = new URL(req.url ?? '/', `http://localhost:${PORT}`);
@@ -151,6 +198,12 @@ export function startServer(rater: string, baseDir: string = CALIBRATION_DIR): v
 
     if (req.method === 'GET' && url.pathname === '/api/rubric') {
       json(200, rubric);
+      return;
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/reference') {
+      reference ??= buildReference();
+      json(200, reference);
       return;
     }
 

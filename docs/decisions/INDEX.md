@@ -3,11 +3,12 @@
 Generated from `decisions.jsonl` — do not edit by hand.
 Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 
-21 decisions.
+22 decisions.
 
 ## By date
 
 - **ADR-0022** (2026-08-24) — [Calibration labeler hardened: opaque case aliases and violation-polarity buttons](ADR-0022-labeler-blindness-aliases-and-polarity-ui.md)
+- **ADR-0023** (2026-08-24) — [The labeler shows the judge's source documents and the gold DB](ADR-0023-labeler-ground-truth-reference.md)
 - **ADR-0021** (2026-08-21) — [Buyer guardrails hardened with an anti-repetition mandate after the G6 pilot audit](ADR-0021-anti-repetition-guardrail-after-g6-audit.md)
 - **ADR-0014** (2026-08-20) — [Personas are public; scenarios are persona-bound instance files split at authoring time](ADR-0014-personas-are-public-scenarios-are-persona-bound-instance-files.md)
 - **ADR-0015** (2026-08-20) — [Layer-1 checks fire only on quotable, context-anchored evidence](ADR-0015-checks-fire-only-on-quotable-context-anchored-evidence.md)
@@ -65,6 +66,7 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 ### `calibration`
 
 - ADR-0022 — [Calibration labeler hardened: opaque case aliases and violation-polarity buttons](ADR-0022-labeler-blindness-aliases-and-polarity-ui.md)
+- ADR-0023 — [The labeler shows the judge's source documents and the gold DB](ADR-0023-labeler-ground-truth-reference.md)
 
 ### `cost`
 
@@ -88,6 +90,10 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 - ADR-0019 — [Judge scaffolding: offline-first, quote-then-verdict enforced structurally, polarity normalised once](ADR-0019-judge-scaffold-offline-first-quote-then-verdict-structural.md)
 - ADR-0020 — [Phases 6-10 scaffolded machine-first: every gate is code before any run is paid for](ADR-0020-phase6-10-scaffolding-machine-side-complete.md)
 
+### `factuality`
+
+- ADR-0023 — [The labeler shows the judge's source documents and the gold DB](ADR-0023-labeler-ground-truth-reference.md)
+
 ### `gate`
 
 - ADR-0003 — [Split "can place a breakpoint" from "reports cache reads"](ADR-0003-split-explicit-caching-from-cache-reporting.md)
@@ -104,6 +110,7 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 ### `judge`
 
 - ADR-0022 — [Calibration labeler hardened: opaque case aliases and violation-polarity buttons](ADR-0022-labeler-blindness-aliases-and-polarity-ui.md)
+- ADR-0023 — [The labeler shows the judge's source documents and the gold DB](ADR-0023-labeler-ground-truth-reference.md)
 
 ### `judge-panel`
 
@@ -171,3 +178,4 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 ### `ui`
 
 - ADR-0022 — [Calibration labeler hardened: opaque case aliases and violation-polarity buttons](ADR-0022-labeler-blindness-aliases-and-polarity-ui.md)
+- ADR-0023 — [The labeler shows the judge's source documents and the gold DB](ADR-0023-labeler-ground-truth-reference.md)
