@@ -909,6 +909,11 @@
                     { className: 'item', key: id },
                     e('p', null, e('span', { className: 'iid' }, id), g.texts[id] || ''),
                     CHECK_HINTS[id] ? e('div', { className: 'hint' }, CHECK_HINTS[id]) : null,
+                    // Shared clarifications (ADR-0026): the judges see the
+                    // exact same text, rendered from the same rubric file.
+                    (rubric.interpretationNotes || {})[id]
+                      ? e('div', { className: 'hint' }, 'note: ' + rubric.interpretationNotes[id])
+                      : null,
                     binaryButtons(id),
                   ),
                 ),

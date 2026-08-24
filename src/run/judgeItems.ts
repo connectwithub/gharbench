@@ -24,6 +24,15 @@ const binaryMap = z.record(z.string().regex(/^[A-Z]{1,2}\d{1,2}$/), z.string().m
 export const judgeItemsSchema = z.strictObject({
   version: z.string().min(1),
   source: z.string().min(1),
+  /**
+   * GharBench-authored clarifications of ambiguous items (ADR-0026), keyed by
+   * item id. Rendered to BOTH the human labeler UI and the judge system
+   * prompt from this one source - guidance one side sees and the other does
+   * not would skew G8 agreement.
+   */
+  interpretationNotes: z
+    .record(z.string().regex(/^[A-Z]{1,2}\d{1,2}$/), z.string().min(1))
+    .optional(),
   dimensions: z.strictObject({
     factuality: z.strictObject({
       name: z.string(),

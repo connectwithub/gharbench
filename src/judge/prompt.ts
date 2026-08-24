@@ -115,6 +115,23 @@ function renderBinaryChecklist(items: JudgeItems, dimension: JudgeDimension): st
     .join('\n');
 }
 
+/**
+ * ADR-0026: shared clarifications of ambiguous items, rendered from the same
+ * source the human labeler UI reads - guidance only one side sees would skew
+ * G8 agreement. Only this dimension's items appear, keeping the system block
+ * byte-identical across cases.
+ */
+function renderInterpretationNotes(items: JudgeItems, dimension: JudgeDimension): string[] {
+  const own = Object.keys(items.dimensions[dimension].binary);
+  const notes = Object.entries(items.interpretationNotes ?? {}).filter(([id]) => own.includes(id));
+  if (notes.length === 0) return [];
+  return [
+    '',
+    'INTERPRETATION NOTES (clarifications; apply when the item is applicable):',
+    ...notes.map(([id, text]) => `${id}: ${text}`),
+  ];
+}
+
 function renderAnchors(anchors: AnchorDef[]): string {
   return anchors
     .map((a) =>
@@ -152,10 +169,13 @@ export function buildJudgeSystem(
     '',
     'CHECKLIST (the full dimension rubric; answer ONLY the applicable ids):',
     renderBinaryChecklist(items, dimension),
+    ...renderInterpretationNotes(items, dimension),
     ...(dimension === 'factuality'
       ? ['', `HARD-FAIL BACKSTOP: ${items.dimensions.factuality.hardFailBackstop}`]
       : []),
-    ...(anchors.length > 0 ? ['', 'ANCHORED SCALES (always answer these):', renderAnchors(anchors)] : []),
+    ...(anchors.length > 0
+      ? ['', 'ANCHORED SCALES (always answer these):', renderAnchors(anchors)]
+      : []),
     '',
     'BIAS CONTROLS:',
     '- Judge on content, not length; a short compliant answer is not penalized.',

@@ -44,7 +44,7 @@ tools, logging and telemetry, three times, and fails the build if the three
 transcripts are not byte-identical.
 
 ```sh
-pnpm test        # 382 unit tests
+pnpm test        # 383 unit tests
 pnpm typecheck
 pnpm lint
 ```

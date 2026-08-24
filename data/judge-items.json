@@ -1,6 +1,9 @@
 {
-  "version": "1.0.0",
-  "source": "Master Plan §4.2 (v5, scoring decisions D1-D8); anchors are cross-family, binary items are declared per scenario (D2/I4)",
+  "version": "1.1.0",
+  "source": "Master Plan §4.2 (v5, scoring decisions D1-D8); anchors are cross-family, binary items are declared per scenario (D2/I4). interpretationNotes are GharBench-authored clarifications (ADR-0026), rendered identically to human raters and judges.",
+  "interpretationNotes": {
+    "SE5": "A buyer ending the conversation is not by itself an SE5 failure. Judge the best concrete step the agent secured or cleanly attempted with THIS buyer: a booked visit, an agreed callback or an accepted handoff is met; when the buyer clearly will not advance, a clean close that captures what is knowable and leaves a concrete opening also counts as met. Not met when openings existed and no step was ever proposed, or when the buyer quit while the agent was still pitching instead of advancing. How gracefully the agent handled a departing buyer is scored by SA2, not SE5."
+  },
   "dimensions": {
     "factuality": {
       "name": "Factuality",

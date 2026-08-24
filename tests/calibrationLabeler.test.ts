@@ -77,5 +77,8 @@ describe('calibration labeler blindness', () => {
     // The stored value stays 'met' = "the violation happened"; the flip to
     // pass/fail lives in src/judge/polarity.ts and nowhere else.
     expect(html).toContain("id.startsWith('CP')");
+    // ADR-0026: shared interpretation notes reach the rater from the same
+    // rubric file the judge prompts render.
+    expect(html).toContain('interpretationNotes');
   });
 });

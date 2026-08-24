@@ -58,6 +58,14 @@ describe('cache-first layout', () => {
     expect(s1).toContain(DOCS);
   });
 
+  it('interpretation notes render for the owning dimension only, from the shared source (ADR-0026)', () => {
+    expect(items.interpretationNotes?.SE5).toBeDefined();
+    const se = buildJudgeSystem(items, 'salesEffectiveness', DOCS);
+    expect(se).toContain('INTERPRETATION NOTES');
+    expect(se).toContain('not by itself an SE5 failure');
+    expect(buildJudgeSystem(items, 'factuality', DOCS)).not.toContain('INTERPRETATION NOTES');
+  });
+
   it('every dimension renders its full rubric and anchors', () => {
     expect(buildJudgeSystem(items, 'factuality', DOCS)).toContain('FA1');
     expect(buildJudgeSystem(items, 'factuality', DOCS)).toContain('HARD-FAIL BACKSTOP');
