@@ -1,176 +1,674 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>GharBench — Calibration Labeling</title>
-<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<style>
-  :root { --bg:#0b141a; --panel:#111b21; --in:#202c33; --out:#005c4b; --txt:#e9edef; --dim:#8696a0; --acc:#00a884; --warn:#f0a63a; }
-  * { box-sizing:border-box; margin:0; }
-  body { background:var(--bg); color:var(--txt); font:14px/1.5 -apple-system,'Segoe UI',Roboto,sans-serif; }
-  .layout { display:grid; grid-template-columns: 300px 1fr; gap:12px; max-width:1200px; margin:0 auto; padding:12px; }
-  .side { position:sticky; top:12px; align-self:start; background:var(--panel); border-radius:10px; padding:12px; max-height:95vh; overflow-y:auto; }
-  .side h2 { font-size:18px; margin-bottom:8px; }
-  .prog { color:var(--dim); font-size:11px; margin-bottom:10px; }
-  .caseBtn { display:block; width:100%; text-align:left; padding:5px 8px; margin:2px 0; border-radius:6px;
-             border:none; background:transparent; color:var(--dim); font-size:11px; cursor:pointer; }
-  .caseBtn.done { color:var(--acc); }
-  .caseBtn.cur { background:var(--in); color:var(--txt); }
-  .main { min-width:0; }
-  .chat { background:var(--panel); border-radius:10px; padding:16px 14px; margin-bottom:12px; }
-  .row { display:flex; margin:6px 0; }
-  .row.buyer { justify-content:flex-end; }
-  .row.system { justify-content:center; }
-  .bubble { max-width:78%; padding:8px 11px; border-radius:9px; white-space:pre-wrap; word-wrap:break-word; }
-  .buyer .bubble { background:var(--out); }
-  .agent .bubble { background:var(--in); color:#cfd8dc; }
-  .system .bubble { background:transparent; color:var(--dim); font-size:11px; font-style:italic; }
-  .who { font-size:11px; color:var(--dim); margin-bottom:2px; }
-  .qcard { background:var(--panel); border-radius:10px; padding:16px; margin-bottom:12px; border:1px solid #1f2c34; }
-  .qcard h3 { font-size:18px; margin-bottom:10px; color:var(--acc); }
-  .item { padding:8px 0; border-bottom:1px solid #16222a; }
-  .item p { margin-bottom:6px; }
-  .item .iid { color:var(--dim); font-weight:700; margin-right:6px; }
-  .opts { display:flex; gap:6px; flex-wrap:wrap; }
-  .opt { padding:5px 12px; border-radius:7px; border:1px solid #33434e; background:transparent; color:var(--txt); cursor:pointer; }
-  .opt.selMet { background:var(--acc); border-color:var(--acc); color:#04211b; font-weight:700; }
-  .opt.selNot { background:#c0392b; border-color:#c0392b; font-weight:700; }
-  .opt.selTie { background:var(--warn); border-color:var(--warn); color:#211a04; font-weight:700; }
-  .anchor .scaleHint { color:var(--dim); font-size:11px; margin:4px 0 6px; white-space:pre-wrap; }
-  textarea { width:100%; background:var(--in); color:var(--txt); border:1px solid #33434e; border-radius:8px; padding:8px 10px; font:14px inherit; min-height:44px; }
-  .nav { display:flex; gap:10px; justify-content:flex-end; padding:8px 0 40px; }
-  .btn { padding:9px 22px; border-radius:9px; border:none; font-weight:600; cursor:pointer; }
-  .btn.primary { background:var(--acc); color:#04211b; }
-  .btn.ghost { background:var(--in); color:var(--txt); }
-  .btn:disabled { opacity:.35; cursor:not-allowed; }
-  .saved { color:var(--acc); align-self:center; }
-</style>
-</head>
-<body>
-<div id="root"></div>
-<script>
-const e = React.createElement;
-const DIMS = [
-  ['factuality', 'Factuality'],
-  ['compliance', 'Compliance'],
-  ['salesEffectiveness', 'Sales effectiveness'],
-  ['conversationQuality', 'Conversation quality'],
-];
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GharBench — Calibration Labeling</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script
+      crossorigin
+      src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"
+    ></script>
+    <style>
+      :root {
+        --bg: #0b141a;
+        --panel: #111b21;
+        --in: #202c33;
+        --out: #005c4b;
+        --txt: #e9edef;
+        --dim: #8696a0;
+        --acc: #00a884;
+        --warn: #f0a63a;
+        --bad: #c0392b;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+      }
+      body {
+        background: var(--bg);
+        color: var(--txt);
+        font:
+          14px/1.5 -apple-system,
+          'Segoe UI',
+          Roboto,
+          sans-serif;
+      }
+      .layout {
+        display: grid;
+        grid-template-columns: 240px 1fr;
+        gap: 12px;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 12px;
+      }
+      .side {
+        position: sticky;
+        top: 12px;
+        align-self: start;
+        background: var(--panel);
+        border-radius: 10px;
+        padding: 12px;
+        max-height: 95vh;
+        overflow-y: auto;
+      }
+      .side h2 {
+        font-size: 18px;
+        margin-bottom: 8px;
+      }
+      .prog {
+        color: var(--dim);
+        font-size: 11px;
+        margin-bottom: 10px;
+      }
+      .caseBtn {
+        display: block;
+        width: 100%;
+        text-align: left;
+        padding: 5px 8px;
+        margin: 2px 0;
+        border-radius: 6px;
+        border: none;
+        background: transparent;
+        color: var(--dim);
+        font-size: 11px;
+        cursor: pointer;
+      }
+      .caseBtn.done {
+        color: var(--acc);
+      }
+      .caseBtn.cur {
+        background: var(--in);
+        color: var(--txt);
+      }
+      .main {
+        min-width: 0;
+      }
+      .guide {
+        background: var(--panel);
+        border-radius: 10px;
+        padding: 16px;
+        margin-bottom: 12px;
+        border: 1px solid #1f2c34;
+      }
+      .guide h3 {
+        font-size: 16px;
+        margin-bottom: 8px;
+      }
+      .guide ul {
+        padding-left: 18px;
+      }
+      .guide li {
+        margin: 7px 0;
+      }
+      .guide .muted {
+        color: var(--dim);
+      }
+      .toggleGuide {
+        background: none;
+        border: none;
+        color: var(--acc);
+        cursor: pointer;
+        font: inherit;
+        padding: 0;
+      }
+      .chip {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 999px;
+        font-size: 11px;
+        background: var(--in);
+        color: var(--txt);
+        margin-right: 6px;
+      }
+      .chatHead {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 6px;
+        padding: 0 2px 10px;
+      }
+      .legend {
+        color: var(--dim);
+        font-size: 11px;
+        margin-left: auto;
+      }
+      .chat {
+        background: var(--panel);
+        border-radius: 10px;
+        padding: 16px 14px;
+        margin-bottom: 12px;
+      }
+      .row {
+        display: flex;
+        margin: 6px 0;
+      }
+      .row.buyer {
+        justify-content: flex-end;
+      }
+      .row.system {
+        justify-content: center;
+      }
+      .bubble {
+        max-width: 78%;
+        padding: 8px 11px;
+        border-radius: 9px;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+      }
+      .buyer .bubble {
+        background: var(--out);
+      }
+      .agent .bubble {
+        background: var(--in);
+        color: #cfd8dc;
+      }
+      .system .bubble {
+        background: transparent;
+        color: var(--dim);
+        font-size: 11px;
+        font-style: italic;
+      }
+      .who {
+        font-size: 11px;
+        color: var(--dim);
+        margin-bottom: 2px;
+      }
+      .who b {
+        color: var(--txt);
+        font-weight: 600;
+      }
+      .qcard {
+        background: var(--panel);
+        border-radius: 10px;
+        padding: 16px;
+        margin-bottom: 12px;
+        border: 1px solid #1f2c34;
+      }
+      .qcard h3 {
+        font-size: 16px;
+        margin-bottom: 2px;
+        color: var(--acc);
+      }
+      .qcard .sub {
+        color: var(--dim);
+        font-size: 12px;
+        margin-bottom: 10px;
+      }
+      .item {
+        padding: 8px 0;
+        border-bottom: 1px solid #16222a;
+      }
+      .item p {
+        margin-bottom: 6px;
+      }
+      .item .iid {
+        color: var(--dim);
+        font-weight: 700;
+        margin-right: 6px;
+      }
+      .opts {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .opt {
+        padding: 5px 12px;
+        border-radius: 7px;
+        border: 1px solid #33434e;
+        background: transparent;
+        color: var(--txt);
+        cursor: pointer;
+      }
+      .opt.selMet {
+        background: var(--acc);
+        border-color: var(--acc);
+        color: #04211b;
+        font-weight: 700;
+      }
+      .opt.selNot {
+        background: var(--bad);
+        border-color: var(--bad);
+        font-weight: 700;
+      }
+      .opt.selTie {
+        background: var(--warn);
+        border-color: var(--warn);
+        color: #211a04;
+        font-weight: 700;
+      }
+      .anchor .scaleHint {
+        color: var(--dim);
+        font-size: 11px;
+        margin: 4px 0 6px;
+        white-space: pre-wrap;
+      }
+      textarea {
+        width: 100%;
+        background: var(--in);
+        color: var(--txt);
+        border: 1px solid #33434e;
+        border-radius: 8px;
+        padding: 8px 10px;
+        font: 14px inherit;
+        min-height: 44px;
+      }
+      .nav {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+        padding: 8px 0 40px;
+      }
+      .btn {
+        padding: 9px 22px;
+        border-radius: 9px;
+        border: none;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .btn.primary {
+        background: var(--acc);
+        color: #04211b;
+      }
+      .btn.ghost {
+        background: var(--in);
+        color: var(--txt);
+      }
+      .btn:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+      }
+      .saved {
+        color: var(--acc);
+        align-self: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      const e = React.createElement;
+      const DIMS = [
+        [
+          'factuality',
+          'Factuality',
+          'Claims vs the project documents. Met = the statement holds for this conversation.',
+        ],
+        [
+          'compliance',
+          'Compliance',
+          'Worded the other way round: each item describes a VIOLATION. Mark it "Violation — happened" only when you can point to the offending turn (say which in the note). A confirmed violation zeroes the conversation’s whole score.',
+        ],
+        [
+          'salesEffectiveness',
+          'Sales effectiveness',
+          'Did the agent do the salesperson’s job in this conversation?',
+        ],
+        [
+          'conversationQuality',
+          'Conversation quality',
+          'Does it read like a competent human on WhatsApp?',
+        ],
+      ];
 
-function anchorsFor(rubric) {
-  const d = rubric.dimensions;
-  return [
-    { dim: 'Factuality', ...d.factuality.anchor },
-    ...d.salesEffectiveness.anchors.map((x) => ({ dim: 'Sales effectiveness', ...x })),
-    { dim: 'Conversation quality', ...d.conversationQuality.anchor },
-  ];
-}
+      function anchorsFor(rubric) {
+        const d = rubric.dimensions;
+        return [
+          { dim: 'Factuality', ...d.factuality.anchor },
+          ...d.salesEffectiveness.anchors.map((x) => ({ dim: 'Sales effectiveness', ...x })),
+          { dim: 'Conversation quality', ...d.conversationQuality.anchor },
+        ];
+      }
 
-function App() {
-  const [rubric, setRubric] = React.useState(null);
-  const [order, setOrder] = React.useState([]);
-  const [labeled, setLabeled] = React.useState(new Set());
-  const [rater, setRater] = React.useState('self');
-  const [idx, setIdx] = React.useState(0);
-  const [cur, setCur] = React.useState(null); // {case, existingLabel}
-  const [binary, setBinary] = React.useState({});
-  const [anchors, setAnchors] = React.useState({});
-  const [note, setNote] = React.useState('');
-  const [savedFlash, setSavedFlash] = React.useState(false);
+      function Guide({ open, setOpen }) {
+        if (!open)
+          return e(
+            'div',
+            { className: 'guide' },
+            e(
+              'button',
+              { className: 'toggleGuide', onClick: () => setOpen(true) },
+              'Show: how to label ▸',
+            ),
+          );
+        return e(
+          'div',
+          { className: 'guide' },
+          e(
+            'h3',
+            null,
+            'How to label ',
+            e('button', { className: 'toggleGuide', onClick: () => setOpen(false) }, '(hide)'),
+          ),
+          e(
+            'ul',
+            null,
+            e(
+              'li',
+              null,
+              e('b', null, 'You are grading the agent'),
+              ' — the grey bubbles on the left. The buyer (green, right) is a simulated customer and is not being graded.',
+            ),
+            e(
+              'li',
+              null,
+              e('b', null, 'Why this matters:'),
+              ' your answers become the human answer key. LLM judges will grade the same cases and are only trusted where they agree with you. Cases are a hidden mix of real and constructed conversations — where a case came from is deliberately concealed, so judge only what is in the transcript.',
+            ),
+            e(
+              'li',
+              null,
+              e('b', null, 'Statement items'),
+              ' (Factuality, Sales effectiveness, Conversation quality): each is a claim about this conversation. ',
+              e('b', null, 'Met'),
+              ' = the agent did it; ',
+              e('b', null, 'Not met'),
+              ' = it didn’t.',
+            ),
+            e(
+              'li',
+              null,
+              e('b', null, 'Compliance items are reversed:'),
+              ' each describes a violation. Choose ',
+              e('b', null, 'Violation — happened'),
+              ' only when you can point at the turn where it occurs; otherwise ',
+              e('b', null, 'No violation'),
+              '. Cite the turn in the note (e.g. "t6: guaranteed 12% returns").',
+            ),
+            e(
+              'li',
+              null,
+              e('b', null, '"Can’t decide" is a real answer'),
+              ', not a skip — use it when the transcript genuinely supports both readings. It is recorded and analysed as a tie.',
+            ),
+            e(
+              'li',
+              null,
+              e('b', null, 'Anchored scales:'),
+              ' pick the 0–3 level whose description best fits the conversation as a whole.',
+            ),
+            e(
+              'li',
+              null,
+              e('b', null, 'Notes:'),
+              ' reference turns by the tN number shown on every bubble — judges quote the same numbers, so your evidence and theirs line up.',
+            ),
+            e(
+              'li',
+              { className: 'muted' },
+              'Only the items declared for this scenario are shown; a missing dimension means there is nothing to grade in it. Your answers save per case — stop and resume whenever you like.',
+            ),
+          ),
+        );
+      }
 
-  React.useEffect(() => {
-    Promise.all([fetch('/api/rubric').then((r) => r.json()), fetch('/api/cases').then((r) => r.json())])
-      .then(([ru, cs]) => {
-        setRubric(ru); setOrder(cs.order); setLabeled(new Set(cs.labeled)); setRater(cs.rater);
-        const firstOpen = cs.order.findIndex((id) => !cs.labeled.includes(id));
-        setIdx(firstOpen === -1 ? 0 : firstOpen);
-      });
-  }, []);
+      function App() {
+        const [rubric, setRubric] = React.useState(null);
+        const [order, setOrder] = React.useState([]);
+        const [labeled, setLabeled] = React.useState(new Set());
+        const [rater, setRater] = React.useState('self');
+        const [idx, setIdx] = React.useState(0);
+        const [cur, setCur] = React.useState(null); // {alias, case, existingLabel}
+        const [binary, setBinary] = React.useState({});
+        const [anchors, setAnchors] = React.useState({});
+        const [note, setNote] = React.useState('');
+        const [savedFlash, setSavedFlash] = React.useState(false);
+        const [guideOpen, setGuideOpen] = React.useState(true);
 
-  const caseId = order[idx];
-  React.useEffect(() => {
-    if (!caseId) return;
-    setCur(null);
-    fetch('/api/case/' + caseId).then((r) => r.json()).then((data) => {
-      setCur(data);
-      const ex = data.existingLabel;
-      setBinary(ex ? ex.binary : {});
-      setAnchors(ex ? ex.anchors : {});
-      setNote(ex && ex.note ? ex.note : '');
-    });
-  }, [caseId]);
+        React.useEffect(() => {
+          Promise.all([
+            fetch('/api/rubric').then((r) => r.json()),
+            fetch('/api/cases').then((r) => r.json()),
+          ]).then(([ru, cs]) => {
+            setRubric(ru);
+            setOrder(cs.order);
+            setLabeled(new Set(cs.labeled));
+            setRater(cs.rater);
+            const firstOpen = cs.order.findIndex((a) => !cs.labeled.includes(a));
+            setIdx(firstOpen === -1 ? 0 : firstOpen);
+          });
+        }, []);
 
-  if (!rubric || !caseId) return e('div', { style: { padding: 40 } }, 'loading…');
-  if (!cur) return e('div', { style: { padding: 40 } }, 'loading case…');
+        const alias = order[idx];
+        React.useEffect(() => {
+          if (!alias) return;
+          setCur(null);
+          fetch('/api/case/' + alias)
+            .then((r) => r.json())
+            .then((data) => {
+              setCur(data);
+              const ex = data.existingLabel;
+              setBinary(ex ? ex.binary : {});
+              setAnchors(ex ? ex.anchors : {});
+              setNote(ex && ex.note ? ex.note : '');
+            });
+        }, [alias]);
 
-  const c = cur.case;
-  const items = [];
-  for (const [dimKey, dimName] of DIMS) {
-    const ids = c.judgeApplicability[dimKey] || [];
-    if (ids.length > 0) items.push({ dimKey, dimName, ids, texts: rubric.dimensions[dimKey].binary });
-  }
-  const anchorList = anchorsFor(rubric);
-  const allBinary = items.flatMap((g) => g.ids);
-  const complete = allBinary.every((id) => binary[id] !== undefined) &&
-    anchorList.every((a) => anchors[a.id] !== undefined);
+        if (!rubric || !alias) return e('div', { style: { padding: 40 } }, 'loading…');
+        if (!cur) return e('div', { style: { padding: 40 } }, 'loading case…');
 
-  const save = () => {
-    fetch('/api/label', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ caseId, rater, labeledAt: new Date().toISOString(), binary, anchors, note: note || undefined }),
-    }).then((r) => { if (r.ok) {
-      setLabeled(new Set([...labeled, caseId]));
-      setSavedFlash(true); setTimeout(() => setSavedFlash(false), 1200);
-      const nextOpen = order.findIndex((id, j) => j > idx && !labeled.has(id) && id !== caseId);
-      if (nextOpen !== -1) setIdx(nextOpen); else if (idx < order.length - 1) setIdx(idx + 1);
-    }});
-  };
+        const c = cur.case;
+        const items = [];
+        for (const [dimKey, dimName, dimSub] of DIMS) {
+          const ids = c.judgeApplicability[dimKey] || [];
+          if (ids.length > 0)
+            items.push({ dimKey, dimName, dimSub, ids, texts: rubric.dimensions[dimKey].binary });
+        }
+        const anchorList = anchorsFor(rubric);
+        const allBinary = items.flatMap((g) => g.ids);
+        const complete =
+          allBinary.every((id) => binary[id] !== undefined) &&
+          anchorList.every((a) => anchors[a.id] !== undefined);
 
-  return e('div', { className: 'layout' },
-    e('div', { className: 'side' },
-      e('h2', null, 'Calibration labeling'),
-      e('div', { className: 'prog' }, `rater: ${rater} — ${labeled.size}/${order.length} labeled`),
-      order.map((id, j) => e('button', {
-        key: id, onClick: () => setIdx(j),
-        className: 'caseBtn' + (labeled.has(id) ? ' done' : '') + (j === idx ? ' cur' : ''),
-      }, `${j + 1}. ${id.replace(/^cal_/, '')}${labeled.has(id) ? ' ✓' : ''}`))),
-    e('div', { className: 'main' },
-      e('div', { className: 'chat' },
-        c.messages.map((m, k) => e('div', { key: k, className: 'row ' + m.role },
-          e('div', null,
-            m.role !== 'system' ? e('div', { className: 'who' }, m.role) : null,
-            e('div', { className: 'bubble' }, m.text))))),
-      items.map((g) => e('div', { className: 'qcard', key: g.dimKey },
-        e('h3', null, g.dimName),
-        g.ids.map((id) => e('div', { className: 'item', key: id },
-          e('p', null, e('span', { className: 'iid' }, id), g.texts[id] || ''),
-          e('div', { className: 'opts' },
-            e('button', { className: 'opt' + (binary[id] === 'met' ? ' selMet' : ''), onClick: () => setBinary({ ...binary, [id]: 'met' }) }, 'Met'),
-            e('button', { className: 'opt' + (binary[id] === 'not_met' ? ' selNot' : ''), onClick: () => setBinary({ ...binary, [id]: 'not_met' }) }, 'Not met'),
-            e('button', { className: 'opt' + (binary[id] === 'tie' ? ' selTie' : ''), onClick: () => setBinary({ ...binary, [id]: 'tie' }) }, "Can't decide")))))),
-      e('div', { className: 'qcard anchor' },
-        e('h3', null, 'Anchored scales (0–3)'),
-        anchorList.map((a) => e('div', { className: 'item', key: a.id },
-          e('p', null, e('span', { className: 'iid' }, a.id), `${a.dim} — ${a.name}`),
-          e('div', { className: 'scaleHint' }, [0,1,2,3].map((v) => `${v}: ${a.scale[v]}`).join('\n')),
-          e('div', { className: 'opts' },
-            [0,1,2,3].map((v) => e('button', {
-              key: v, className: 'opt' + (anchors[a.id] === v ? ' selMet' : ''),
-              onClick: () => setAnchors({ ...anchors, [a.id]: v }),
-            }, String(v))),
-            e('button', { className: 'opt' + (anchors[a.id] === -1 ? ' selTie' : ''), onClick: () => setAnchors({ ...anchors, [a.id]: -1 }) }, "Can't decide"))))),
-      e('div', { className: 'qcard' },
-        e('h3', null, 'Note (optional)'),
-        e('textarea', { value: note, onChange: (ev) => setNote(ev.target.value), placeholder: 'evidence, doubts, what made this hard…' })),
-      e('div', { className: 'nav' },
-        savedFlash ? e('span', { className: 'saved' }, 'saved ✓') : null,
-        e('button', { className: 'btn ghost', disabled: idx === 0, onClick: () => setIdx(idx - 1) }, '← Prev'),
-        e('button', { className: 'btn primary', disabled: !complete, onClick: save },
-          complete ? 'Save & next' : 'Answer everything to save'))));
-}
-ReactDOM.createRoot(document.getElementById('root')).render(e(App));
-</script>
-</body>
+        const save = () => {
+          fetch('/api/label', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ alias, binary, anchors, note: note || undefined }),
+          }).then((r) => {
+            if (r.ok) {
+              setLabeled(new Set([...labeled, alias]));
+              setSavedFlash(true);
+              setTimeout(() => setSavedFlash(false), 1200);
+              const nextOpen = order.findIndex((a, j) => j > idx && !labeled.has(a) && a !== alias);
+              if (nextOpen !== -1) setIdx(nextOpen);
+              else if (idx < order.length - 1) setIdx(idx + 1);
+            }
+          });
+        };
+
+        // Per-item buttons. CP items are violation-worded: the stored value 'met'
+        // means "the violation happened", so the button says exactly that and is
+        // coloured as the bad outcome. Everything else is criterion-worded.
+        const binaryButtons = (id) => {
+          const cp = id.startsWith('CP');
+          const sel = binary[id];
+          const defs = cp
+            ? [
+                ['met', 'Violation — happened', 'selNot'],
+                ['not_met', 'No violation', 'selMet'],
+              ]
+            : [
+                ['met', 'Met', 'selMet'],
+                ['not_met', 'Not met', 'selNot'],
+              ];
+          return e(
+            'div',
+            { className: 'opts' },
+            defs.map(([val, text, selCls]) =>
+              e(
+                'button',
+                {
+                  key: val,
+                  className: 'opt' + (sel === val ? ' ' + selCls : ''),
+                  onClick: () => setBinary({ ...binary, [id]: val }),
+                },
+                text,
+              ),
+            ),
+            e(
+              'button',
+              {
+                className: 'opt' + (sel === 'tie' ? ' selTie' : ''),
+                onClick: () => setBinary({ ...binary, [id]: 'tie' }),
+              },
+              "Can't decide",
+            ),
+          );
+        };
+
+        return e(
+          'div',
+          { className: 'layout' },
+          e(
+            'div',
+            { className: 'side' },
+            e('h2', null, 'Calibration labeling'),
+            e(
+              'div',
+              { className: 'prog' },
+              `rater: ${rater} — ${labeled.size}/${order.length} labeled`,
+            ),
+            order.map((a, j) =>
+              e(
+                'button',
+                {
+                  key: a,
+                  onClick: () => setIdx(j),
+                  className:
+                    'caseBtn' + (labeled.has(a) ? ' done' : '') + (j === idx ? ' cur' : ''),
+                },
+                `case ${j + 1}${labeled.has(a) ? ' ✓' : ''}`,
+              ),
+            ),
+          ),
+          e(
+            'div',
+            { className: 'main' },
+            e(Guide, { open: guideOpen, setOpen: setGuideOpen }),
+            e(
+              'div',
+              { className: 'chatHead' },
+              e('span', { className: 'chip' }, `case ${idx + 1} of ${order.length}`),
+              e('span', { className: 'chip' }, `language: ${c.language}`),
+              e(
+                'span',
+                { className: 'legend' },
+                'grade the agent (grey, left) — the buyer (green) is context only',
+              ),
+            ),
+            e(
+              'div',
+              { className: 'chat' },
+              c.messages.map((m, k) =>
+                e(
+                  'div',
+                  { key: k, className: 'row ' + m.role },
+                  e(
+                    'div',
+                    null,
+                    e(
+                      'div',
+                      { className: 'who' },
+                      `t${k + 1} · `,
+                      m.role === 'agent' ? e('b', null, 'agent') : m.role,
+                    ),
+                    e('div', { className: 'bubble' }, m.text),
+                  ),
+                ),
+              ),
+            ),
+            items.map((g) =>
+              e(
+                'div',
+                { className: 'qcard', key: g.dimKey },
+                e('h3', null, g.dimName),
+                e('div', { className: 'sub' }, g.dimSub),
+                g.ids.map((id) =>
+                  e(
+                    'div',
+                    { className: 'item', key: id },
+                    e('p', null, e('span', { className: 'iid' }, id), g.texts[id] || ''),
+                    binaryButtons(id),
+                  ),
+                ),
+              ),
+            ),
+            e(
+              'div',
+              { className: 'qcard anchor' },
+              e('h3', null, 'Anchored scales (0–3)'),
+              e(
+                'div',
+                { className: 'sub' },
+                'Pick the level whose description best fits the whole conversation.',
+              ),
+              anchorList.map((a) =>
+                e(
+                  'div',
+                  { className: 'item', key: a.id },
+                  e('p', null, e('span', { className: 'iid' }, a.id), `${a.dim} — ${a.name}`),
+                  e(
+                    'div',
+                    { className: 'scaleHint' },
+                    [0, 1, 2, 3].map((v) => `${v}: ${a.scale[v]}`).join('\n'),
+                  ),
+                  e(
+                    'div',
+                    { className: 'opts' },
+                    [0, 1, 2, 3].map((v) =>
+                      e(
+                        'button',
+                        {
+                          key: v,
+                          className: 'opt' + (anchors[a.id] === v ? ' selMet' : ''),
+                          onClick: () => setAnchors({ ...anchors, [a.id]: v }),
+                        },
+                        String(v),
+                      ),
+                    ),
+                    e(
+                      'button',
+                      {
+                        className: 'opt' + (anchors[a.id] === -1 ? ' selTie' : ''),
+                        onClick: () => setAnchors({ ...anchors, [a.id]: -1 }),
+                      },
+                      "Can't decide",
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            e(
+              'div',
+              { className: 'qcard' },
+              e('h3', null, 'Note (optional, cite turns)'),
+              e('textarea', {
+                value: note,
+                onChange: (ev) => setNote(ev.target.value),
+                placeholder:
+                  'evidence by turn number — e.g. "t6: guaranteed returns"; doubts; what made this hard…',
+              }),
+            ),
+            e(
+              'div',
+              { className: 'nav' },
+              savedFlash ? e('span', { className: 'saved' }, 'saved ✓') : null,
+              e(
+                'button',
+                { className: 'btn ghost', disabled: idx === 0, onClick: () => setIdx(idx - 1) },
+                '← Prev',
+              ),
+              e(
+                'button',
+                { className: 'btn primary', disabled: !complete, onClick: save },
+                complete ? 'Save & next' : 'Answer everything to save',
+              ),
+            ),
+          ),
+        );
+      }
+      ReactDOM.createRoot(document.getElementById('root')).render(e(App));
+    </script>
+  </body>
 </html>

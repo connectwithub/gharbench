@@ -11,6 +11,14 @@
  * came from or what it was seeded to violate. Case order is shuffled
  * deterministically from the rater name so synthetic anchors interleave with
  * real output invisibly.
+ *
+ * Case ids themselves encode provenance (cal_syn_pass_*, cal_adv_*, and
+ * cal_real_<contestant>_<scenario>), so serving them would hand the rater the
+ * answer. The API therefore speaks only opaque per-rater aliases ("c017" =
+ * the rater's 17th case); real ids exist server-side only, and label files
+ * are still written under the real id so downstream tooling is unaffected.
+ * (ADR-0022. Threat model: anti-priming for cooperative raters, not
+ * anti-adversary - the case files sit on the same disk.)
  */
 
 import { createServer } from 'node:http';
@@ -45,7 +53,9 @@ function shuffledCaseIds(rater: string, casesDir: string): string[] {
     .sort();
   if (rater !== 'self' && casesDir === CASES_DIR) {
     if (!existsSync(SLICE_FILE)) {
-      throw new Error(`Rater "${rater}" labels the 50-case slice; run pnpm calibration:slice first.`);
+      throw new Error(
+        `Rater "${rater}" labels the 50-case slice; run pnpm calibration:slice first.`,
+      );
     }
     const slice = JSON.parse(readFileSync(SLICE_FILE, 'utf8')) as { ids: string[] };
     const allowed = new Set(slice.ids);
@@ -62,9 +72,24 @@ function shuffledCaseIds(rater: string, casesDir: string): string[] {
   return keyed.map((x) => x.id);
 }
 
-function redactCase(raw: CalibrationCase): Record<string, unknown> {
+/** Positional aliases over the rater's shuffled order - stable across sittings. */
+export function aliasCaseIds(order: readonly string[]): {
+  toAlias: Map<string, string>;
+  toId: Map<string, string>;
+} {
+  const toAlias = new Map<string, string>();
+  const toId = new Map<string, string>();
+  order.forEach((id, i) => {
+    const alias = `c${String(i + 1).padStart(3, '0')}`;
+    toAlias.set(id, alias);
+    toId.set(alias, id);
+  });
+  return { toAlias, toId };
+}
+
+/** What the rater may see: no caseId, no band/source/provenance. */
+export function redactCase(raw: CalibrationCase): Record<string, unknown> {
   return {
-    caseId: raw.caseId,
     language: raw.language,
     judgeApplicability: raw.judgeApplicability,
     messages: raw.messages,
@@ -86,28 +111,41 @@ export function startServer(rater: string, baseDir: string = CALIBRATION_DIR): v
 
     if (req.method === 'GET' && url.pathname === '/api/cases') {
       const order = shuffledCaseIds(rater, casesDir);
-      const labeled = new Set(
-        readdirSync(labelsDir)
-          .filter((f) => f.endsWith('.json'))
-          .map((f) => f.replace(/\.json$/, '')),
-      );
-      json(200, { rater, order, labeled: [...labeled] });
+      const { toAlias } = aliasCaseIds(order);
+      const labeled = readdirSync(labelsDir)
+        .filter((f) => f.endsWith('.json'))
+        .map((f) => toAlias.get(f.replace(/\.json$/, '')))
+        .filter((a): a is string => a !== undefined);
+      json(200, { rater, order: order.map((id) => toAlias.get(id)), labeled });
       return;
     }
 
     if (req.method === 'GET' && url.pathname.startsWith('/api/case/')) {
-      const caseId = url.pathname.slice('/api/case/'.length);
-      const path = join(casesDir, `${caseId}.json`);
-      if (!existsSync(path) || !/^cal_[a-z0-9_.-]+$/.test(caseId)) {
+      const alias = url.pathname.slice('/api/case/'.length);
+      const order = shuffledCaseIds(rater, casesDir);
+      const caseId = aliasCaseIds(order).toId.get(alias);
+      const path = caseId !== undefined ? join(casesDir, `${caseId}.json`) : '';
+      if (caseId === undefined || !existsSync(path)) {
         json(404, { error: 'no such case' });
         return;
       }
       const raw = JSON.parse(readFileSync(path, 'utf8')) as CalibrationCase;
       const labelPath = join(labelsDir, `${caseId}.json`);
+      // The stored label carries the real caseId; hand back only the answers.
       const existing = existsSync(labelPath)
-        ? (JSON.parse(readFileSync(labelPath, 'utf8')) as unknown)
+        ? (JSON.parse(readFileSync(labelPath, 'utf8')) as {
+            binary: unknown;
+            anchors: unknown;
+            note?: unknown;
+          })
         : null;
-      json(200, { case: redactCase(raw), existingLabel: existing });
+      json(200, {
+        alias,
+        case: redactCase(raw),
+        existingLabel: existing
+          ? { binary: existing.binary, anchors: existing.anchors, note: existing.note ?? '' }
+          : null,
+      });
       return;
     }
 
@@ -121,13 +159,32 @@ export function startServer(rater: string, baseDir: string = CALIBRATION_DIR): v
       req.on('data', (c) => (body += c));
       req.on('end', () => {
         try {
-          const parsed = calibrationLabelSchema.safeParse(JSON.parse(body));
-          if (!parsed.success) {
-            json(400, { error: parsed.error.message });
+          const posted = JSON.parse(body) as {
+            alias?: string;
+            binary?: unknown;
+            anchors?: unknown;
+            note?: string;
+          };
+          const order = shuffledCaseIds(rater, casesDir);
+          const caseId =
+            posted.alias !== undefined ? aliasCaseIds(order).toId.get(posted.alias) : undefined;
+          if (caseId === undefined) {
+            json(400, { error: `unknown case alias ${posted.alias ?? '(none)'}` });
             return;
           }
-          if (parsed.data.rater !== rater) {
-            json(400, { error: `label rater ${parsed.data.rater} != server rater ${rater}` });
+          // The client never sees the real id; the full label (real caseId,
+          // rater, timestamp) is assembled here so the stored file keeps the
+          // shape every downstream consumer already expects.
+          const parsed = calibrationLabelSchema.safeParse({
+            caseId,
+            rater,
+            labeledAt: new Date().toISOString(),
+            binary: posted.binary,
+            anchors: posted.anchors,
+            ...(posted.note !== undefined && posted.note !== '' ? { note: posted.note } : {}),
+          });
+          if (!parsed.success) {
+            json(400, { error: parsed.error.message });
             return;
           }
           writeFileSync(
