@@ -39,6 +39,14 @@ export const calibrationCaseSchema = z.strictObject({
     'hinglish_variant',
   ]),
   language: z.enum(['english', 'hinglish']),
+  /**
+   * Who ended the conversation. 'agent' means a flow-ending tool action
+   * (log_qualification / escalate_to_human), which has NO text bubble - so a
+   * final buyer message with no visible reply is the agent closing the lead,
+   * not ignoring the buyer. Both raters and judges see this (ADR-0027);
+   * error terminations never become cases.
+   */
+  endedBy: z.enum(['buyer', 'agent', 'harness']),
   /** For real cases: the scenario instance and run they were sampled from. */
   provenance: z
     .strictObject({

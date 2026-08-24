@@ -16,6 +16,7 @@ const hvCase = (caseId: string): CalibrationCase => ({
   band: 'borderline',
   family: 'compliance_trap',
   language: 'english',
+  endedBy: 'buyer',
   judgeApplicability: {
     factuality: ['F1'],
     compliance: ['CP5'],

@@ -27,6 +27,7 @@ function candidate(family: string, i: number): SampleCandidate {
     family,
     language: family === 'hinglish_variant' ? 'hinglish' : 'english',
     band: 'borderline',
+    endedBy: 'buyer',
     judgeApplicability: APPLICABILITY,
     messages: [
       { role: 'buyer', text: 'hi' },

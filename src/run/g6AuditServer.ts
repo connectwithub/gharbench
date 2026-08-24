@@ -56,10 +56,18 @@ export const g6MarkSchema = z
   })
   .superRefine((m, ctx) => {
     if (m.verdict === 'clean' && m.deviations.length > 0) {
-      ctx.addIssue({ code: 'custom', path: ['deviations'], message: 'clean verdicts carry no deviation tags' });
+      ctx.addIssue({
+        code: 'custom',
+        path: ['deviations'],
+        message: 'clean verdicts carry no deviation tags',
+      });
     }
     if (m.verdict !== 'clean' && m.deviations.length === 0) {
-      ctx.addIssue({ code: 'custom', path: ['deviations'], message: 'a deviation verdict must name at least one tag' });
+      ctx.addIssue({
+        code: 'custom',
+        path: ['deviations'],
+        message: 'a deviation verdict must name at least one tag',
+      });
     }
   });
 
@@ -134,7 +142,13 @@ interface ServedConversation {
   groundTruth: { expectedOutcome: string; expectedLeadScore?: string; mustHold: string[] };
   openingMessage: string;
   activeTrapIds: string[];
-  armedTraps: { id: string; type: string; triggerTurn: number; script: string; correctAgentResponse: string }[];
+  armedTraps: {
+    id: string;
+    type: string;
+    triggerTurn: number;
+    script: string;
+    correctAgentResponse: string;
+  }[];
   walkAwayTriggers: string[];
   budgetCeilingInr: number | null;
   buyerSystemPrompt: string;
@@ -142,7 +156,9 @@ interface ServedConversation {
   messages: { role: string; content: string; toolName?: string; t?: number }[];
 }
 
-function terminationSource(reason: ConversationRecord['terminationReason']): ServedConversation['terminationSource'] {
+export function terminationSource(
+  reason: ConversationRecord['terminationReason'],
+): ServedConversation['terminationSource'] {
   switch (reason.kind) {
     case 'buyer_token':
       return 'buyer';
@@ -192,7 +208,9 @@ function serveConversation(record: ConversationRecord): ServedConversation {
     terminationSource: terminationSource(record.terminationReason),
     groundTruth: {
       expectedOutcome: scenario.groundTruth.expectedOutcome,
-      ...(scenario.groundTruth.expectedLeadScore ? { expectedLeadScore: scenario.groundTruth.expectedLeadScore } : {}),
+      ...(scenario.groundTruth.expectedLeadScore
+        ? { expectedLeadScore: scenario.groundTruth.expectedLeadScore }
+        : {}),
       mustHold: [...scenario.groundTruth.mustHold],
     },
     openingMessage: scenario.openingMessage,
@@ -215,7 +233,9 @@ function serveConversation(record: ConversationRecord): ServedConversation {
 
 let setCache: ReturnType<typeof loadScenarioSet> | undefined;
 function cachedSet(): ReturnType<typeof loadScenarioSet> {
-  setCache ??= loadScenarioSet({ includePrivate: existsSync(join(REPO_ROOT, 'private-pool', 'scenarios')) });
+  setCache ??= loadScenarioSet({
+    includePrivate: existsSync(join(REPO_ROOT, 'private-pool', 'scenarios')),
+  });
   return setCache;
 }
 
@@ -292,7 +312,9 @@ export function startG6Server(runId: string): void {
   });
 
   server.listen(PORT, '127.0.0.1', () => {
-    console.log(`G6 audit for run ${runId}: http://localhost:${PORT} (${records.length} conversations)`);
+    console.log(
+      `G6 audit for run ${runId}: http://localhost:${PORT} (${records.length} conversations)`,
+    );
   });
 }
 

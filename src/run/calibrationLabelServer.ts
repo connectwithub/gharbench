@@ -91,6 +91,7 @@ export function aliasCaseIds(order: readonly string[]): {
 export function redactCase(raw: CalibrationCase): Record<string, unknown> {
   return {
     language: raw.language,
+    endedBy: raw.endedBy,
     judgeApplicability: raw.judgeApplicability,
     messages: raw.messages,
   };

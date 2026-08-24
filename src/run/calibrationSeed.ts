@@ -63,6 +63,7 @@ export const SYNTHETIC_CASES: readonly Authored[] = [
       band: 'known_fail',
       family: 'deep_factual',
       language: 'english',
+      endedBy: 'buyer',
       judgeApplicability: {
         factuality: ['F1', 'F4'],
         compliance: ['CP3', 'CP4'],
@@ -98,6 +99,7 @@ export const SYNTHETIC_CASES: readonly Authored[] = [
       band: 'known_fail',
       family: 'compliance_trap',
       language: 'hinglish',
+      endedBy: 'buyer',
       judgeApplicability: {
         factuality: ['F1'],
         compliance: ['CP3', 'CP5'],
@@ -129,6 +131,7 @@ export const SYNTHETIC_CASES: readonly Authored[] = [
       band: 'known_fail',
       family: 'reengagement_24h',
       language: 'english',
+      endedBy: 'buyer',
       judgeApplicability: {
         factuality: ['F1'],
         compliance: ['CP6', 'CP9'],
@@ -159,6 +162,7 @@ export const SYNTHETIC_CASES: readonly Authored[] = [
       band: 'known_fail',
       family: 'compliance_trap',
       language: 'hinglish',
+      endedBy: 'buyer',
       judgeApplicability: {
         factuality: ['F1'],
         compliance: ['CP2', 'CP3', 'CP7'],
@@ -188,6 +192,7 @@ export const SYNTHETIC_CASES: readonly Authored[] = [
       band: 'known_fail',
       family: 'budget_mismatch',
       language: 'english',
+      endedBy: 'buyer',
       judgeApplicability: {
         factuality: ['F1', 'F2'],
         compliance: ['CP3', 'CP6'],
@@ -219,6 +224,7 @@ export const SYNTHETIC_CASES: readonly Authored[] = [
       band: 'known_fail',
       family: 'cold_inquiry',
       language: 'hinglish',
+      endedBy: 'buyer',
       judgeApplicability: {
         factuality: ['F1'],
         compliance: ['CP1', 'CP3'],
@@ -250,6 +256,7 @@ export const SYNTHETIC_CASES: readonly Authored[] = [
       band: 'known_fail',
       family: 'site_visit_scheduling',
       language: 'english',
+      endedBy: 'buyer',
       judgeApplicability: {
         factuality: ['F1'],
         compliance: ['CP3', 'CP8'],
@@ -281,6 +288,7 @@ export const SYNTHETIC_CASES: readonly Authored[] = [
       band: 'known_fail',
       family: 'compliance_trap',
       language: 'hinglish',
+      endedBy: 'buyer',
       judgeApplicability: {
         factuality: ['F1'],
         compliance: ['CP3', 'CP10', 'CP11'],
@@ -314,6 +322,7 @@ export const SYNTHETIC_CASES: readonly Authored[] = [
       band: 'known_pass',
       family: 'site_visit_scheduling',
       language: 'english',
+      endedBy: 'agent',
       judgeApplicability: {
         factuality: ['F1', 'F4'],
         compliance: ['CP3', 'CP4'],
@@ -349,6 +358,7 @@ export const SYNTHETIC_CASES: readonly Authored[] = [
       band: 'known_pass',
       family: 'hinglish_variant',
       language: 'hinglish',
+      endedBy: 'buyer',
       judgeApplicability: {
         factuality: ['F1'],
         compliance: ['CP3'],
@@ -380,6 +390,7 @@ export const SYNTHETIC_CASES: readonly Authored[] = [
       band: 'known_pass',
       family: 'deep_factual',
       language: 'english',
+      endedBy: 'buyer',
       judgeApplicability: {
         factuality: ['F1', 'F5'],
         compliance: ['CP3'],
@@ -413,6 +424,7 @@ export const SYNTHETIC_CASES: readonly Authored[] = [
       band: 'known_pass',
       family: 'cold_inquiry',
       language: 'hinglish',
+      endedBy: 'agent',
       judgeApplicability: {
         factuality: ['F1'],
         compliance: ['CP6'],
@@ -444,6 +456,7 @@ export const SYNTHETIC_CASES: readonly Authored[] = [
       band: 'borderline',
       family: 'compliance_trap',
       language: 'english',
+      endedBy: 'buyer',
       judgeApplicability: {
         factuality: ['F1'],
         compliance: ['CP3', 'CP7'],
@@ -475,6 +488,7 @@ export const SYNTHETIC_CASES: readonly Authored[] = [
       band: 'borderline',
       family: 'deep_factual',
       language: 'english',
+      endedBy: 'buyer',
       judgeApplicability: {
         factuality: ['F1'],
         compliance: ['CP3'],
@@ -504,6 +518,7 @@ export const SYNTHETIC_CASES: readonly Authored[] = [
       band: 'borderline',
       family: 'site_visit_scheduling',
       language: 'english',
+      endedBy: 'agent',
       judgeApplicability: {
         factuality: ['F2', 'F4'],
         compliance: ['CP3'],
@@ -537,6 +552,7 @@ export const SYNTHETIC_CASES: readonly Authored[] = [
       band: 'borderline',
       family: 'budget_mismatch',
       language: 'hinglish',
+      endedBy: 'buyer',
       judgeApplicability: {
         factuality: ['F1', 'F4'],
         compliance: ['CP3', 'CP6'],
@@ -566,6 +582,7 @@ export const SYNTHETIC_CASES: readonly Authored[] = [
       band: 'borderline',
       family: 'cold_inquiry',
       language: 'english',
+      endedBy: 'buyer',
       judgeApplicability: {
         factuality: ['F2'],
         compliance: ['CP6'],
@@ -597,6 +614,7 @@ export const SYNTHETIC_CASES: readonly Authored[] = [
       band: 'borderline',
       family: 'compliance_trap',
       language: 'hinglish',
+      endedBy: 'buyer',
       judgeApplicability: {
         factuality: ['F1'],
         compliance: ['CP3', 'CP5', 'CP10'],

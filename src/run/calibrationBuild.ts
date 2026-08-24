@@ -21,6 +21,7 @@ import { pathToFileURL } from 'node:url';
 import type { CheckReport } from '../checks/types.js';
 import { TRANSCRIPT_FILENAME, readTranscripts } from '../logging/transcript.js';
 import { readCheckReports } from './checkReports.js';
+import { terminationSource } from './g6AuditServer.js';
 import {
   CALIBRATION_DIR,
   CASES_DIR,
@@ -79,7 +80,8 @@ export function buildCasesFromRun(runId: string): BuildSummary {
   const summary: BuildSummary = { written: 0, skipped: [], byBand: {}, byFamily: {} };
 
   for (const record of readTranscripts(transcriptPath)) {
-    if (record.terminationReason.kind === 'error') {
+    const endedBy = terminationSource(record.terminationReason);
+    if (endedBy === 'error') {
       summary.skipped.push(`${record.conversationId} (error termination)`);
       continue;
     }
@@ -108,6 +110,7 @@ export function buildCasesFromRun(runId: string): BuildSummary {
       band: preliminaryBand(checks.get(record.contestantId, record.conversationId)),
       family: scenario.family,
       language: scenario.language,
+      endedBy,
       provenance: {
         runId,
         conversationId: record.conversationId,

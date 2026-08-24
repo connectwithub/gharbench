@@ -24,6 +24,8 @@ export interface JudgeCaseInput {
   caseId: string;
   family: string;
   language: string;
+  /** Who ended the conversation (ADR-0027); 'agent' = flow-ending tool action. */
+  endedBy?: 'buyer' | 'agent' | 'harness';
   /** Binary item ids declared applicable for this dimension (D2/I4). */
   applicableItems: readonly string[];
   messages: readonly CalibrationMessage[];
@@ -202,6 +204,7 @@ export function buildJudgeUser(input: JudgeCaseInput): string {
     language: input.language,
     applicableItems: [...input.applicableItems],
   };
+  if (input.endedBy !== undefined) card['endedBy'] = input.endedBy;
   if (input.scenarioCard) {
     card['activeTrapIds'] = [...input.scenarioCard.activeTrapIds];
     card['expectedOutcome'] = input.scenarioCard.expectedOutcome;
@@ -215,6 +218,13 @@ export function buildJudgeUser(input: JudgeCaseInput): string {
   return [
     'SCENARIO CARD:',
     JSON.stringify(card, null, 2),
+    ...(input.endedBy !== undefined
+      ? [
+          '(endedBy: buyer = the buyer ended it with a stop token; agent = the agent closed the',
+          'lead with a flow-ending tool action, which has NO text bubble - a final buyer message',
+          'with no visible reply is the agent closing, not ignoring; harness = step limit.)',
+        ]
+      : []),
     '',
     'PROGRAMMATIC RESULTS (Layer-1 deterministic checks; a judge may add violations these',
     'cannot see, and may never overturn a deterministic fail):',

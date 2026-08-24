@@ -24,13 +24,18 @@ import type { JudgeDimension } from '../src/run/judgeItems.js';
 
 const JUDGES = ['j/a', 'j/b', 'j/c'];
 
-function makeCase(caseId: string, band: CalibrationCase['band'], compliance: string[]): CalibrationCase {
+function makeCase(
+  caseId: string,
+  band: CalibrationCase['band'],
+  compliance: string[],
+): CalibrationCase {
   return {
     caseId,
     source: 'synthetic',
     band,
     family: 'compliance_trap',
     language: 'english',
+    endedBy: 'buyer',
     judgeApplicability: {
       factuality: ['F1'],
       compliance,
@@ -123,7 +128,11 @@ describe('assembleUnits', () => {
   });
 });
 
-function label(caseId: string, rater: string, binary: Record<string, 'met' | 'not_met' | 'tie'>): CalibrationLabel {
+function label(
+  caseId: string,
+  rater: string,
+  binary: Record<string, 'met' | 'not_met' | 'tie'>,
+): CalibrationLabel {
   return { caseId, rater, labeledAt: '2026-08-20', binary, anchors: {} };
 }
 
@@ -183,7 +192,9 @@ describe('compliancePrf', () => {
 describe('binaryAgreement', () => {
   it('sends aligned 0/1 rows to the bridge and reports raw agreement', () => {
     const cases = [makeCase('cal_1', 'known_fail', ['CP5', 'CP6'])];
-    const judgments = JUDGES.map((j) => sj(j, 'cal_1', 'compliance', { CP5: 'VIOLATION', CP6: 'OK' }));
+    const judgments = JUDGES.map((j) =>
+      sj(j, 'cal_1', 'compliance', { CP5: 'VIOLATION', CP6: 'OK' }),
+    );
     const { binaries } = assembleUnits(cases, judgments, JUDGES);
     const reference = new Map([
       ['cal_1|CP5', false],
@@ -192,7 +203,13 @@ describe('binaryAgreement', () => {
     let sent: Record<string, (number | null)[]> | undefined;
     const bridge: BridgeFn = (raters) => {
       sent = raters;
-      return { krippendorff_alpha: null, cohen_kappa: 0.5, weighted_kappa: null, spearman: null, pearson: null };
+      return {
+        krippendorff_alpha: null,
+        cohen_kappa: 0.5,
+        weighted_kappa: null,
+        spearman: null,
+        pearson: null,
+      };
     };
     const out = binaryAgreement(binaries, reference, bridge);
     expect(out?.units).toBe(2);

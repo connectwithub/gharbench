@@ -24,6 +24,7 @@ const CASE = calibrationCaseSchema.parse({
   band: 'known_pass',
   family: 'cold_inquiry',
   language: 'english',
+  endedBy: 'buyer',
   provenance: {
     runId: 'r',
     conversationId: 'c',
@@ -45,7 +46,12 @@ const CASE = calibrationCaseSchema.parse({
 describe('calibration labeler blindness', () => {
   it('serves no case identity, band, source or provenance to the rater', () => {
     const served = redactCase(CASE);
-    expect(Object.keys(served).sort()).toEqual(['judgeApplicability', 'language', 'messages']);
+    expect(Object.keys(served).sort()).toEqual([
+      'endedBy',
+      'judgeApplicability',
+      'language',
+      'messages',
+    ]);
   });
 
   it('aliases are positional over the given order, padded, and bijective', () => {
@@ -80,5 +86,7 @@ describe('calibration labeler blindness', () => {
     // ADR-0026: shared interpretation notes reach the rater from the same
     // rubric file the judge prompts render.
     expect(html).toContain('interpretationNotes');
+    // ADR-0027: the ended-by chip - an agent tool-close has no text bubble.
+    expect(html).toContain('ended by: agent (tool action)');
   });
 });

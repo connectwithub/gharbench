@@ -43,6 +43,7 @@ import {
   type CalibrationCase,
 } from './calibrationCase.js';
 import { projectMessages } from './calibrationBuild.js';
+import { terminationSource } from './g6AuditServer.js';
 import { readCheckReports } from './checkReports.js';
 import { SLICE_FILE } from './calibrationSlice.js';
 import { loadJudgeItems, type JudgeDimension, type JudgeItems } from './judgeItems.js';
@@ -70,6 +71,7 @@ export interface Judgeable {
   caseId: string;
   family: string;
   language: string;
+  endedBy?: JudgeCaseInput['endedBy'];
   applicability: Record<JudgeDimension, readonly string[]>;
   messages: { role: 'buyer' | 'agent' | 'system'; text: string }[];
   scenarioCard?: JudgeCaseInput['scenarioCard'];
@@ -84,6 +86,7 @@ export function inputFor(j: Judgeable, dimension: JudgeDimension): JudgeCaseInpu
     applicableItems: j.applicability[dimension],
     messages: j.messages,
   };
+  if (j.endedBy !== undefined) input.endedBy = j.endedBy;
   if (j.scenarioCard) input.scenarioCard = j.scenarioCard;
   if (j.programmaticResults !== undefined) input.programmaticResults = j.programmaticResults;
   return input;
@@ -158,6 +161,7 @@ export function toCalibrationJudgeable(c: CalibrationCase): Judgeable {
     caseId: c.caseId,
     family: c.family,
     language: c.language,
+    endedBy: c.endedBy,
     applicability: c.judgeApplicability,
     messages: c.messages,
   };
@@ -189,7 +193,8 @@ export function loadRunJudgeables(runId: string): {
   const skipped: string[] = [];
   let gated = 0;
   for (const record of readTranscripts(transcriptPath)) {
-    if (record.terminationReason.kind === 'error') {
+    const endedBy = terminationSource(record.terminationReason);
+    if (endedBy === 'error') {
       skipped.push(`${record.conversationId} (error termination)`);
       continue;
     }
@@ -207,6 +212,7 @@ export function loadRunJudgeables(runId: string): {
       caseId: runCaseId(record.contestantId, record.conversationId),
       family: scenario.family,
       language: scenario.language,
+      endedBy,
       applicability: scenario.judgeApplicability,
       messages: projectMessages(record),
       scenarioCard: {

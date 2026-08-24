@@ -154,6 +154,15 @@
         color: var(--txt);
         margin-right: 6px;
       }
+      .chip.ended-buyer {
+        border: 1px solid var(--warn);
+      }
+      .chip.ended-agent {
+        border: 1px solid var(--acc);
+      }
+      .chip.ended-harness {
+        border: 1px solid var(--dim);
+      }
       .refTabs {
         display: flex;
         gap: 6px;
@@ -701,6 +710,12 @@
             e(
               'li',
               null,
+              e('b', null, 'The "ended by" chip tells you who closed the chat.'),
+              ' "agent (tool action)" means the agent ended it by logging the qualification or escalating — that action has NO text bubble, so a final buyer message with no visible reply is the agent closing the lead, not ignoring the buyer. Whether closing right there was good judgment is still yours to score. "buyer" = the buyer stopped; "step limit" = the harness cut it off mid-flow.',
+            ),
+            e(
+              'li',
+              null,
               e('b', null, '"Can’t decide" is a real answer'),
               ', not a skip — use it when the transcript genuinely supports both readings. It is recorded and analysed as a tie.',
             ),
@@ -892,6 +907,17 @@
               { className: 'chatHead' },
               e('span', { className: 'chip' }, `case ${idx + 1} of ${order.length}`),
               e('span', { className: 'chip' }, `language: ${c.language}`),
+              c.endedBy
+                ? e(
+                    'span',
+                    { className: 'chip ended-' + c.endedBy },
+                    c.endedBy === 'buyer'
+                      ? 'ended by: buyer'
+                      : c.endedBy === 'agent'
+                        ? 'ended by: agent (tool action)'
+                        : 'ended by: step limit',
+                  )
+                : null,
               e(
                 'span',
                 { className: 'legend' },

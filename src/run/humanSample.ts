@@ -26,6 +26,7 @@ import { pathToFileURL } from 'node:url';
 import { TRANSCRIPT_FILENAME, readTranscripts } from '../logging/transcript.js';
 import { calibrationCaseSchema, type CalibrationCase } from './calibrationCase.js';
 import { preliminaryBand, projectMessages } from './calibrationBuild.js';
+import { terminationSource } from './g6AuditServer.js';
 import { readCheckReports } from './checkReports.js';
 import { REPO_ROOT, loadScenarioSet } from './scenarioSet.js';
 import { N5_FAMILIES } from './sweep.js';
@@ -52,6 +53,7 @@ export interface SampleCandidate {
   family: string;
   language: string;
   band: CalibrationCase['band'];
+  endedBy: CalibrationCase['endedBy'];
   judgeApplicability: CalibrationCase['judgeApplicability'];
   messages: CalibrationCase['messages'];
 }
@@ -116,7 +118,8 @@ export function collectCandidates(runIds: readonly string[]): SampleCandidate[] 
     if (!existsSync(transcriptPath)) throw new Error(`No ${TRANSCRIPT_FILENAME} in runs/${runId}`);
     const checks = readCheckReports(runDir);
     for (const record of readTranscripts(transcriptPath)) {
-      if (record.terminationReason.kind === 'error') continue;
+      const endedBy = terminationSource(record.terminationReason);
+      if (endedBy === 'error') continue;
       const scenario = scenarioById.get(record.scenarioId);
       if (!scenario) continue;
       out.push({
@@ -127,6 +130,7 @@ export function collectCandidates(runIds: readonly string[]): SampleCandidate[] 
         family: scenario.family,
         language: scenario.language,
         band: preliminaryBand(checks.get(record.contestantId, record.conversationId)),
+        endedBy,
         judgeApplicability: scenario.judgeApplicability,
         messages: projectMessages(record),
       });
@@ -153,6 +157,7 @@ export function writeSample(
       band: c.band,
       family: c.family as CalibrationCase['family'],
       language: c.language as CalibrationCase['language'],
+      endedBy: c.endedBy,
       judgeApplicability: c.judgeApplicability,
       messages: c.messages,
     };

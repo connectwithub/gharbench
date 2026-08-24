@@ -127,6 +127,7 @@ describe('calibration prompt-shape uniformity (ADR-0025)', () => {
       band: 'borderline',
       family: 'compliance_trap',
       language: 'english',
+      endedBy: 'agent',
       provenance: {
         runId: 'r',
         conversationId: 'scn_x.P01#0',
@@ -151,10 +152,16 @@ describe('calibration prompt-shape uniformity (ADR-0025)', () => {
       caseId: j.caseId,
       family: j.family,
       language: j.language,
+      endedBy: j.endedBy,
       applicableItems: j.applicability.compliance,
       messages: j.messages,
     });
     expect(user).not.toContain('mustHold');
     expect(user).toContain('unavailable (no Layer-1 report');
+    // ADR-0027: who ended the conversation IS part of the shared minimal
+    // shape - an agent tool-close has no text bubble, and judges must not
+    // read the missing reply as the agent ignoring the buyer.
+    expect(user).toContain('"endedBy": "agent"');
+    expect(user).toContain('flow-ending tool action');
   });
 });
