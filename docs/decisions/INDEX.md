@@ -3,7 +3,7 @@
 Generated from `decisions.jsonl` — do not edit by hand.
 Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 
-26 decisions.
+27 decisions.
 
 ## By date
 
@@ -13,6 +13,7 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 - **ADR-0025** (2026-08-24) — [Calibration judging: uniform prompt shape and no conduct-only item lists](ADR-0025-calibration-blindness-uniform-prompt.md)
 - **ADR-0026** (2026-08-24) — [Shared rubric interpretation notes; disclosed rater-baseline adjudication](ADR-0026-shared-interpretation-notes-rater-baseline.md)
 - **ADR-0027** (2026-08-24) — [Every calibration case records who ended the conversation](ADR-0027-endedby-on-calibration-cases.md)
+- **ADR-0028** (2026-08-24) — [Buyer scaffolding leaks: 17 calibration cases purged, leak screen added, buyer prompt hardened](ADR-0028-buyer-scaffolding-leak-purge.md)
 - **ADR-0021** (2026-08-21) — [Buyer guardrails hardened with an anti-repetition mandate after the G6 pilot audit](ADR-0021-anti-repetition-guardrail-after-g6-audit.md)
 - **ADR-0014** (2026-08-20) — [Personas are public; scenarios are persona-bound instance files split at authoring time](ADR-0014-personas-are-public-scenarios-are-persona-bound-instance-files.md)
 - **ADR-0015** (2026-08-20) — [Layer-1 checks fire only on quotable, context-anchored evidence](ADR-0015-checks-fire-only-on-quotable-context-anchored-evidence.md)
@@ -52,10 +53,12 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 
 - ADR-0022 — [Calibration labeler hardened: opaque case aliases and violation-polarity buttons](ADR-0022-labeler-blindness-aliases-and-polarity-ui.md)
 - ADR-0025 — [Calibration judging: uniform prompt shape and no conduct-only item lists](ADR-0025-calibration-blindness-uniform-prompt.md)
+- ADR-0028 — [Buyer scaffolding leaks: 17 calibration cases purged, leak screen added, buyer prompt hardened](ADR-0028-buyer-scaffolding-leak-purge.md)
 
 ### `buyer`
 
 - ADR-0021 — [Buyer guardrails hardened with an anti-repetition mandate after the G6 pilot audit](ADR-0021-anti-repetition-guardrail-after-g6-audit.md)
+- ADR-0028 — [Buyer scaffolding leaks: 17 calibration cases purged, leak screen added, buyer prompt hardened](ADR-0028-buyer-scaffolding-leak-purge.md)
 
 ### `buyer-simulator`
 
@@ -75,6 +78,7 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 - ADR-0025 — [Calibration judging: uniform prompt shape and no conduct-only item lists](ADR-0025-calibration-blindness-uniform-prompt.md)
 - ADR-0026 — [Shared rubric interpretation notes; disclosed rater-baseline adjudication](ADR-0026-shared-interpretation-notes-rater-baseline.md)
 - ADR-0027 — [Every calibration case records who ended the conversation](ADR-0027-endedby-on-calibration-cases.md)
+- ADR-0028 — [Buyer scaffolding leaks: 17 calibration cases purged, leak screen added, buyer prompt hardened](ADR-0028-buyer-scaffolding-leak-purge.md)
 
 ### `checks`
 
@@ -116,6 +120,7 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 - ADR-0020 — [Phases 6-10 scaffolded machine-first: every gate is code before any run is paid for](ADR-0020-phase6-10-scaffolding-machine-side-complete.md)
 - ADR-0021 — [Buyer guardrails hardened with an anti-repetition mandate after the G6 pilot audit](ADR-0021-anti-repetition-guardrail-after-g6-audit.md)
 - ADR-0024 — [Pre-run pipeline hardening: contestant-aware check reports and gate completeness floors](ADR-0024-prerun-pipeline-hardening.md)
+- ADR-0028 — [Buyer scaffolding leaks: 17 calibration cases purged, leak screen added, buyer prompt hardened](ADR-0028-buyer-scaffolding-leak-purge.md)
 
 ### `harness`
 
@@ -191,6 +196,7 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 ### `simulator`
 
 - ADR-0021 — [Buyer guardrails hardened with an anti-repetition mandate after the G6 pilot audit](ADR-0021-anti-repetition-guardrail-after-g6-audit.md)
+- ADR-0028 — [Buyer scaffolding leaks: 17 calibration cases purged, leak screen added, buyer prompt hardened](ADR-0028-buyer-scaffolding-leak-purge.md)
 
 ### `stack`
 

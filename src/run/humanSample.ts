@@ -25,7 +25,7 @@ import { pathToFileURL } from 'node:url';
 
 import { TRANSCRIPT_FILENAME, readTranscripts } from '../logging/transcript.js';
 import { calibrationCaseSchema, type CalibrationCase } from './calibrationCase.js';
-import { preliminaryBand, projectMessages } from './calibrationBuild.js';
+import { buyerLeakMarker, preliminaryBand, projectMessages } from './calibrationBuild.js';
 import { terminationSource } from './g6AuditServer.js';
 import { readCheckReports } from './checkReports.js';
 import { REPO_ROOT, loadScenarioSet } from './scenarioSet.js';
@@ -122,6 +122,9 @@ export function collectCandidates(runIds: readonly string[]): SampleCandidate[] 
       if (endedBy === 'error') continue;
       const scenario = scenarioById.get(record.scenarioId);
       if (!scenario) continue;
+      // ADR-0028: a buyer that leaked its scaffolding voids the conversation
+      // for scoring - never serve it to a rater.
+      if (buyerLeakMarker(projectMessages(record)) !== null) continue;
       out.push({
         runId,
         conversationId: record.conversationId,

@@ -13,6 +13,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { buyerLeakMarker } from '../src/run/calibrationBuild.js';
 import { calibrationCaseSchema } from '../src/run/calibrationCase.js';
 import { aliasCaseIds, buildReference, redactCase } from '../src/run/calibrationLabelServer.js';
 import { loadSourceDocuments } from '../src/run/judgeRun.js';
@@ -88,5 +89,29 @@ describe('calibration labeler blindness', () => {
     expect(html).toContain('interpretationNotes');
     // ADR-0027: the ended-by chip - an agent tool-close has no text bubble.
     expect(html).toContain('ended by: agent (tool action)');
+  });
+});
+
+describe('buyer scaffolding-leak screen (ADR-0028)', () => {
+  it('flags reminder blocks and card vocabulary in buyer messages only', () => {
+    expect(
+      buyerLeakMarker([
+        {
+          role: 'buyer',
+          text: 'thik hai\n\n<simulation-reminder>\n- Hidden budget ceiling: 75L\n</simulation-reminder>',
+        },
+      ]),
+    ).not.toBeNull();
+    expect(
+      buyerLeakMarker([{ role: 'buyer', text: 'my walk-away trigger is unclear pricing' }]),
+    ).not.toBeNull();
+    expect(
+      buyerLeakMarker([{ role: 'buyer', text: 'I will stop here ###STOP###' }]),
+    ).not.toBeNull();
+    // Only BUYER surfaces are screened; and ordinary budget talk is not a leak.
+    expect(buyerLeakMarker([{ role: 'agent', text: '<simulation-reminder>' }])).toBeNull();
+    expect(
+      buyerLeakMarker([{ role: 'buyer', text: 'budget 75 lakh max hai, usse zyada nahi' }]),
+    ).toBeNull();
   });
 });

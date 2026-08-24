@@ -43,6 +43,40 @@ export function preliminaryBand(report: CheckReport | undefined): CalibrationCas
  * judge reads - shared by calibration cases, the judge run mode and the
  * Phase 7 human-validation sample so all three see the same surface.
  */
+/**
+ * ADR-0028: buyer frame-break / scaffolding-leak screen. The 235B buyer was
+ * caught writing its own <simulation-reminder>-style block into outgoing
+ * messages - leaking its hidden brief (budget ceiling, walk-away triggers)
+ * verbatim to the agent. Such a conversation is void for agent scoring: the
+ * agent was handed the buyer's private playbook. 17/118 calibration cases
+ * were purged for this; every case builder screens for it now. Legitimate
+ * buyer text never contains these (validated: 0 false positives over the
+ * remaining 119 cases); stop tokens are engine-stripped, so any in-text
+ * occurrence is also a leak.
+ */
+const LEAK_MARKERS: readonly RegExp[] = [
+  /<\s*\/?\s*simulation-reminder/i,
+  /facts about you that never change/i,
+  /hidden budget/i,
+  /walk-?away trigger/i,
+  /stretch possible/i,
+  /consistency anchor/i,
+  /###(STOP|TRANSFER|OUT-OF-SCOPE)###/,
+  /<scenario>/i,
+  /\(no reply yet\)/i,
+];
+
+/** The first leak marker found in a buyer surface message, or null if clean. */
+export function buyerLeakMarker(
+  messages: readonly { role: string; text: string }[],
+): string | null {
+  for (const m of messages) {
+    if (m.role !== 'buyer') continue;
+    for (const re of LEAK_MARKERS) if (re.test(m.text)) return re.source;
+  }
+  return null;
+}
+
 export function projectMessages(record: {
   messages: { role: string; content: string }[];
 }): { role: 'buyer' | 'agent' | 'system'; text: string }[] {
@@ -83,6 +117,11 @@ export function buildCasesFromRun(runId: string): BuildSummary {
     const endedBy = terminationSource(record.terminationReason);
     if (endedBy === 'error') {
       summary.skipped.push(`${record.conversationId} (error termination)`);
+      continue;
+    }
+    const leak = buyerLeakMarker(projectMessages(record));
+    if (leak !== null) {
+      summary.skipped.push(`${record.conversationId} (buyer frame break: ${leak})`);
       continue;
     }
     const scenario = scenarioById.get(record.scenarioId);
