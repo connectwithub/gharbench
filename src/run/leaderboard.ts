@@ -25,6 +25,11 @@ import { qualityVerdictToPass } from '../judge/polarity.js';
 import type { JudgeVerdict } from '../judge/schema.js';
 import { bootstrapMeanCi, wilsonInterval } from '../metrics/ci.js';
 import {
+  operationalProfile,
+  type OperationalProfile,
+  type ProfileCall,
+} from '../metrics/operationalProfile.js';
+import {
   V_WEIGHTS,
   blendSubScore,
   composite,
@@ -282,7 +287,24 @@ export interface LeaderboardEntry {
   hinglishGap: { english: number | null; hinglish: number | null; delta: number | null };
   costPerConversation: number | null;
   d4Sensitivity: Record<string, number | null>;
+  /**
+   * Descriptive serving telemetry (ADR-0031). Never an input to any score,
+   * ranking, or gate in this file - see `OPERATIONAL_PROFILE_NOTE`. Null when
+   * the run's costs.json predates per-call records; absence stays loud.
+   */
+  operationalProfile: (OperationalProfile & { conversationsWithoutCallData: number }) | null;
 }
+
+/**
+ * Published verbatim next to the profile so the caveat travels with the
+ * numbers: whoever reads the JSON without this file reads the disclaimer too.
+ */
+export const OPERATIONAL_PROFILE_NOTE =
+  'Descriptive serving telemetry, not a scored metric. Reply latency measures the provider serving ' +
+  'stack (route, region, load, cache state) on the run date, is excluded from the composite and ' +
+  'every ranking, and is not reproducible from model pins. Interactive (non-batch) calls only. ' +
+  'A reply is one buyer-visible agent turn: all tool-loop calls between two buyer messages, summed - ' +
+  'on WhatsApp there is no streaming, so this is the wait a lead actually experiences.';
 
 export interface Leaderboard {
   generatedAt: string;
@@ -290,6 +312,7 @@ export interface Leaderboard {
   entries: LeaderboardEntry[];
   robustPairs: { a: string; b: string; verdict: 'a' | 'b' | 'non-separable' }[];
   hardFailByTrap: Record<string, Record<string, number>>;
+  operationalProfileNote: string;
 }
 
 function readCostPerConversation(
@@ -312,6 +335,32 @@ function readCostPerConversation(
   return out;
 }
 
+/**
+ * Per-contestant call sequences for the operational profile (ADR-0031).
+ * A conversation without a `calls` array (costs.json written before the
+ * telemetry existed, e.g. the pilot) is counted as missing rather than
+ * silently dropped, so the printed profile can say how partial it is.
+ */
+function readOperationalCalls(
+  runIds: readonly string[],
+): Map<string, { conversations: ProfileCall[][]; missing: number }> {
+  const out = new Map<string, { conversations: ProfileCall[][]; missing: number }>();
+  for (const runId of runIds) {
+    const path = join(REPO_ROOT, 'runs', runId, 'costs.json');
+    if (!existsSync(path)) continue;
+    const costs = JSON.parse(readFileSync(path, 'utf8')) as {
+      perConversation?: { contestant: string; calls?: ProfileCall[] }[];
+    };
+    for (const c of costs.perConversation ?? []) {
+      const bucket = out.get(c.contestant) ?? { conversations: [], missing: 0 };
+      if (c.calls === undefined) bucket.missing += 1;
+      else bucket.conversations.push(c.calls);
+      out.set(c.contestant, bucket);
+    }
+  }
+  return out;
+}
+
 export function buildLeaderboard(runIds: readonly string[]): Leaderboard {
   const set = loadScenarioSet({ includePrivate: true });
   const scored = runIds.flatMap((r) => scoreRun(r, set));
@@ -322,6 +371,7 @@ export function buildLeaderboard(runIds: readonly string[]): Leaderboard {
     byContestant.set(c.contestantId, bucket);
   }
   const costByRef = readCostPerConversation(runIds);
+  const callsByRef = readOperationalCalls(runIds);
 
   const subsByFamilyOf = (convs: readonly ScoredConversation[]): Map<string, SubScores[]> => {
     const m = new Map<string, SubScores[]>();
@@ -406,8 +456,10 @@ export function buildLeaderboard(runIds: readonly string[]): Leaderboard {
       };
 
       // Transcript ids look like "contestant:<ref>"; costs.json keys the bare ref.
-      const cost =
-        costByRef.get(contestantId) ?? costByRef.get(contestantId.replace(/^contestant:/, ''));
+      const bareRef = contestantId.replace(/^contestant:/, '');
+      const cost = costByRef.get(contestantId) ?? costByRef.get(bareRef);
+      const callData = callsByRef.get(contestantId) ?? callsByRef.get(bareRef);
+      const profile = callData ? operationalProfile(callData.conversations) : null;
       return {
         contestantId,
         conversations: convs.length,
@@ -450,6 +502,9 @@ export function buildLeaderboard(runIds: readonly string[]): Leaderboard {
         },
         costPerConversation: cost && cost.n > 0 ? cost.usd / cost.n : null,
         d4Sensitivity: { '0.60': d4At(0.6), '0.70': d4At(0.7), '0.80': d4At(0.8) },
+        operationalProfile: profile
+          ? { ...profile, conversationsWithoutCallData: callData?.missing ?? 0 }
+          : null,
       };
     });
 
@@ -487,6 +542,7 @@ export function buildLeaderboard(runIds: readonly string[]): Leaderboard {
     entries,
     robustPairs,
     hardFailByTrap,
+    operationalProfileNote: OPERATIONAL_PROFILE_NOTE,
   };
 }
 
@@ -517,6 +573,28 @@ function main(): void {
   console.log(
     `pairwise orderings: ${robust} ROBUST, ${board.robustPairs.length - robust} non-separable (D7)`,
   );
+
+  console.log('=== operational profile (descriptive serving telemetry - NOT scored, NOT ranked) ===');
+  const secs = (ms: number): string => `${(ms / 1000).toFixed(1)}s`;
+  for (const e of board.entries) {
+    const p = e.operationalProfile;
+    if (p === null) {
+      console.log(`${e.contestantId.padEnd(30)} latency telemetry unavailable (pre-ADR-0031 costs.json)`);
+      continue;
+    }
+    const tps = p.outputTokensPerSecond === null ? '-' : p.outputTokensPerSecond.toFixed(0);
+    console.log(
+      `${e.contestantId.padEnd(30)} reply p50=${secs(p.replyLatencyMs.medianMs)} ` +
+        `p95=${secs(p.replyLatencyMs.p95Ms)} max=${secs(p.replyLatencyMs.maxMs)} | ` +
+        `call p50=${secs(p.callLatencyMs.medianMs)} | ${p.callsPerReply.mean.toFixed(1)} calls/reply | ` +
+        `${tps} tok/s (${p.replies} replies / ${p.conversations} convs` +
+        (p.conversationsWithoutCallData > 0
+          ? `, ${p.conversationsWithoutCallData} convs without call data`
+          : '') +
+        ')',
+    );
+  }
+  console.log(`note: ${board.operationalProfileNote}`);
   const unjudged = board.entries.reduce((a, e) => a + e.unjudged, 0);
   if (unjudged > 0) {
     console.log(

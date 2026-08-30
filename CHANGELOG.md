@@ -18,6 +18,10 @@ DOI (ADR-0030) - every entry here is what a version DOI points at.
   `LICENSE-DATA` CC BY 4.0), this changelog, paper citation stubs (`paper/`).
 - `endedBy`/`endedByTool` on calibration cases, shown to raters and judges
   (ADR-0027..0029).
+- Operational profile: sweeps persist per-call latency telemetry, and the
+  leaderboard reports per-reply p50/p95, calls/reply and tok/s as descriptive
+  serving data - never scored, never ranked, latency-blindness of the scoring
+  stack test-pinned (ADR-0031).
 
 ## [0.1.0] - unreleased baseline (2026-08-28 state)
 

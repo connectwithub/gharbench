@@ -33,7 +33,7 @@ import {
 import { TranscriptWriter } from '../logging/transcript.js';
 import { resolveModel } from '../providers/registry.js';
 import { ModelBuyer, buildBuyerSystemPrompt } from '../simulator/buyer.js';
-import { CostMeter, type CostSummary } from '../telemetry/cost.js';
+import { CostMeter, type CostSummary, type ModelCallRecord } from '../telemetry/cost.js';
 import { checkRun } from './checksRun.js';
 import { REPO_ROOT, loadScenarioSet, type ScenarioSet } from './scenarioSet.js';
 
@@ -242,6 +242,7 @@ async function main(): Promise<void> {
         const runOnce = async (): Promise<{
           record: Awaited<ReturnType<Orchestrator['run']>>;
           summary: CostSummary;
+          calls: readonly ModelCallRecord[];
         }> => {
           const db = resetDb(set.corpus);
           const clock = new SimClock(job.scenario.clock);
@@ -272,7 +273,7 @@ async function main(): Promise<void> {
           });
 
           const record = await orchestrator.run();
-          return { record, summary: costMeter.summary() };
+          return { record, summary: costMeter.summary(), calls: costMeter.records };
         };
 
         // A conversation that dies on a provider/network error is an infra
@@ -280,7 +281,7 @@ async function main(): Promise<void> {
         // costs are counted - merged into the conversation's summary so
         // costs.json (and G12's $/conv on top of it) sees the real spend,
         // not just the surviving attempt.
-        let { record, summary } = await runOnce();
+        let { record, summary, calls } = await runOnce();
         let retried = false;
         if (record.terminationReason.kind === 'error') {
           console.warn(
@@ -289,7 +290,10 @@ async function main(): Promise<void> {
           );
           const failedAttempt = summary;
           retried = true;
-          ({ record, summary } = await runOnce());
+          // The retry's `calls` replace the failed attempt's: the operational
+          // profile describes the conversation that produced the data, while
+          // the merged summary keeps billing honest about the real spend.
+          ({ record, summary, calls } = await runOnce());
           summary = addCostSummaries(failedAttempt, summary);
         }
         spentUsd += summary.totalUsd;
@@ -303,7 +307,7 @@ async function main(): Promise<void> {
             `BUDGET: $${spentUsd.toFixed(2)} >= $${options.maxUsd}; skipping remaining conversations.`,
           );
         }
-        return { job, record, summary, retried };
+        return { job, record, summary, calls, retried };
       }),
     ),
   );
@@ -340,6 +344,17 @@ async function main(): Promise<void> {
           contestant: r.job.contestantRef,
           conversationId: r.record.conversationId,
           summary: r.summary satisfies CostSummary,
+          // ADR-0031: chronological per-call telemetry for the operational
+          // profile. Order carries the reply boundaries (contestant runs split
+          // on buyer calls); latency is wall-clock and measures the vendor, so
+          // this array is descriptive data, never a scoring input.
+          calls: r.calls.map((c) => ({
+            role: c.role,
+            modelId: c.modelId,
+            latencyMs: Math.round(c.latencyMs),
+            outputTokens: c.outputTokens,
+            cacheHit: c.cacheHit,
+          })),
         })),
       },
       null,

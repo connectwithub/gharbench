@@ -3,10 +3,11 @@
 Generated from `decisions.jsonl` — do not edit by hand.
 Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 
-29 decisions.
+30 decisions.
 
 ## By date
 
+- **ADR-0031** (2026-08-30) — [Operational profile: latency published as serving telemetry, never scored](ADR-0031-operational-profile.md)
 - **ADR-0030** (2026-08-28) — [SISTER work order: judge-robustness machinery, clustered CIs, canary, release hygiene](ADR-0030-sister-workorder.md)
 - **ADR-0029** (2026-08-27) — [Agent-ended cases carry the closing tool; the answer key shows the agent's full capability surface](ADR-0029-ended-by-tool.md)
 - **ADR-0022** (2026-08-24) — [Calibration labeler hardened: opaque case aliases and violation-polarity buttons](ADR-0022-labeler-blindness-aliases-and-polarity-ui.md)
@@ -156,9 +157,14 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 
 - ADR-0029 — [Agent-ended cases carry the closing tool; the answer key shows the agent's full capability surface](ADR-0029-ended-by-tool.md)
 
+### `leaderboard`
+
+- ADR-0031 — [Operational profile: latency published as serving telemetry, never scored](ADR-0031-operational-profile.md)
+
 ### `metrics`
 
 - ADR-0030 — [SISTER work order: judge-robustness machinery, clustered CIs, canary, release hygiene](ADR-0030-sister-workorder.md)
+- ADR-0031 — [Operational profile: latency published as serving telemetry, never scored](ADR-0031-operational-profile.md)
 
 ### `process`
 
@@ -197,6 +203,10 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 ### `release`
 
 - ADR-0030 — [SISTER work order: judge-robustness machinery, clustered CIs, canary, release hygiene](ADR-0030-sister-workorder.md)
+
+### `reporting`
+
+- ADR-0031 — [Operational profile: latency published as serving telemetry, never scored](ADR-0031-operational-profile.md)
 
 ### `reproducibility`
 
@@ -237,6 +247,7 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 ### `telemetry`
 
 - ADR-0013 — [The price table refuses to invent a number](ADR-0013-the-price-table-refuses-to-invent-a-number.md)
+- ADR-0031 — [Operational profile: latency published as serving telemetry, never scored](ADR-0031-operational-profile.md)
 
 ### `tooling`
 
