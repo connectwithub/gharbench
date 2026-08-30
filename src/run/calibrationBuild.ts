@@ -19,6 +19,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import type { CheckReport } from '../checks/types.js';
+import type { ChatMessage } from '../contestants/types.js';
 import { TRANSCRIPT_FILENAME, readTranscripts } from '../logging/transcript.js';
 import { readCheckReports } from './checkReports.js';
 import { terminationSource } from './g6AuditServer.js';
@@ -75,6 +76,29 @@ export function buyerLeakMarker(
     for (const re of LEAK_MARKERS) if (re.test(m.text)) return re.source;
   }
   return null;
+}
+
+export const FLOW_ENDING_TOOLS = ['escalate_to_human', 'log_qualification'] as const;
+export type FlowEndingTool = (typeof FLOW_ENDING_TOOLS)[number];
+
+/**
+ * The successful flow-ending tool call that closed an agent-ended
+ * conversation (ADR-0029). The close has no text bubble, and the two tools
+ * mean opposite things (lead logged+closed vs handed to a human), so the
+ * name travels with the case to raters and judges alike. Returns undefined
+ * when no successful flow-ending call exists - for an endedBy === 'agent'
+ * record that is a data defect, and the case schema rejects it loudly.
+ */
+export function closingTool(record: { messages: ChatMessage[] }): FlowEndingTool | undefined {
+  let found: FlowEndingTool | undefined;
+  for (const m of record.messages) {
+    for (const r of m.toolResults ?? []) {
+      if (r.ok && (FLOW_ENDING_TOOLS as readonly string[]).includes(r.name)) {
+        found = r.name as FlowEndingTool;
+      }
+    }
+  }
+  return found;
 }
 
 export function projectMessages(record: {
@@ -143,6 +167,7 @@ export function buildCasesFromRun(runId: string): BuildSummary {
     // contestant slug and is sanitised; provenance keeps the originals.
     const slug = (s: string): string => s.toLowerCase().replace(/[^a-z0-9_.-]/g, '-');
     const contestantSlug = slug(record.contestantId.split('/').pop() ?? record.contestantId);
+    const endedByTool = endedBy === 'agent' ? closingTool(record) : undefined;
     const calCase: CalibrationCase = {
       caseId: `cal_real_${contestantSlug}_${slug(record.conversationId)}`,
       source: 'real',
@@ -150,6 +175,7 @@ export function buildCasesFromRun(runId: string): BuildSummary {
       family: scenario.family,
       language: scenario.language,
       endedBy,
+      ...(endedByTool !== undefined ? { endedByTool } : {}),
       provenance: {
         runId,
         conversationId: record.conversationId,

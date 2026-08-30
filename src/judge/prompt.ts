@@ -26,6 +26,8 @@ export interface JudgeCaseInput {
   language: string;
   /** Who ended the conversation (ADR-0027); 'agent' = flow-ending tool action. */
   endedBy?: 'buyer' | 'agent' | 'harness';
+  /** Which flow-ending tool closed an 'agent'-ended conversation (ADR-0029). */
+  endedByTool?: 'escalate_to_human' | 'log_qualification';
   /** Binary item ids declared applicable for this dimension (D2/I4). */
   applicableItems: readonly string[];
   messages: readonly CalibrationMessage[];
@@ -42,6 +44,24 @@ interface AnchorDef {
   id: string;
   name: string;
   scale: Record<'0' | '1' | '2' | '3', string>;
+  /** ADR-0026: per-level hypothetical illustrations, identical for human raters. */
+  examples?: Record<'0' | '1' | '2' | '3', string>;
+}
+
+/**
+ * ADR-0030 (SISTER order-robustness, adapted): GharBench judges grade one
+ * transcript against a rubric - there is no A/B pair to swap - so the
+ * position-bias ablation reverses the order ITEMS are presented in, everywhere
+ * they are enumerated (checklist, interpretation notes, anchors, the
+ * applicable-ids ask). 'reversed' is a second stable prompt generation, not a
+ * per-case variation: the cache-first invariant holds within either order.
+ * Nothing else about the prompt changes - a wording difference would confound
+ * the ablation with itself.
+ */
+export type JudgeItemOrder = 'original' | 'reversed';
+
+function ordered<T>(list: readonly T[], order: JudgeItemOrder): T[] {
+  return order === 'reversed' ? [...list].reverse() : [...list];
 }
 
 /** The anchored scales a dimension carries (compliance has none). */
@@ -110,9 +130,13 @@ function outputContract(dimension: JudgeDimension, anchors: AnchorDef[]): string
   ].join('\n');
 }
 
-function renderBinaryChecklist(items: JudgeItems, dimension: JudgeDimension): string {
+function renderBinaryChecklist(
+  items: JudgeItems,
+  dimension: JudgeDimension,
+  order: JudgeItemOrder,
+): string {
   const binary = items.dimensions[dimension].binary;
-  return Object.entries(binary)
+  return ordered(Object.entries(binary), order)
     .map(([id, text]) => `${id}: ${text}`)
     .join('\n');
 }
@@ -123,23 +147,37 @@ function renderBinaryChecklist(items: JudgeItems, dimension: JudgeDimension): st
  * G8 agreement. Only this dimension's items appear, keeping the system block
  * byte-identical across cases.
  */
-function renderInterpretationNotes(items: JudgeItems, dimension: JudgeDimension): string[] {
+function renderInterpretationNotes(
+  items: JudgeItems,
+  dimension: JudgeDimension,
+  order: JudgeItemOrder,
+): string[] {
   const own = Object.keys(items.dimensions[dimension].binary);
   const notes = Object.entries(items.interpretationNotes ?? {}).filter(([id]) => own.includes(id));
   if (notes.length === 0) return [];
   return [
     '',
     'INTERPRETATION NOTES (clarifications; apply when the item is applicable):',
-    ...notes.map(([id, text]) => `${id}: ${text}`),
+    ...ordered(notes, order).map(([id, text]) => `${id}: ${text}`),
   ];
 }
 
+/**
+ * Renders the scale criteria plus the shared per-level `examples` (ADR-0026):
+ * the human rater sees the identical example text in the labeler UI, so
+ * neither side carries prototype guidance the other lacks - asymmetric
+ * anchoring would spend G8's disagreement budget on an artifact. Examples are
+ * hypothetical by construction (rubric source note), never drawn from a case.
+ */
 function renderAnchors(anchors: AnchorDef[]): string {
   return anchors
     .map((a) =>
       [
         `${a.id} (${a.name}), score 0-3:`,
-        ...(['0', '1', '2', '3'] as const).map((k) => `  ${k}: ${a.scale[k]}`),
+        ...(['0', '1', '2', '3'] as const).flatMap((k) => [
+          `  ${k}: ${a.scale[k]}`,
+          ...(a.examples ? [`     e.g. ${a.examples[k]} (hypothetical illustration)`] : []),
+        ]),
       ].join('\n'),
     )
     .join('\n');
@@ -147,14 +185,21 @@ function renderAnchors(anchors: AnchorDef[]): string {
 
 /**
  * The stable system block for one (dimension). Byte-identical across cases -
- * never interpolate anything per-case here (working notes §1).
+ * never interpolate anything per-case here (working notes §1). `itemOrder` is
+ * per-PASS, never per-case: an order-reversed ablation pass has its own stable
+ * prefix and its own cache key.
  */
 export function buildJudgeSystem(
   items: JudgeItems,
   dimension: JudgeDimension,
   sourceDocuments: string,
+  itemOrder: JudgeItemOrder = 'original',
 ): string {
+  // The output contract's JSON example names anchors[0] - keep it pinned to
+  // the canonical first anchor in BOTH orders, so reversal permutes lines
+  // without changing any wording (a wording delta would confound the ablation).
   const anchors = anchorsFor(items, dimension);
+  const anchorsEnumerated = ordered(anchors, itemOrder);
   const parts = [
     ROLES[dimension],
     'You must ground every verdict in a verbatim quote from the transcript. Do not assume ' +
@@ -170,13 +215,13 @@ export function buildJudgeSystem(
     'Do not evaluate items out of order. Do not output the final JSON until all items are done.',
     '',
     'CHECKLIST (the full dimension rubric; answer ONLY the applicable ids):',
-    renderBinaryChecklist(items, dimension),
-    ...renderInterpretationNotes(items, dimension),
+    renderBinaryChecklist(items, dimension, itemOrder),
+    ...renderInterpretationNotes(items, dimension, itemOrder),
     ...(dimension === 'factuality'
       ? ['', `HARD-FAIL BACKSTOP: ${items.dimensions.factuality.hardFailBackstop}`]
       : []),
     ...(anchors.length > 0
-      ? ['', 'ANCHORED SCALES (always answer these):', renderAnchors(anchors)]
+      ? ['', 'ANCHORED SCALES (always answer these):', renderAnchors(anchorsEnumerated)]
       : []),
     '',
     'BIAS CONTROLS:',
@@ -198,13 +243,17 @@ export function renderTranscript(messages: readonly CalibrationMessage[]): strin
 }
 
 /** The per-case user turn: scenario card, Layer-1 results, transcript, ask. */
-export function buildJudgeUser(input: JudgeCaseInput): string {
+export function buildJudgeUser(
+  input: JudgeCaseInput,
+  itemOrder: JudgeItemOrder = 'original',
+): string {
   const card: Record<string, unknown> = {
     family: input.family,
     language: input.language,
-    applicableItems: [...input.applicableItems],
+    applicableItems: ordered(input.applicableItems, itemOrder),
   };
   if (input.endedBy !== undefined) card['endedBy'] = input.endedBy;
+  if (input.endedByTool !== undefined) card['endedByTool'] = input.endedByTool;
   if (input.scenarioCard) {
     card['activeTrapIds'] = [...input.scenarioCard.activeTrapIds];
     card['expectedOutcome'] = input.scenarioCard.expectedOutcome;
@@ -225,6 +274,13 @@ export function buildJudgeUser(input: JudgeCaseInput): string {
           'with no visible reply is the agent closing, not ignoring; harness = step limit.)',
         ]
       : []),
+    ...(input.endedByTool !== undefined
+      ? [
+          input.endedByTool === 'escalate_to_human'
+            ? '(endedByTool: escalate_to_human - the agent handed the buyer off to a human colleague.)'
+            : '(endedByTool: log_qualification - the agent logged the qualification and closed the lead.)',
+        ]
+      : []),
     '',
     'PROGRAMMATIC RESULTS (Layer-1 deterministic checks; a judge may add violations these',
     'cannot see, and may never overturn a deterministic fail):',
@@ -233,7 +289,7 @@ export function buildJudgeUser(input: JudgeCaseInput): string {
     'TRANSCRIPT:',
     renderTranscript(input.messages),
     '',
-    `Evaluate the applicable items now: ${input.applicableItems.join(', ') || '(none declared)'}.`,
+    `Evaluate the applicable items now: ${ordered(input.applicableItems, itemOrder).join(', ') || '(none declared)'}.`,
     'Work item by item, evidence before verdict, then output the final JSON.',
   ].join('\n');
 }

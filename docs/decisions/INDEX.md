@@ -3,10 +3,12 @@
 Generated from `decisions.jsonl` — do not edit by hand.
 Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 
-27 decisions.
+29 decisions.
 
 ## By date
 
+- **ADR-0030** (2026-08-28) — [SISTER work order: judge-robustness machinery, clustered CIs, canary, release hygiene](ADR-0030-sister-workorder.md)
+- **ADR-0029** (2026-08-27) — [Agent-ended cases carry the closing tool; the answer key shows the agent's full capability surface](ADR-0029-ended-by-tool.md)
 - **ADR-0022** (2026-08-24) — [Calibration labeler hardened: opaque case aliases and violation-polarity buttons](ADR-0022-labeler-blindness-aliases-and-polarity-ui.md)
 - **ADR-0023** (2026-08-24) — [The labeler shows the judge's source documents and the gold DB](ADR-0023-labeler-ground-truth-reference.md)
 - **ADR-0024** (2026-08-24) — [Pre-run pipeline hardening: contestant-aware check reports and gate completeness floors](ADR-0024-prerun-pipeline-hardening.md)
@@ -49,11 +51,16 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 - ADR-0019 — [Judge scaffolding: offline-first, quote-then-verdict enforced structurally, polarity normalised once](ADR-0019-judge-scaffold-offline-first-quote-then-verdict-structural.md)
 - ADR-0020 — [Phases 6-10 scaffolded machine-first: every gate is code before any run is paid for](ADR-0020-phase6-10-scaffolding-machine-side-complete.md)
 
+### `attribution`
+
+- ADR-0030 — [SISTER work order: judge-robustness machinery, clustered CIs, canary, release hygiene](ADR-0030-sister-workorder.md)
+
 ### `blindness`
 
 - ADR-0022 — [Calibration labeler hardened: opaque case aliases and violation-polarity buttons](ADR-0022-labeler-blindness-aliases-and-polarity-ui.md)
 - ADR-0025 — [Calibration judging: uniform prompt shape and no conduct-only item lists](ADR-0025-calibration-blindness-uniform-prompt.md)
 - ADR-0028 — [Buyer scaffolding leaks: 17 calibration cases purged, leak screen added, buyer prompt hardened](ADR-0028-buyer-scaffolding-leak-purge.md)
+- ADR-0029 — [Agent-ended cases carry the closing tool; the answer key shows the agent's full capability surface](ADR-0029-ended-by-tool.md)
 
 ### `buyer`
 
@@ -79,10 +86,15 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 - ADR-0026 — [Shared rubric interpretation notes; disclosed rater-baseline adjudication](ADR-0026-shared-interpretation-notes-rater-baseline.md)
 - ADR-0027 — [Every calibration case records who ended the conversation](ADR-0027-endedby-on-calibration-cases.md)
 - ADR-0028 — [Buyer scaffolding leaks: 17 calibration cases purged, leak screen added, buyer prompt hardened](ADR-0028-buyer-scaffolding-leak-purge.md)
+- ADR-0029 — [Agent-ended cases carry the closing tool; the answer key shows the agent's full capability surface](ADR-0029-ended-by-tool.md)
 
 ### `checks`
 
 - ADR-0024 — [Pre-run pipeline hardening: contestant-aware check reports and gate completeness floors](ADR-0024-prerun-pipeline-hardening.md)
+
+### `contamination`
+
+- ADR-0030 — [SISTER work order: judge-robustness machinery, clustered CIs, canary, release hygiene](ADR-0030-sister-workorder.md)
 
 ### `cost`
 
@@ -133,10 +145,20 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 - ADR-0025 — [Calibration judging: uniform prompt shape and no conduct-only item lists](ADR-0025-calibration-blindness-uniform-prompt.md)
 - ADR-0026 — [Shared rubric interpretation notes; disclosed rater-baseline adjudication](ADR-0026-shared-interpretation-notes-rater-baseline.md)
 - ADR-0027 — [Every calibration case records who ended the conversation](ADR-0027-endedby-on-calibration-cases.md)
+- ADR-0029 — [Agent-ended cases carry the closing tool; the answer key shows the agent's full capability surface](ADR-0029-ended-by-tool.md)
+- ADR-0030 — [SISTER work order: judge-robustness machinery, clustered CIs, canary, release hygiene](ADR-0030-sister-workorder.md)
 
 ### `judge-panel`
 
 - ADR-0019 — [Judge scaffolding: offline-first, quote-then-verdict enforced structurally, polarity normalised once](ADR-0019-judge-scaffold-offline-first-quote-then-verdict-structural.md)
+
+### `labeler`
+
+- ADR-0029 — [Agent-ended cases carry the closing tool; the answer key shows the agent's full capability surface](ADR-0029-ended-by-tool.md)
+
+### `metrics`
+
+- ADR-0030 — [SISTER work order: judge-robustness machinery, clustered CIs, canary, release hygiene](ADR-0030-sister-workorder.md)
 
 ### `process`
 
@@ -172,6 +194,10 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 
 - ADR-0016 — [OpenRouter routing is not behaviour-neutral: pin the host, use the chat surface](ADR-0016-openrouter-routing-is-not-behaviour-neutral.md)
 
+### `release`
+
+- ADR-0030 — [SISTER work order: judge-robustness machinery, clustered CIs, canary, release hygiene](ADR-0030-sister-workorder.md)
+
 ### `reproducibility`
 
 - ADR-0006 — [No provider honours seed; live reproducibility rests elsewhere](ADR-0006-no-provider-honours-seed.md)
@@ -183,6 +209,7 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 
 - ADR-0026 — [Shared rubric interpretation notes; disclosed rater-baseline adjudication](ADR-0026-shared-interpretation-notes-rater-baseline.md)
 - ADR-0027 — [Every calibration case records who ended the conversation](ADR-0027-endedby-on-calibration-cases.md)
+- ADR-0029 — [Agent-ended cases carry the closing tool; the answer key shows the agent's full capability surface](ADR-0029-ended-by-tool.md)
 
 ### `schema`
 
@@ -202,6 +229,10 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 
 - ADR-0010 — [No application framework in the harness; NestJS is the product stack](ADR-0010-no-application-framework-in-the-harness.md)
 - ADR-0011 — [AI SDK v6 surface: five places reality differed from the plan](ADR-0011-ai-sdk-v6-surface-deviations.md)
+
+### `stats`
+
+- ADR-0030 — [SISTER work order: judge-robustness machinery, clustered CIs, canary, release hygiene](ADR-0030-sister-workorder.md)
 
 ### `telemetry`
 

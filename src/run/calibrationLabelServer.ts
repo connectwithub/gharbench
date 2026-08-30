@@ -26,6 +26,7 @@ import { mkdirSync, readFileSync, readdirSync, writeFileSync, existsSync } from 
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+import { TOOL_SPECS } from '../env/tools.js';
 import {
   CALIBRATION_DIR,
   CASES_DIR,
@@ -92,6 +93,9 @@ export function redactCase(raw: CalibrationCase): Record<string, unknown> {
   return {
     language: raw.language,
     endedBy: raw.endedBy,
+    // ADR-0029: which flow-ending tool closed an agent-ended chat - the two
+    // closes read identically in the transcript but mean opposite things.
+    ...(raw.endedByTool !== undefined ? { endedByTool: raw.endedByTool } : {}),
     judgeApplicability: raw.judgeApplicability,
     messages: raw.messages,
   };
@@ -109,12 +113,19 @@ export function redactCase(raw: CalibrationCase): Record<string, unknown> {
  */
 export function buildReference(): {
   documents: { file: string; text: string }[];
+  /**
+   * The agent's COMPLETE tool roster (ADR-0029): "did the agent even have
+   * such a facility?" is a ground-truth question - e.g. no tool holds or
+   * reserves a unit, and send_asset can only send the listed assets.
+   */
+  tools: { name: string; kind: string; endsChat: boolean; description: string }[];
   db: {
     project: unknown;
     agentPolicy: unknown;
     paymentPlans: unknown;
     units: unknown[];
     siteVisitSlots: unknown[];
+    assets: unknown[];
   };
 } {
   const docsDir = join(REPO_ROOT, 'data', 'corpus', 'documents');
@@ -130,15 +141,23 @@ export function buildReference(): {
     paymentPlans: unknown;
     units: unknown[];
     siteVisitSlots: unknown[];
+    assets: unknown[];
   };
   return {
     documents,
+    tools: TOOL_SPECS.map((t) => ({
+      name: t.name,
+      kind: t.kind,
+      endsChat: t.flowEnding,
+      description: t.description,
+    })),
     db: {
       project: gold.project,
       agentPolicy: gold.agentPolicy,
       paymentPlans: gold.paymentPlans,
       units: gold.units,
       siteVisitSlots: gold.siteVisitSlots,
+      assets: gold.assets,
     },
   };
 }

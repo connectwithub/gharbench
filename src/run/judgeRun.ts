@@ -19,6 +19,7 @@
  *   pnpm judge:calibration --dry-run
  *   pnpm judge:run --run=<runId> --dry-run
  *   pnpm judge:calibration --retest        # test-retest second pass
+ *   pnpm judge:calibration --item-order=reversed   # ADR-0030 order ablation
  */
 
 import 'dotenv/config';
@@ -31,7 +32,12 @@ import pLimit from 'p-limit';
 import { sha256 } from '../env/db.js';
 import { judgeCase, modelJudgeCaller, type JudgeCaseResult } from '../judge/judge.js';
 import { JUDGE_PANEL, judgeSlug } from '../judge/panel.js';
-import { buildJudgeSystem, buildJudgeUser, type JudgeCaseInput } from '../judge/prompt.js';
+import {
+  buildJudgeSystem,
+  buildJudgeUser,
+  type JudgeCaseInput,
+  type JudgeItemOrder,
+} from '../judge/prompt.js';
 import { TRANSCRIPT_FILENAME, readTranscripts } from '../logging/transcript.js';
 import { parseModelRef } from '../providers/registry.js';
 import { CostMeter, isPriceKnown } from '../telemetry/cost.js';
@@ -42,7 +48,7 @@ import {
   calibrationCaseSchema,
   type CalibrationCase,
 } from './calibrationCase.js';
-import { projectMessages } from './calibrationBuild.js';
+import { closingTool, projectMessages } from './calibrationBuild.js';
 import { terminationSource } from './g6AuditServer.js';
 import { readCheckReports } from './checkReports.js';
 import { SLICE_FILE } from './calibrationSlice.js';
@@ -51,6 +57,8 @@ import { REPO_ROOT, loadScenarioSet } from './scenarioSet.js';
 
 export const JUDGMENTS_DIR = join(CALIBRATION_DIR, 'judgments');
 export const JUDGMENTS_RETEST_DIR = join(CALIBRATION_DIR, 'judgments-retest');
+/** ADR-0030: order-reversed ablation verdicts live apart from the primary pass. */
+export const JUDGMENTS_REVERSED_DIR = join(CALIBRATION_DIR, 'judgments-reversed');
 const DOCS_DIR = join(REPO_ROOT, 'data', 'corpus', 'documents');
 
 export const DIMENSIONS: readonly JudgeDimension[] = [
@@ -72,6 +80,7 @@ export interface Judgeable {
   family: string;
   language: string;
   endedBy?: JudgeCaseInput['endedBy'];
+  endedByTool?: JudgeCaseInput['endedByTool'];
   applicability: Record<JudgeDimension, readonly string[]>;
   messages: { role: 'buyer' | 'agent' | 'system'; text: string }[];
   scenarioCard?: JudgeCaseInput['scenarioCard'];
@@ -87,6 +96,7 @@ export function inputFor(j: Judgeable, dimension: JudgeDimension): JudgeCaseInpu
     messages: j.messages,
   };
   if (j.endedBy !== undefined) input.endedBy = j.endedBy;
+  if (j.endedByTool !== undefined) input.endedByTool = j.endedByTool;
   if (j.scenarioCard) input.scenarioCard = j.scenarioCard;
   if (j.programmaticResults !== undefined) input.programmaticResults = j.programmaticResults;
   return input;
@@ -162,6 +172,9 @@ export function toCalibrationJudgeable(c: CalibrationCase): Judgeable {
     family: c.family,
     language: c.language,
     endedBy: c.endedBy,
+    // Not per-provenance enrichment: every agent-ended case carries it,
+    // whatever its source (ADR-0029), so the shape stays uniform.
+    ...(c.endedByTool !== undefined ? { endedByTool: c.endedByTool } : {}),
     applicability: c.judgeApplicability,
     messages: c.messages,
   };
@@ -208,11 +221,13 @@ export function loadRunJudgeables(runId: string): {
       gated += 1;
       continue; // composite already 0: judging spend on it is wasted money
     }
+    const endedByTool = endedBy === 'agent' ? closingTool(record) : undefined;
     judgeables.push({
       caseId: runCaseId(record.contestantId, record.conversationId),
       family: scenario.family,
       language: scenario.language,
       endedBy,
+      ...(endedByTool !== undefined ? { endedByTool } : {}),
       applicability: scenario.judgeApplicability,
       messages: projectMessages(record),
       scenarioCard: {
@@ -246,6 +261,7 @@ interface CliOptions {
   judges: string[];
   maxUsd?: number;
   concurrency: number;
+  itemOrder: JudgeItemOrder;
 }
 
 function parseArgs(argv: string[]): CliOptions {
@@ -258,6 +274,7 @@ function parseArgs(argv: string[]): CliOptions {
     dimensions: [...DIMENSIONS],
     judges: JUDGE_PANEL.map((j) => j.ref),
     concurrency: 3,
+    itemOrder: 'original',
   };
   const judges: string[] = [];
   for (const arg of argv) {
@@ -305,12 +322,23 @@ function parseArgs(argv: string[]): CliOptions {
       case '--concurrency':
         options.concurrency = Number.parseInt(value, 10);
         break;
+      case '--item-order':
+        if (value !== 'original' && value !== 'reversed') {
+          throw new Error('--item-order=original|reversed');
+        }
+        options.itemOrder = value;
+        break;
       default:
         throw new Error(`unknown flag ${flag}`);
     }
   }
   if (judges.length > 0) options.judges = judges;
   if (options.runId && options.retest) throw new Error('--retest is a calibration-mode flag');
+  if (options.retest && options.itemOrder !== 'original') {
+    // Two independent axes would need a 4th verdict dir; the ablation design
+    // (docs/judge-protocol.md) only ever compares reversed vs the primary pass.
+    throw new Error('--item-order=reversed cannot combine with --retest');
+  }
   return options;
 }
 
@@ -323,10 +351,11 @@ async function main(): Promise<void> {
 
   let judgeables: Judgeable[];
   let baseDir: string;
+  const runJudgmentsDir = options.itemOrder === 'reversed' ? 'judgments-reversed' : 'judgments';
   if (options.runId) {
     const loaded = loadRunJudgeables(options.runId);
     judgeables = loaded.judgeables;
-    baseDir = join(REPO_ROOT, 'runs', options.runId, 'judgments');
+    baseDir = join(REPO_ROOT, 'runs', options.runId, runJudgmentsDir);
     console.log(
       `run ${options.runId}: ${judgeables.length} conversation(s) to judge, ` +
         `${loaded.gated} hard-fail-gated (skipped - composite already 0), ` +
@@ -338,7 +367,11 @@ async function main(): Promise<void> {
     }
   } else {
     judgeables = loadCalibrationJudgeables(options.cases === 'slice', options.caseIds);
-    baseDir = options.retest ? JUDGMENTS_RETEST_DIR : JUDGMENTS_DIR;
+    baseDir = options.retest
+      ? JUDGMENTS_RETEST_DIR
+      : options.itemOrder === 'reversed'
+        ? JUDGMENTS_REVERSED_DIR
+        : JUDGMENTS_DIR;
   }
 
   // Work list: (judge, case, dimension) triples that still need a verdict.
@@ -359,6 +392,7 @@ async function main(): Promise<void> {
   console.log(
     `judge pass: ${judgeables.length} case(s) x ${options.dimensions.length} dimension(s) x ` +
       `${options.judges.length} judge(s) -> ${work.length} call(s)` +
+      (options.itemOrder === 'reversed' ? ' [item-order REVERSED ablation]' : '') +
       (skippedExisting > 0 ? ` (${skippedExisting} already judged, skipped)` : ''),
   );
 
@@ -371,9 +405,11 @@ async function main(): Promise<void> {
       let judgeUsd = 0;
       let judgeTokens = 0;
       for (const dimension of options.dimensions) {
-        const sysTok = estTokens(buildJudgeSystem(items, dimension, sourceDocuments));
+        const sysTok = estTokens(
+          buildJudgeSystem(items, dimension, sourceDocuments, options.itemOrder),
+        );
         for (const j of judgeables) {
-          const user = buildJudgeUser(inputFor(j, dimension));
+          const user = buildJudgeUser(inputFor(j, dimension), options.itemOrder);
           const usage = {
             inputTokens: sysTok + estTokens(user),
             outputTokens: 1000,
@@ -435,6 +471,7 @@ async function main(): Promise<void> {
           dimension,
           input: inputFor(j, dimension),
           sourceDocuments,
+          itemOrder: options.itemOrder,
         });
         const stored: StoredJudgment = { ...result, judgeRef, ts };
         mkdirSync(join(baseDir, judgeSlug(judgeRef)), { recursive: true });
@@ -463,13 +500,17 @@ async function main(): Promise<void> {
         source: options.runId ? { run: options.runId } : { calibration: options.cases },
         judges: options.judges,
         dimensions: options.dimensions,
+        itemOrder: options.itemOrder,
         cases: judgeables.length,
         judged: done,
         errored,
         skippedExisting,
         budgetStopped,
         promptShas: Object.fromEntries(
-          options.dimensions.map((d) => [d, sha256(buildJudgeSystem(items, d, sourceDocuments))]),
+          options.dimensions.map((d) => [
+            d,
+            sha256(buildJudgeSystem(items, d, sourceDocuments, options.itemOrder)),
+          ]),
         ),
         costs: summary,
       },

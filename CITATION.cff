@@ -1,0 +1,23 @@
+# CITATION.cff (ADR-0030; pattern from SISTER). GitHub renders this as the
+# "Cite this repository" widget. The Zenodo concept DOI is minted at the
+# Phase 10 release (dual software + dataset deposits) - add it under `doi`
+# then, and keep this file's version in lockstep with package.json.
+cff-version: 1.2.0
+message: "If you use GharBench, please cite it using the metadata from this file."
+type: software
+title: "GharBench: a benchmark of LLM sales agents in WhatsApp-style Indian real-estate lead conversations"
+authors:
+  - family-names: Bharti
+    given-names: Udbhav
+version: 0.1.0
+date-released: "2026-08-28"
+license: MIT
+repository-code: "https://github.com/connectwithub/gharbench"
+keywords:
+  - benchmark
+  - llm-evaluation
+  - sales-agents
+  - llm-as-judge
+  - real-estate
+  - hinglish
+  - india

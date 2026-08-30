@@ -1,0 +1,23 @@
+Data licence: Creative Commons Attribution 4.0 International (CC BY 4.0)
+
+Scope (ADR-0030 licence split): this licence covers the benchmark DATA in this
+repository -
+
+  data/corpus/       the Kalpana Heights grounding corpus and generated documents
+  data/personas/     the 12 buyer persona cards
+  data/scenarios/    the public scenario instances
+  data/judge-items.json  the judge rubric items
+
+- and any dataset artifacts derived from them that GharBench publishes (e.g.
+the Phase 10 Hugging Face configs and Zenodo dataset deposit).
+
+The harness CODE (src/, tests/, scripts/, stats-bridge/) is separately licensed
+under the MIT licence in ./LICENSE - CC BY is not recommended for software, so
+the two are deliberately distinct. Vendored third-party material under
+docs/tau2-attribution/ keeps its own upstream licence and is covered by
+neither of this repository's licences.
+
+Attribution for the data: cite the repository (see CITATION.cff) or, once
+minted at release, the Zenodo dataset DOI.
+
+Full CC BY 4.0 legal code: https://creativecommons.org/licenses/by/4.0/legalcode

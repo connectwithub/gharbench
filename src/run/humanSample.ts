@@ -25,7 +25,12 @@ import { pathToFileURL } from 'node:url';
 
 import { TRANSCRIPT_FILENAME, readTranscripts } from '../logging/transcript.js';
 import { calibrationCaseSchema, type CalibrationCase } from './calibrationCase.js';
-import { buyerLeakMarker, preliminaryBand, projectMessages } from './calibrationBuild.js';
+import {
+  buyerLeakMarker,
+  closingTool,
+  preliminaryBand,
+  projectMessages,
+} from './calibrationBuild.js';
 import { terminationSource } from './g6AuditServer.js';
 import { readCheckReports } from './checkReports.js';
 import { REPO_ROOT, loadScenarioSet } from './scenarioSet.js';
@@ -54,6 +59,7 @@ export interface SampleCandidate {
   language: string;
   band: CalibrationCase['band'];
   endedBy: CalibrationCase['endedBy'];
+  endedByTool?: CalibrationCase['endedByTool'];
   judgeApplicability: CalibrationCase['judgeApplicability'];
   messages: CalibrationCase['messages'];
 }
@@ -125,6 +131,7 @@ export function collectCandidates(runIds: readonly string[]): SampleCandidate[] 
       // ADR-0028: a buyer that leaked its scaffolding voids the conversation
       // for scoring - never serve it to a rater.
       if (buyerLeakMarker(projectMessages(record)) !== null) continue;
+      const endedByTool = endedBy === 'agent' ? closingTool(record) : undefined;
       out.push({
         runId,
         conversationId: record.conversationId,
@@ -134,6 +141,7 @@ export function collectCandidates(runIds: readonly string[]): SampleCandidate[] 
         language: scenario.language,
         band: preliminaryBand(checks.get(record.contestantId, record.conversationId)),
         endedBy,
+        ...(endedByTool !== undefined ? { endedByTool } : {}),
         judgeApplicability: scenario.judgeApplicability,
         messages: projectMessages(record),
       });
@@ -161,6 +169,7 @@ export function writeSample(
       family: c.family as CalibrationCase['family'],
       language: c.language as CalibrationCase['language'],
       endedBy: c.endedBy,
+      ...(c.endedByTool !== undefined ? { endedByTool: c.endedByTool } : {}),
       judgeApplicability: c.judgeApplicability,
       messages: c.messages,
     };

@@ -69,6 +69,17 @@ export const scenarioConfigSchema = z
     language: z.enum(['english', 'hinglish']),
     /** G16: the stratified ~30% private pool is tagged at authoring time. */
     pool: z.enum(['public', 'private']),
+    /**
+     * ADR-0030: contamination canary (BIG-bench practice, fresh GUID - the
+     * BIG-bench GUID is already memorised by frontier models and thus burned).
+     * Stamped into every private-pool file by `pnpm canary:stamp`; if a
+     * contestant can later recall the GUID, its private-pool scores are
+     * contaminated. The field exists ONLY in the file: no prompt builder reads
+     * it (tests/canary.test.ts pins that), because a canary sent to a provider
+     * at inference time could enter provider logs and later training - a
+     * self-inflicted false positive on the very probe it powers.
+     */
+    canary: z.string().min(1).optional(),
     /** For hinglish_variant scenarios derived from a base scenario. */
     variantOf: z.string().min(1).optional(),
     /** Persona trap ids armed in this scenario (subset of the card's traps). */

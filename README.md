@@ -398,12 +398,29 @@ Phase 6 runs use the hardened prompt.
 
 ## Licence
 
-[MIT](LICENSE), (c) 2026 Udbhav Bharti. The LICENSE file is the unmodified MIT
-template so licence scanners match it exactly.
+Split by artifact kind (code licences are wrong for data, and vice versa):
+
+- **Code** (`src/`, `tests/`, `scripts/`, `stats-bridge/`): [MIT](LICENSE),
+  (c) 2026 Udbhav Bharti. The LICENSE file is the unmodified MIT template so
+  licence scanners match it exactly.
+- **Data** (`data/` - corpus, personas, public scenarios, judge items) and any
+  published dataset artifacts: [CC BY 4.0](LICENSE-DATA).
 
 Third-party material: `docs/tau2-attribution/` is vendored verbatim from
 sierra-research/tau2-bench (tag v1.0.1) and is covered by its own upstream MIT
-licence, included in that directory; the copyright above does not extend to it.
+licence, included in that directory; neither licence above extends to it.
+
+## Citing
+
+`CITATION.cff` carries the machine-readable citation (GitHub's "Cite this
+repository" widget reads it); Zenodo DOIs - one for the harness, one for the
+dataset - are minted at the first release and added there. `paper/refs.bib`
+holds the full reference list the methodology commits us to.
+
+The held-out private pool is stamped with a contamination-canary GUID
+(BIG-bench practice, fresh GUID; the GUID itself is never published). If a
+contestant model can recall it, that model's private-pool scores are treated
+as contaminated and only its public-pool scores are reported.
 
 ---
 
@@ -422,3 +439,12 @@ Work that reports pass^k or uses these tokens should cite:
 
 - Yao et al., _tau-bench_ - [arXiv:2406.12045](https://arxiv.org/abs/2406.12045)
 - Barres et al., _tau2-bench_ - [arXiv:2506.07982](https://arxiv.org/abs/2506.07982)
+
+The judge order-robustness ablation, evidence-first audit framing,
+scenario-clustered bootstrap and the dual-DOI release pattern adapt practices
+from **SISTER** ([solusops/SISTER](https://github.com/solusops/SISTER); Zenodo
+[10.5281/zenodo.21951541](https://doi.org/10.5281/zenodo.21951541) software,
+[10.5281/zenodo.21954790](https://doi.org/10.5281/zenodo.21954790) dataset).
+`docs/judge-protocol.md` and `paper/refs.bib` map which practice credits which
+source - generic techniques (order-swapping, judge panels, cluster bootstrap)
+are cited to their canonical origins, SISTER for the specific combination.

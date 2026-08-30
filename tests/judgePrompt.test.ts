@@ -73,6 +73,22 @@ describe('cache-first layout', () => {
     expect(buildJudgeSystem(items, 'conversationQuality', DOCS)).toContain('QA1');
     expect(anchorsFor(items, 'compliance')).toEqual([]);
   });
+
+  it('anchor level examples render to the judge exactly as the labeler shows them (ADR-0026)', () => {
+    // Owner decision 2026-08-27 (calibration/protocol-notes.md): the per-level
+    // `examples` are shared guidance - both sides see the same illustrations,
+    // so neither carries prototype anchoring the other lacks.
+    expect(items.dimensions.factuality.anchor.examples).toBeDefined();
+    const fact = buildJudgeSystem(items, 'factuality', DOCS);
+    expect(fact).toContain('private helipad on the clubhouse roof');
+    expect(fact).toContain('(hypothetical illustration)');
+    const cq = buildJudgeSystem(items, 'conversationQuality', DOCS);
+    expect(cq).toContain('Dear Esteemed Customer');
+    // Compliance has no anchors, so no examples belong there.
+    expect(buildJudgeSystem(items, 'compliance', DOCS)).not.toContain(
+      '(hypothetical illustration)',
+    );
+  });
 });
 
 describe('per-case user turn', () => {
@@ -117,6 +133,41 @@ describe('per-case user turn', () => {
   });
 });
 
+describe('item-order ablation (ADR-0030)', () => {
+  it('reversed order flips item presentation everywhere items are enumerated', () => {
+    const original = buildJudgeSystem(items, 'compliance', DOCS);
+    const reversed = buildJudgeSystem(items, 'compliance', DOCS, 'reversed');
+    expect(original.indexOf('CP1: ')).toBeLessThan(original.indexOf('CP11: '));
+    expect(reversed.indexOf('CP1: ')).toBeGreaterThan(reversed.indexOf('CP11: '));
+
+    const user = buildJudgeUser(caseA, 'reversed');
+    expect(user).toContain('CP5, CP1');
+    expect(user).not.toContain('CP1, CP5');
+  });
+
+  it('each order is its own stable cache prefix; default stays original', () => {
+    // Per-PASS, never per-case: within one order the system block is still
+    // byte-identical, and omitting the argument is byte-identical to
+    // 'original' - existing verdicts and prompt shas are untouched.
+    const reversed = buildJudgeSystem(items, 'compliance', DOCS, 'reversed');
+    expect(reversed).toBe(buildJudgeSystem(items, 'compliance', DOCS, 'reversed'));
+    expect(reversed).not.toBe(buildJudgeSystem(items, 'compliance', DOCS));
+    expect(buildJudgeSystem(items, 'compliance', DOCS)).toBe(
+      buildJudgeSystem(items, 'compliance', DOCS, 'original'),
+    );
+    expect(buildJudgeUser(caseA)).toBe(buildJudgeUser(caseA, 'original'));
+  });
+
+  it('reversing changes ONLY ordering, never the wording set', () => {
+    // A wording difference between the two passes would confound the ablation:
+    // the same lines must be present, just permuted.
+    const sortLines = (s: string): string => s.split('\n').sort().join('\n');
+    expect(sortLines(buildJudgeSystem(items, 'salesEffectiveness', DOCS, 'reversed'))).toBe(
+      sortLines(buildJudgeSystem(items, 'salesEffectiveness', DOCS)),
+    );
+  });
+});
+
 describe('calibration prompt-shape uniformity (ADR-0025)', () => {
   it('a provenance-carrying case yields the same minimal shape as a synthetic one', () => {
     // Enriching real cases with scenario cards / Layer-1 results gave seeded
@@ -128,6 +179,7 @@ describe('calibration prompt-shape uniformity (ADR-0025)', () => {
       family: 'compliance_trap',
       language: 'english',
       endedBy: 'agent',
+      endedByTool: 'escalate_to_human',
       provenance: {
         runId: 'r',
         conversationId: 'scn_x.P01#0',
@@ -153,6 +205,7 @@ describe('calibration prompt-shape uniformity (ADR-0025)', () => {
       family: j.family,
       language: j.language,
       endedBy: j.endedBy,
+      endedByTool: j.endedByTool,
       applicableItems: j.applicability.compliance,
       messages: j.messages,
     });
@@ -163,5 +216,9 @@ describe('calibration prompt-shape uniformity (ADR-0025)', () => {
     // read the missing reply as the agent ignoring the buyer.
     expect(user).toContain('"endedBy": "agent"');
     expect(user).toContain('flow-ending tool action');
+    // ADR-0029: WHICH flow-ending tool - a handoff and a logged close mean
+    // opposite things for SE5/CP10, and the rater's chip shows the same.
+    expect(user).toContain('"endedByTool": "escalate_to_human"');
+    expect(user).toContain('handed the buyer off to a human colleague');
   });
 });

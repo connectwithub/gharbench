@@ -1,0 +1,134 @@
+% GharBench paper references (ADR-0030). Phase 9 deliberately has no LaTeX
+% scaffold yet - this .bib is toolchain-independent and gets imported wherever
+% the paper is eventually built.
+%
+% SISTER entries VERIFIED against the live Zenodo API on 2026-08-28
+% (titles, dates, versions, authorship copied verbatim from the records;
+% note the dataset record lists Singh as sole creator - do not "fix" it to
+% match the software record). Re-check arXiv/OpenReview before submission:
+% if the SISTER manuscript is published anywhere citable, cite that INSTEAD
+% of the @misc and alongside the DOIs.
+
+% ---------- SISTER (cite wherever its specific protocols are reused:
+% ---------- reversed-order judging, judge-audit discipline, story-clustered
+% ---------- bootstrap, dual-DOI + per-artifact-config release pattern) ------
+
+@software{singh2026sister_software,
+  author    = {Singh, Anshuman and Eyasir, Abrar and Yaqoob, Haseeb and Manavalan, John},
+  title     = {{The Effects of Incremental Instruction Delivery on Language-Model Creative Writing}},
+  year      = {2026},
+  month     = {8},
+  publisher = {Zenodo},
+  version   = {v0.1.0},
+  doi       = {10.5281/zenodo.21951541},
+  url       = {https://doi.org/10.5281/zenodo.21951541},
+  note      = {Software (SISTER harness); concept DOI 10.5281/zenodo.21951540}
+}
+
+@misc{singh2026sister_dataset,
+  author    = {Singh, Anshuman},
+  title     = {{Incremental Instruction Creative Writing: Benchmark, Generations, and Evaluation Dataset}},
+  year      = {2026},
+  month     = {8},
+  publisher = {Zenodo},
+  doi       = {10.5281/zenodo.21954790},
+  url       = {https://doi.org/10.5281/zenodo.21954790},
+  note      = {Dataset, v0.1.0; concept DOI 10.5281/zenodo.21954789}
+}
+
+@misc{singh2026sister_paper,
+  title  = {The Effects of Incremental Instruction Delivery on Language-Model Creative Writing},
+  author = {Anshuman Singh and Abrar Eyasir and Haseeb Yaqoob and John Manavalan},
+  year   = {2026},
+  note   = {Manuscript in preparation}
+}
+
+% ---------- Canonical origins (cite THESE for the generic techniques, ------
+% ---------- not SISTER) ----------------------------------------------------
+
+% LLM-as-a-judge; position bias mitigated by swapping response order.
+@inproceedings{zheng2023judging,
+  title     = {Judging {LLM}-as-a-Judge with {MT}-Bench and Chatbot Arena},
+  author    = {Zheng, Lianmin and Chiang, Wei-Lin and Sheng, Ying and Zhuang, Siyuan and Wu, Zhanghao and Zhuang, Yonghao and Lin, Zi and Li, Zhuohan and Li, Dacheng and Xing, Eric P. and Zhang, Hao and Gonzalez, Joseph E. and Stoica, Ion},
+  booktitle = {Advances in Neural Information Processing Systems 36 (Datasets and Benchmarks)},
+  year      = {2023},
+  note      = {arXiv:2306.05685}
+}
+
+% Positional bias in LLM evaluators, quantified.
+@inproceedings{wang2024fair,
+  title     = {Large Language Models are not Fair Evaluators},
+  author    = {Wang, Peiyi and Li, Lei and Chen, Liang and Cai, Zefan and Zhu, Dawei and Lin, Binghuai and Cao, Yunbo and Liu, Qi and Liu, Tianyu and Sui, Zhifang},
+  booktitle = {Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics},
+  year      = {2024},
+  note      = {arXiv:2305.17926}
+}
+
+% Panels of diverse judges; leave-one-judge-out style panel robustness.
+@misc{verga2024poll,
+  title  = {Replacing Judges with Juries: Evaluating {LLM} Generations with a Panel of Diverse Models},
+  author = {Verga, Pat and Hofstatter, Sebastian and Althammer, Sophia and Su, Yixuan and Piktus, Aleksandra and Arkhangorodsky, Arkady and Xu, Minjie and White, Naomi and Lewis, Patrick},
+  year   = {2024},
+  note   = {arXiv:2404.18796}
+}
+
+% Self-preference: LLM evaluators recognise and favor their own generations.
+@misc{panickssery2024selfpreference,
+  title  = {{LLM} Evaluators Recognize and Favor Their Own Generations},
+  author = {Panickssery, Arjun and Bowman, Samuel R. and Feng, Shi},
+  year   = {2024},
+  note   = {arXiv:2404.13076}
+}
+
+% pass^k reliability metric; half-duplex user-simulator benchmark pattern.
+@misc{yao2024taubench,
+  title  = {$\tau$-bench: A Benchmark for Tool-Agent-User Interaction in Real-World Domains},
+  author = {Yao, Shunyu and Shinn, Noah and Razavi, Pedram and Narasimhan, Karthik},
+  year   = {2024},
+  note   = {arXiv:2406.12045}
+}
+
+@misc{barres2025tau2,
+  title  = {$\tau^2$-Bench: Evaluating Conversational Agents in a Dual-Control Environment},
+  author = {Barres, Victor and Dong, Honghua and Ray, Soham and Si, Xujie and Narasimhan, Karthik},
+  year   = {2025},
+  note   = {arXiv:2506.07982}
+}
+
+% Canary-string contamination guard (the GUID practice; ours uses a fresh GUID).
+@misc{srivastava2023bigbench,
+  title  = {Beyond the Imitation Game: Quantifying and extrapolating the capabilities of language models},
+  author = {Srivastava, Aarohi and others},
+  year   = {2023},
+  note   = {arXiv:2206.04615; Transactions on Machine Learning Research}
+}
+
+% Datasheets for the Phase 10 release documentation.
+@article{gebru2021datasheets,
+  title   = {Datasheets for Datasets},
+  author  = {Gebru, Timnit and Morgenstern, Jamie and Vecchione, Briana and Vaughan, Jennifer Wortman and Wallach, Hanna and Daum{\'e} III, Hal and Crawford, Kate},
+  journal = {Communications of the ACM},
+  volume  = {64},
+  number  = {12},
+  pages   = {86--92},
+  year    = {2021}
+}
+
+% Prevalence-robust agreement for the rare compliance hard-fail events.
+@article{gwet2008ac1,
+  title   = {Computing inter-rater reliability and its variance in the presence of high agreement},
+  author  = {Gwet, Kilem Li},
+  journal = {British Journal of Mathematical and Statistical Psychology},
+  volume  = {61},
+  number  = {1},
+  pages   = {29--48},
+  year    = {2008}
+}
+
+% Cluster bootstrap (generic statistical method - cite this, not SISTER).
+@book{davison1997bootstrap,
+  title     = {Bootstrap Methods and their Application},
+  author    = {Davison, Anthony C. and Hinkley, David V.},
+  publisher = {Cambridge University Press},
+  year      = {1997}
+}

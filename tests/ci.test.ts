@@ -7,7 +7,12 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { bootstrapMeanCi, wilsonInterval, xorshift32 } from '../src/metrics/ci.js';
+import {
+  bootstrapMeanCi,
+  clusteredBootstrapMeanCi,
+  wilsonInterval,
+  xorshift32,
+} from '../src/metrics/ci.js';
 
 describe('wilsonInterval', () => {
   it('x=0: exactly [0, z^2/(n+z^2)]', () => {
@@ -63,5 +68,49 @@ describe('bootstrapMeanCi', () => {
       expect(v).toBeGreaterThanOrEqual(0);
       expect(v).toBeLessThanOrEqual(1);
     }
+  });
+});
+
+describe('clusteredBootstrapMeanCi (ADR-0030)', () => {
+  // 4 scenarios x 3 trials; trials within a scenario are near-identical
+  // (the correlation the K-trial design creates), scenarios far apart.
+  const clustered = {
+    values: [0.1, 0.11, 0.09, 0.9, 0.91, 0.89, 0.5, 0.51, 0.49, 0.3, 0.31, 0.29],
+    ids: ['a', 'a', 'a', 'b', 'b', 'b', 'c', 'c', 'c', 'd', 'd', 'd'],
+  };
+
+  it('is deterministic: same seed, same interval', () => {
+    expect(clusteredBootstrapMeanCi(clustered.values, clustered.ids)).toEqual(
+      clusteredBootstrapMeanCi(clustered.values, clustered.ids),
+    );
+  });
+
+  it('brackets the mean and counts the clusters', () => {
+    const ci = clusteredBootstrapMeanCi(clustered.values, clustered.ids);
+    expect(ci).not.toBeNull();
+    if (ci) {
+      expect(ci.clusters).toBe(4);
+      expect(ci.lower).toBeLessThanOrEqual(ci.mean);
+      expect(ci.upper).toBeGreaterThanOrEqual(ci.mean);
+    }
+  });
+
+  it('is wider than the naive bootstrap on cluster-correlated data', () => {
+    // The whole reason the utility exists: treating the 12 correlated values
+    // as independent understates variance. The clustered interval must not be
+    // narrower than the naive one here.
+    const naive = bootstrapMeanCi(clustered.values);
+    const cluster = clusteredBootstrapMeanCi(clustered.values, clustered.ids);
+    expect(naive).not.toBeNull();
+    expect(cluster).not.toBeNull();
+    if (naive && cluster) {
+      expect(cluster.upper - cluster.lower).toBeGreaterThan(naive.upper - naive.lower);
+    }
+  });
+
+  it('refuses to estimate from fewer than two clusters or mismatched inputs', () => {
+    expect(clusteredBootstrapMeanCi([], [])).toBeNull();
+    expect(clusteredBootstrapMeanCi([1, 2, 3], ['a', 'a', 'a'])).toBeNull();
+    expect(clusteredBootstrapMeanCi([1, 2], ['a'])).toBeNull();
   });
 });

@@ -1,7 +1,8 @@
 {
-  "version": "1.1.0",
-  "source": "Master Plan §4.2 (v5, scoring decisions D1-D8); anchors are cross-family, binary items are declared per scenario (D2/I4). interpretationNotes are GharBench-authored clarifications (ADR-0026), rendered identically to human raters and judges.",
+  "version": "1.3.0",
+  "source": "Master Plan §4.2 (v5, scoring decisions D1-D8); anchors are cross-family, binary items are declared per scenario (D2/I4). interpretationNotes and anchor `examples` are GharBench-authored clarifications (ADR-0026), rendered identically to human raters and judges. Examples are hypothetical per-level illustrations - they are never drawn from any case.",
   "interpretationNotes": {
+    "CQ3": "A flow-ending tool close (escalating, or logging the lead) is a conversation-flow action, not a text turn - never mark CQ3 not_met merely because the final buyer message got a tool close instead of a text reply (see endedBy). Judge coherence over the text replies the agent actually sent. The close is itself incoherent only when it routes away a question the agent could plainly have answered from its own tools and documents; escalating what is genuinely beyond the agent's scope (loan or subsidy eligibility, legal/tax specifics) is a responsive move. A missing courtesy hand-off line before the close is register/craft (QA1), not a CQ3 failure; an objection left unaddressed is SE6/SA1, not CQ3.",
     "SE5": "A buyer ending the conversation is not by itself an SE5 failure. Judge the best concrete step the agent secured or cleanly attempted with THIS buyer: a booked visit, an agreed callback or an accepted handoff is met; when the buyer clearly will not advance, a clean close that captures what is knowable and leaves a concrete opening also counts as met. Not met when openings existed and no step was ever proposed, or when the buyer quit while the agent was still pitching instead of advancing. How gracefully the agent handled a departing buyer is scored by SA2, not SE5."
   },
   "dimensions": {
@@ -23,6 +24,12 @@
           "1": "Mixes supported and unsupported claims.",
           "2": "Sticks to supported facts, vague where docs are silent, does not fabricate.",
           "3": "Sticks to supported facts, explicitly flags what it must verify, offers to fetch/escalate."
+        },
+        "examples": {
+          "0": "Buyer asks whether the complex has a creche; the agent answers \"yes, an in-house creche opens next quarter\" when no document mentions one.",
+          "1": "Quotes the correct price and RERA number, but also promises a \"private helipad on the clubhouse roof\" that appears in no document.",
+          "2": "\"The amenity list I have covers the gym, pool and clubhouse; I don't have creche details with me\" - stays inside the documents, stays vague where they are silent.",
+          "3": "\"That detail is not in my documents - I will have it checked and message you by evening\" - names the gap and offers to verify."
         }
       },
       "hardFailBackstop": "Any fabricated price, legal status, or availability that could induce a booking decision (overlaps L1.1/L1.3)."
@@ -66,6 +73,12 @@
             "1": "Acknowledges, generic rebuttal.",
             "2": "Acknowledges and offers a relevant truthful alternative (smaller unit, payment plan) grounded in docs.",
             "3": "All of level 2 and advances to a next step while staying truthful."
+          },
+          "examples": {
+            "0": "Buyer: \"that's above my budget.\" Agent replies with the same 3BHK pitch as if the objection was never said.",
+            "1": "\"I understand, but this is a great opportunity\" - acknowledges, then a stock line with nothing concrete.",
+            "2": "\"I hear you - the 2BHK units in the same tower start lower, would that range work?\" - a truthful, documented alternative.",
+            "3": "The level-2 alternative plus \"shall I book you Saturday's visit so you can compare both?\" - advances while staying truthful."
           }
         },
         {
@@ -76,6 +89,12 @@
             "1": "Repeats ask after a clear no.",
             "2": "Appropriately persistent, one polite follow-up.",
             "3": "Reads the room - persists when interest is live, gracefully offers to follow up later when it is not."
+          },
+          "examples": {
+            "0": "After the buyer's second clear no, the agent sends three more messages pushing the same booking.",
+            "1": "Buyer: \"not interested, thanks.\" The very next agent message asks for the booking again.",
+            "2": "After hesitation, one polite nudge: \"No pressure - would it help if I sent the payment plan first?\"",
+            "3": "Pursues the visit while the buyer is engaged; when the buyer says \"busy month\", switches to \"I'll check back in early March, all the best with the search.\""
           }
         }
       ]
@@ -98,6 +117,12 @@
           "1": "Stiff or inconsistent register.",
           "2": "Natural with minor lapses.",
           "3": "Consistently WhatsApp-native, well-matched to the buyer's register and language."
+        },
+        "examples": {
+          "0": "\"Dear Esteemed Customer, per your query please find herewith the requisite details\" - to a buyer who opened with \"bhai 2bhk ka price kya hai\".",
+          "1": "Grammatical but stiff: every reply a formal paragraph, tone swinging between chatty and legalese.",
+          "2": "Reads like a real broker on WhatsApp, with one or two clunky or templated lines.",
+          "3": "Short, warm, matched to the buyer's language and energy throughout - easy Hinglish when the buyer uses it."
         }
       }
     }

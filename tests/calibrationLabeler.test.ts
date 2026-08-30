@@ -53,6 +53,14 @@ describe('calibration labeler blindness', () => {
       'language',
       'messages',
     ]);
+    // ADR-0029: the closing tool IS served when present - it is observable
+    // conversation data, not provenance.
+    const agentEnded = redactCase({
+      ...CASE,
+      endedBy: 'agent',
+      endedByTool: 'escalate_to_human',
+    });
+    expect(agentEnded['endedByTool']).toBe('escalate_to_human');
   });
 
   it('aliases are positional over the given order, padded, and bijective', () => {
@@ -74,6 +82,11 @@ describe('calibration labeler blindness', () => {
     expect(ref.db.units).toHaveLength(32);
     expect(ref.db.siteVisitSlots.length).toBeGreaterThan(0);
     expect(ref.db.agentPolicy).toBeDefined();
+    // ADR-0029: "did the agent even have such a facility?" is ground truth -
+    // the complete tool roster and sendable-asset list are on screen.
+    expect(ref.tools).toHaveLength(6);
+    expect(ref.tools.filter((t) => t.endsChat)).toHaveLength(2);
+    expect(ref.db.assets.length).toBeGreaterThan(0);
   });
 
   it('the UI states the goal and presents CP items in violation polarity', () => {
@@ -89,6 +102,21 @@ describe('calibration labeler blindness', () => {
     expect(html).toContain('interpretationNotes');
     // ADR-0027: the ended-by chip - an agent tool-close has no text bubble.
     expect(html).toContain('ended by: agent (tool action)');
+    // ADR-0029: the chip names WHICH close, and the panel carries the
+    // complete tool roster + sendable-asset list.
+    expect(html).toContain('ended by: agent — escalated to human');
+    expect(html).toContain('ended by: agent — logged & closed the lead');
+    expect(html).toContain('The agent’s tools — the COMPLETE set');
+    expect(html).toContain('Sendable assets — the COMPLETE list');
+    // Search jump: clicking a hit opens the tab, scrolls to and flashes the row.
+    expect(html).toContain('flashBg');
+    // 2026-08-27 display upgrades: per-level anchor examples (rater-only, see
+    // protocol-notes), sortable columns, tower×BHK summary, global search.
+    expect(html).toContain('a.examples');
+    expect(html).toContain('Worked examples');
+    expect(html).toContain('buildSearchIndex');
+    expect(html).toContain("['summary', 'Summary']");
+    expect(html).toContain('SortTable');
   });
 });
 

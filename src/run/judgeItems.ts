@@ -17,6 +17,15 @@ const anchorSchema = z.strictObject({
   id: z.string().regex(/^[A-Z]{1,2}\d{1,2}$/),
   name: z.string().min(1),
   scale: z.strictObject({ 0: z.string(), 1: z.string(), 2: z.string(), 3: z.string() }),
+  /**
+   * Optional per-level hypothetical illustrations (ADR-0026): rendered to
+   * BOTH the human labeler UI and the judge system prompt from this one
+   * source (owner decision 2026-08-27, calibration/protocol-notes.md). Never
+   * draw an example from an actual case - that would tip its verdict.
+   */
+  examples: z
+    .strictObject({ 0: z.string(), 1: z.string(), 2: z.string(), 3: z.string() })
+    .optional(),
 });
 
 const binaryMap = z.record(z.string().regex(/^[A-Z]{1,2}\d{1,2}$/), z.string().min(1));

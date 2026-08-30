@@ -30,6 +30,15 @@ __pycache__/
 .venv/
 stats-bridge/.venv/
 
+# Playwright MCP browser captures (page snapshots of logged-in sessions -
+# potentially private content, never repo material).
+.playwright-mcp/
+
+# Personal Claude Code harness config (local hooks, e.g. the claude.ai project
+# sync reminder). Not benchmark code; a future team-shared .claude/settings.json
+# would need this narrowed to .claude/settings.local.json + .claude/hooks/.
+.claude/
+
 # Editors / OS
 .DS_Store
 *.swp

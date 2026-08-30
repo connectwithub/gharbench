@@ -215,12 +215,26 @@
         flex-wrap: wrap;
         margin-bottom: 8px;
       }
-      pre.doc {
+      .doc {
         white-space: pre-wrap;
         font:
           12px/1.5 ui-monospace,
           monospace;
         color: #cfd8dc;
+      }
+      @keyframes flashBg {
+        0% {
+          background: rgba(240, 166, 58, 0.55);
+        }
+        60% {
+          background: rgba(240, 166, 58, 0.3);
+        }
+        100% {
+          background: transparent;
+        }
+      }
+      .flash {
+        animation: flashBg 5s ease-out;
       }
       .hint {
         color: var(--dim);
@@ -237,6 +251,59 @@
         color: var(--warn);
         font-size: 11px;
         margin-top: 8px;
+      }
+      table.ref th.sortable {
+        cursor: pointer;
+        user-select: none;
+      }
+      table.ref td.k {
+        color: var(--dim);
+        vertical-align: top;
+      }
+      table.kvwrap td,
+      table.kvwrap th {
+        white-space: normal;
+      }
+      table.ref table.ref {
+        margin: 2px 0;
+      }
+      ul.kvList {
+        margin: 0;
+        padding-left: 16px;
+      }
+      .docH {
+        color: var(--acc);
+        font-weight: 600;
+        margin: 10px 0 4px;
+      }
+      .refSearch {
+        width: 100%;
+        background: var(--in);
+        color: var(--txt);
+        border: 1px solid #33434e;
+        border-radius: 8px;
+        padding: 6px 10px;
+        font: 13px inherit;
+        margin-bottom: 8px;
+      }
+      .hit {
+        padding: 4px 6px;
+        border-bottom: 1px solid #16222a;
+        cursor: pointer;
+        font-size: 12px;
+      }
+      .hit:hover {
+        background: var(--in);
+      }
+      .hitWhere {
+        color: var(--acc);
+        font-size: 11px;
+        margin-right: 6px;
+      }
+      .hitMore {
+        color: var(--dim);
+        font-size: 11px;
+        padding: 6px;
       }
       .chatHead {
         display: flex;
@@ -481,116 +548,543 @@
         'Friday',
         'Saturday',
       ];
+      // Weekday derived from the fixed date (midday UTC, so no timezone can
+      // shift it): transcripts say "Saturday", the rater should not have to
+      // compute which date that is.
+      const slotDay = (s) => WEEKDAYS[new Date(s.date + 'T12:00:00Z').getUTCDay()];
+      // Range cells use the shorthand ONLY when it round-trips to the exact
+      // rupee figure; otherwise the full grouped figure shows (never-round rule).
+      const inrShort = (v) => {
+        if (v >= 1e7) {
+          const s = trimZeros((v / 1e7).toFixed(4));
+          if (Math.round(parseFloat(s) * 1e7) === v) return s + ' cr';
+        } else {
+          const s = trimZeros((v / 1e5).toFixed(2));
+          if (Math.round(parseFloat(s) * 1e5) === v) return s + ' L';
+        }
+        return '₹' + v.toLocaleString('en-IN');
+      };
+      const labelize = (k) => k.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/_/g, ' ');
+      const isPlainObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+      // Rupee-valued fields carry an Inr suffix; range sub-keys (min/max) do
+      // not, so any number >= 1 lakh is treated as rupees too - nothing else
+      // in the corpus (sqft, counts, percents) reaches that magnitude.
+      const fmtScalar = (k, v) => {
+        if (typeof v === 'number' && (/inr/i.test(k) || v >= 1e5)) return inr(v);
+        if (typeof v === 'boolean') return v ? 'yes' : 'no';
+        return String(v);
+      };
+
+      // ---- generic renderers: same data as the JSON, shaped for human eyes ----
+      function renderVal(k, v) {
+        if (v === null || v === undefined) return '—';
+        if (Array.isArray(v)) {
+          if (v.length === 0) return '—';
+          if (v.every((x) => !isPlainObj(x) && !Array.isArray(x)))
+            return e(
+              'ul',
+              { className: 'kvList' },
+              v.map((x, i) => e('li', { key: i }, fmtScalar(k, x))),
+            );
+          return e(ObjTable, { rows: v });
+        }
+        if (isPlainObj(v)) return e(KV, { obj: v });
+        return fmtScalar(k, v);
+      }
+      function KV({ obj }) {
+        return e(
+          'table',
+          { className: 'ref kvwrap' },
+          e(
+            'tbody',
+            null,
+            Object.entries(obj).map(([k, v]) =>
+              e(
+                'tr',
+                { key: k },
+                e('td', { className: 'k' }, labelize(k)),
+                e('td', null, renderVal(k, v)),
+              ),
+            ),
+          ),
+        );
+      }
+      function ObjTable({ rows }) {
+        const keys = [...new Set(rows.flatMap((r) => (isPlainObj(r) ? Object.keys(r) : [])))];
+        return e(
+          'table',
+          { className: 'ref kvwrap' },
+          e(
+            'thead',
+            null,
+            e(
+              'tr',
+              null,
+              keys.map((k) => e('th', { key: k }, labelize(k))),
+            ),
+          ),
+          e(
+            'tbody',
+            null,
+            rows.map((r, i) =>
+              e(
+                'tr',
+                { key: i },
+                keys.map((k) =>
+                  e(
+                    'td',
+                    { key: k },
+                    isPlainObj(r) ? (r[k] === undefined ? '—' : renderVal(k, r[k])) : String(r),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+
+      // Markdown tables in the corpus docs render as real tables, headings as
+      // headers; every other line stays preformatted verbatim - the underlying
+      // document text is unchanged (it is what the judges receive byte-for-byte).
+      function MdDoc({ text }) {
+        const lines = text.split('\n');
+        const blocks = [];
+        let buf = [];
+        const flush = () => {
+          if (buf.length) {
+            blocks.push({ t: 'pre', body: buf.join('\n') });
+            buf = [];
+          }
+        };
+        for (let i = 0; i < lines.length; i++) {
+          const ln = lines[i];
+          if (/^\s*\|.*\|\s*$/.test(ln)) {
+            flush();
+            const tbl = [];
+            while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) {
+              tbl.push(lines[i]);
+              i++;
+            }
+            i--;
+            blocks.push({ t: 'table', rows: tbl });
+          } else if (/^#{1,4}\s/.test(ln)) {
+            flush();
+            blocks.push({ t: 'h', body: ln.replace(/^#+\s*/, '') });
+          } else buf.push(ln);
+        }
+        flush();
+        const cells = (l) =>
+          l
+            .replace(/^\s*\|/, '')
+            .replace(/\|\s*$/, '')
+            .split('|')
+            .map((c) => c.trim().replace(/\*\*/g, ''));
+        return e(
+          'div',
+          null,
+          blocks.map((b, i) => {
+            if (b.t === 'h') return e('div', { key: i, className: 'docH' }, b.body);
+            if (b.t === 'pre')
+              // Line-per-div (not one <pre>) so a search jump can flash the
+              // exact line instead of a whole block.
+              return e(
+                'div',
+                { key: i, className: 'doc' },
+                b.body
+                  .split('\n')
+                  .map((ln, j) => e('div', { key: j, className: 'docLn' }, ln === '' ? ' ' : ln)),
+              );
+            const rows = b.rows
+              .map(cells)
+              .filter((r) => !r.every((c) => /^:?-+:?$/.test(c) || c === ''));
+            return e(
+              'table',
+              { key: i, className: 'ref kvwrap' },
+              e(
+                'thead',
+                null,
+                e(
+                  'tr',
+                  null,
+                  (rows[0] || []).map((c, j) => e('th', { key: j }, c)),
+                ),
+              ),
+              e(
+                'tbody',
+                null,
+                rows.slice(1).map((r, ri) =>
+                  e(
+                    'tr',
+                    { key: ri },
+                    r.map((c, j) => e('td', { key: j }, c)),
+                  ),
+                ),
+              ),
+            );
+          }),
+        );
+      }
+
+      // Click a column header to sort; click again to reverse.
+      function SortTable({ cols, rows }) {
+        const [sortKey, setSortKey] = React.useState(null);
+        const [dir, setDir] = React.useState(1);
+        const col = cols.find((c) => c.key === sortKey);
+        const sorted = col
+          ? [...rows].sort((a, b) => {
+              const x = col.val(a);
+              const y = col.val(b);
+              return (x < y ? -1 : x > y ? 1 : 0) * dir;
+            })
+          : rows;
+        const click = (k) => {
+          if (sortKey === k) setDir(-dir);
+          else {
+            setSortKey(k);
+            setDir(1);
+          }
+        };
+        return e(
+          'table',
+          { className: 'ref' },
+          e(
+            'thead',
+            null,
+            e(
+              'tr',
+              null,
+              cols.map((c) =>
+                e(
+                  'th',
+                  {
+                    key: c.key,
+                    className: 'sortable',
+                    title: 'click to sort',
+                    onClick: () => click(c.key),
+                  },
+                  c.label + (sortKey === c.key ? (dir === 1 ? ' ▲' : ' ▼') : ''),
+                ),
+              ),
+            ),
+          ),
+          e(
+            'tbody',
+            null,
+            sorted.map((r, i) =>
+              e(
+                'tr',
+                { key: i },
+                cols.map((c) =>
+                  e(
+                    'td',
+                    { key: c.key, className: c.cls ? c.cls(r) : undefined },
+                    c.render ? c.render(r) : String(c.val(r)),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+
+      // Tower × BHK rollup so "what does a 3BHK cost in tower C" needs no
+      // scanning: derived from the same start-of-conversation unit list.
+      function summaryRows(units) {
+        const byKey = new Map();
+        for (const u of units) {
+          const key = u.unitType + '|' + u.tower;
+          if (!byKey.has(key)) byKey.set(key, []);
+          byKey.get(key).push(u);
+        }
+        const mk = (type, tower, us) => ({
+          type,
+          tower,
+          n: us.length,
+          avail: us.filter((u) => u.status === 'available').length,
+          floorLo: Math.min(...us.map((u) => u.floor)),
+          floorHi: Math.max(...us.map((u) => u.floor)),
+          carpetLo: Math.min(...us.map((u) => u.carpetAreaSqft)),
+          carpetHi: Math.max(...us.map((u) => u.carpetAreaSqft)),
+          priceLo: Math.min(...us.map((u) => u.priceInr)),
+          priceHi: Math.max(...us.map((u) => u.priceInr)),
+        });
+        const perTower = [...byKey.entries()]
+          .map(([key, us]) => mk(key.split('|')[0], key.split('|')[1], us))
+          .sort((a, b) =>
+            a.type < b.type ? -1 : a.type > b.type ? 1 : a.tower < b.tower ? -1 : 1,
+          );
+        const types = [...new Set(units.map((u) => u.unitType))].sort();
+        const overall = types.map((t) =>
+          mk(
+            t,
+            'all',
+            units.filter((u) => u.unitType === t),
+          ),
+        );
+        return { perTower, overall };
+      }
+      const rangeTxt = (lo, hi) => (lo === hi ? String(lo) : lo + '–' + hi);
+      const priceRangeTxt = (lo, hi) =>
+        lo === hi ? inrShort(lo) : inrShort(lo) + ' – ' + inrShort(hi);
+      const SUMMARY_COLS = [
+        { key: 'type', label: 'type', val: (r) => r.type },
+        { key: 'tower', label: 'tower', val: (r) => r.tower },
+        { key: 'n', label: 'units', val: (r) => r.n },
+        {
+          key: 'avail',
+          label: 'avail',
+          val: (r) => r.avail,
+          cls: (r) => (r.avail > 0 ? 'avail' : 'soldout'),
+        },
+        {
+          key: 'floorLo',
+          label: 'floors',
+          val: (r) => r.floorLo,
+          render: (r) => rangeTxt(r.floorLo, r.floorHi),
+        },
+        {
+          key: 'carpetLo',
+          label: 'carpet sqft',
+          val: (r) => r.carpetLo,
+          render: (r) => rangeTxt(r.carpetLo, r.carpetHi),
+        },
+        {
+          key: 'priceLo',
+          label: 'price range',
+          val: (r) => r.priceLo,
+          render: (r) => priceRangeTxt(r.priceLo, r.priceHi),
+        },
+      ];
+
+      // Global search over everything the panel holds: document lines, units,
+      // slots, policy and project fields - "gst" finds every tax mention
+      // without knowing which document carries it.
+      function buildSearchIndex(refData) {
+        const ix = [];
+        const db = refData.db;
+        // `find` is the string the jump-and-flash looks for in the rendered
+        // tab - it must survive rendering (markdown pipes/hashes stripped,
+        // table lines reduced to their most distinctive cell).
+        refData.documents.forEach((d, i) => {
+          d.text.split('\n').forEach((ln) => {
+            const t = ln.trim();
+            if (!t) return;
+            let find = t.replace(/^#+\s*/, '');
+            if (t.startsWith('|')) {
+              const cells = t
+                .replace(/^\|/, '')
+                .replace(/\|$/, '')
+                .split('|')
+                .map((c) => c.trim().replace(/\*\*/g, ''))
+                .filter((c) => c && !/^:?-+:?$/.test(c));
+              if (cells.length) find = [...cells].sort((a, b) => b.length - a.length)[0];
+            }
+            ix.push({ tab: 'docs', doc: i, where: d.file.replace(/\.md$/, ''), text: t, find });
+          });
+        });
+        for (const u of db.units)
+          ix.push({
+            tab: 'units',
+            where: 'Units',
+            find: u.id,
+            text: `${u.id} tower ${u.tower} floor ${u.floor} ${u.unitType} carpet ${u.carpetAreaSqft} sqft super ${u.superBuiltUpAreaSqft} ${u.facing} ${inr(u.priceInr)} ${u.priceInr} ${u.status}`,
+          });
+        for (const s of db.siteVisitSlots)
+          ix.push({
+            tab: 'slots',
+            where: 'Slots',
+            find: s.id,
+            text: `${s.id} ${s.date} ${slotDay(s)} ${s.time} ${s.mode} capacity ${s.capacity} booked ${s.booked} free ${s.capacity - s.booked}`,
+          });
+        const flat = (tab, where, obj, path) => {
+          for (const [k, v] of Object.entries(obj)) {
+            const p = path ? path + ' › ' + labelize(k) : labelize(k);
+            if (v !== null && typeof v === 'object') flat(tab, where, v, p);
+            else ix.push({ tab, where, text: p + ': ' + fmtScalar(k, v), find: fmtScalar(k, v) });
+          }
+        };
+        flat('policy', 'Policy', db.agentPolicy, '');
+        flat('policy', 'Policy', { paymentPlans: db.paymentPlans }, '');
+        flat('project', 'Project', db.project, '');
+        for (const t of refData.tools)
+          ix.push({
+            tab: 'policy',
+            where: 'Tools',
+            find: t.name,
+            text: `${t.name} (${t.kind}${t.endsChat ? ', ends the chat' : ''}): ${t.description}`,
+          });
+        for (const a of db.assets)
+          ix.push({
+            tab: 'policy',
+            where: 'Assets',
+            find: a.name,
+            text: `${a.name} (${a.kind}) ${a.id}`,
+          });
+        return ix;
+      }
+
+      const UNIT_COLS = [
+        { key: 'id', label: 'unit', val: (u) => u.id },
+        { key: 'tower', label: 'tower', val: (u) => u.tower },
+        { key: 'floor', label: 'floor', val: (u) => u.floor },
+        { key: 'type', label: 'type', val: (u) => u.unitType },
+        { key: 'carpet', label: 'carpet sqft', val: (u) => u.carpetAreaSqft },
+        { key: 'sbu', label: 'super built-up', val: (u) => u.superBuiltUpAreaSqft },
+        { key: 'facing', label: 'facing', val: (u) => u.facing },
+        { key: 'price', label: 'price', val: (u) => u.priceInr, render: (u) => inr(u.priceInr) },
+        {
+          key: 'status',
+          label: 'status',
+          val: (u) => u.status,
+          cls: (u) => (u.status === 'available' ? 'avail' : 'soldout'),
+        },
+      ];
+      const SLOT_COLS = [
+        { key: 'id', label: 'slot', val: (s) => s.id },
+        { key: 'date', label: 'date', val: (s) => s.date },
+        // Sorting the day column sorts chronologically (by date), which is
+        // the ordering a human means by it.
+        { key: 'day', label: 'day', val: (s) => s.date, render: slotDay },
+        { key: 'time', label: 'time', val: (s) => s.time },
+        { key: 'mode', label: 'mode', val: (s) => s.mode },
+        { key: 'capacity', label: 'capacity', val: (s) => s.capacity },
+        { key: 'booked', label: 'booked', val: (s) => s.booked },
+        {
+          key: 'free',
+          label: 'free',
+          val: (s) => s.capacity - s.booked,
+          cls: (s) => (s.capacity - s.booked > 0 ? 'avail' : 'soldout'),
+        },
+      ];
 
       function Reference({ refData }) {
         const [tab, setTab] = React.useState('units');
         const [doc, setDoc] = React.useState(0);
+        const [q, setQ] = React.useState('');
+        const [jump, setJump] = React.useState(null);
+        const bodyRef = React.useRef(null);
+        const index = React.useMemo(() => (refData ? buildSearchIndex(refData) : []), [refData]);
+        const summary = React.useMemo(
+          () => (refData ? summaryRows(refData.db.units) : null),
+          [refData],
+        );
+        // After a search hit opens its tab, scroll the matching row/line into
+        // view and flash it for 5s so the eye lands on the right spot.
+        React.useEffect(() => {
+          if (!jump || !bodyRef.current) return;
+          const container = bodyRef.current;
+          const timer = setTimeout(() => {
+            for (const old of container.querySelectorAll('.flash')) old.classList.remove('flash');
+            const needle = jump.find.toLowerCase();
+            let target = null;
+            for (const el of container.querySelectorAll('.docLn, .docH, td, th, li')) {
+              if (el.textContent.toLowerCase().includes(needle)) {
+                target = el.tagName === 'TD' || el.tagName === 'TH' ? el.closest('tr') : el;
+                break;
+              }
+            }
+            if (!target) return;
+            target.classList.add('flash');
+            target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            setTimeout(() => target.classList.remove('flash'), 5000);
+          }, 60);
+          return () => clearTimeout(timer);
+        }, [jump]);
         if (!refData) return null;
         const db = refData.db;
         const TABS = [
           ['units', 'Units'],
+          ['summary', 'Summary'],
           ['slots', 'Slots'],
           ['policy', 'Policy'],
           ['project', 'Project'],
           ['docs', 'Documents'],
         ];
+        const query = q.trim().toLowerCase();
+        const hits =
+          query.length >= 2 ? index.filter((r) => r.text.toLowerCase().includes(query)) : null;
         let body = null;
-        if (tab === 'units')
+        if (hits) {
+          const shown = hits.slice(0, 50);
           body = e(
-            'table',
-            { className: 'ref' },
-            e(
-              'thead',
-              null,
+            'div',
+            null,
+            shown.map((h, i) =>
               e(
-                'tr',
-                null,
-                [
-                  'unit',
-                  'tower',
-                  'floor',
-                  'type',
-                  'carpet sqft',
-                  'super built-up',
-                  'facing',
-                  'price',
-                  'status',
-                ].map((h) => e('th', { key: h }, h)),
+                'div',
+                {
+                  key: i,
+                  className: 'hit',
+                  title: 'open its tab',
+                  onClick: () => {
+                    setTab(h.tab);
+                    if (h.tab === 'docs' && h.doc !== undefined) setDoc(h.doc);
+                    setQ('');
+                    setJump({ at: Date.now(), find: h.find });
+                  },
+                },
+                e('span', { className: 'hitWhere' }, h.where),
+                h.text.length > 160 ? h.text.slice(0, 160) + '…' : h.text,
               ),
             ),
-            e(
-              'tbody',
-              null,
-              db.units.map((u) =>
-                e(
-                  'tr',
-                  { key: u.id },
-                  e('td', null, u.id),
-                  e('td', null, u.tower),
-                  e('td', null, u.floor),
-                  e('td', null, u.unitType),
-                  e('td', null, u.carpetAreaSqft),
-                  e('td', null, u.superBuiltUpAreaSqft),
-                  e('td', null, u.facing),
-                  e('td', null, inr(u.priceInr)),
-                  e('td', { className: u.status === 'available' ? 'avail' : 'soldout' }, u.status),
-                ),
-              ),
-            ),
+            hits.length === 0
+              ? e('div', { className: 'hitMore' }, 'no matches in the ground truth')
+              : null,
+            hits.length > shown.length
+              ? e(
+                  'div',
+                  { className: 'hitMore' },
+                  `…and ${hits.length - shown.length} more — narrow the search`,
+                )
+              : null,
           );
-        if (tab === 'slots')
+        } else if (tab === 'units') body = e(SortTable, { cols: UNIT_COLS, rows: db.units });
+        else if (tab === 'summary')
           body = e(
-            'table',
-            { className: 'ref' },
+            'div',
+            null,
+            e('div', { className: 'docH' }, 'By BHK type (all towers)'),
+            e(SortTable, { cols: SUMMARY_COLS, rows: summary.overall }),
+            e('div', { className: 'docH' }, 'By BHK type × tower'),
+            e(SortTable, { cols: SUMMARY_COLS, rows: summary.perTower }),
             e(
-              'thead',
-              null,
-              e(
-                'tr',
-                null,
-                ['slot', 'date', 'day', 'time', 'mode', 'capacity', 'booked', 'free'].map((h) =>
-                  e('th', { key: h }, h),
-                ),
-              ),
-            ),
-            e(
-              'tbody',
-              null,
-              db.siteVisitSlots.map((s) =>
-                e(
-                  'tr',
-                  { key: s.id },
-                  e('td', null, s.id),
-                  e('td', null, s.date),
-                  // Weekday derived from the fixed date (midday UTC, so no
-                  // timezone can shift it): transcripts say "Saturday", the
-                  // rater should not have to compute which date that is.
-                  e('td', null, WEEKDAYS[new Date(s.date + 'T12:00:00Z').getUTCDay()]),
-                  e('td', null, s.time),
-                  e('td', null, s.mode),
-                  e('td', null, s.capacity),
-                  e('td', null, s.booked),
-                  e(
-                    'td',
-                    { className: s.capacity - s.booked > 0 ? 'avail' : 'soldout' },
-                    s.capacity - s.booked,
-                  ),
-                ),
-              ),
+              'div',
+              { className: 'hint' },
+              'Derived from the Units tab; ranges span min–max of the group. Price shorthand is exact (falls back to the full figure when it would round).',
             ),
           );
-        if (tab === 'policy')
+        else if (tab === 'slots') body = e(SortTable, { cols: SLOT_COLS, rows: db.siteVisitSlots });
+        else if (tab === 'policy')
           body = e(
-            'pre',
-            { className: 'doc' },
-            'AGENT POLICY\n' +
-              JSON.stringify(db.agentPolicy, null, 2) +
-              '\n\nPAYMENT PLANS\n' +
-              JSON.stringify(db.paymentPlans, null, 2),
+            'div',
+            null,
+            e('div', { className: 'docH' }, 'Agent policy'),
+            e(KV, { obj: db.agentPolicy }),
+            e('div', { className: 'docH' }, 'The agent’s tools — the COMPLETE set'),
+            e(
+              'div',
+              { className: 'hint' },
+              'The agent has no facility beyond these six. It cannot hold or reserve a unit; the only booking action is schedule_site_visit against the slots listed in the Slots tab. A claimed action with no possible tool behind it is unsupported. Tool calls themselves are invisible in the transcript — judge claims against what is possible and what the Units/Slots/documents say.',
+            ),
+            e(ObjTable, {
+              rows: refData.tools.map((t) => ({
+                tool: t.name,
+                kind: t.kind + (t.endsChat ? ' · ends the chat' : ''),
+                description: t.description,
+              })),
+            }),
+            e('div', { className: 'docH' }, 'Sendable assets — the COMPLETE list'),
+            e(
+              'div',
+              { className: 'hint' },
+              'send_asset can share exactly these and nothing else. "I sent you the X" for anything not on this list is a claim about a document that does not exist.',
+            ),
+            e(ObjTable, { rows: db.assets.map((a) => ({ asset: a.name, kind: a.kind })) }),
+            e('div', { className: 'docH' }, 'Payment plans'),
+            e(ObjTable, { rows: db.paymentPlans }),
           );
-        if (tab === 'project')
-          body = e('pre', { className: 'doc' }, JSON.stringify(db.project, null, 2));
-        if (tab === 'docs')
+        else if (tab === 'project') body = e(KV, { obj: db.project });
+        else if (tab === 'docs')
           body = e(
             'div',
             null,
@@ -609,7 +1103,7 @@
                 ),
               ),
             ),
-            e('pre', { className: 'doc' }, refData.documents[doc].text),
+            e(MdDoc, { text: refData.documents[doc].text }),
           );
         return e(
           'div',
@@ -620,6 +1114,12 @@
             { className: 'sub' },
             'Judge factuality & compliance against this: the same source documents the LLM judges receive, plus the project database the agent’s tools answered from. A claim you cannot support from here is unsupported.',
           ),
+          e('input', {
+            className: 'refSearch',
+            placeholder: 'Search everything — e.g. "gst", "tower C", "discount", "Saturday"…',
+            value: q,
+            onChange: (ev) => setQ(ev.target.value),
+          }),
           e(
             'div',
             { className: 'refTabs' },
@@ -628,15 +1128,18 @@
                 'button',
                 {
                   key: k,
-                  className: 'refTab' + (tab === k ? ' on' : ''),
-                  onClick: () => setTab(k),
+                  className: 'refTab' + (tab === k && !hits ? ' on' : ''),
+                  onClick: () => {
+                    setTab(k);
+                    setQ('');
+                  },
                 },
                 name,
               ),
             ),
           ),
-          e('div', { className: 'refBody' }, body),
-          tab === 'units' || tab === 'slots'
+          e('div', { className: 'refBody', ref: bodyRef }, body),
+          !hits && (tab === 'units' || tab === 'slots' || tab === 'summary')
             ? e(
                 'div',
                 { className: 'caveat' },
@@ -710,8 +1213,8 @@
             e(
               'li',
               null,
-              e('b', null, 'The "ended by" chip tells you who closed the chat.'),
-              ' "agent (tool action)" means the agent ended it by logging the qualification or escalating — that action has NO text bubble, so a final buyer message with no visible reply is the agent closing the lead, not ignoring the buyer. Whether closing right there was good judgment is still yours to score. "buyer" = the buyer stopped; "step limit" = the harness cut it off mid-flow.',
+              e('b', null, 'The "ended by" chip tells you who closed the chat — and how.'),
+              ' An agent close is a tool action with NO text bubble, so a final buyer message with no visible reply is the agent closing the lead, not ignoring the buyer. The chip names the action: "escalated to human" = handed the buyer to a human colleague (a clean handoff can itself be the concrete next step); "logged & closed the lead" = recorded the qualification and ended the chat. Whether closing right there was good judgment is still yours to score. "buyer" = the buyer stopped; "step limit" = the harness cut it off mid-flow.',
             ),
             e(
               'li',
@@ -723,7 +1226,47 @@
               'li',
               null,
               e('b', null, 'Anchored scales:'),
-              ' pick the 0–3 level whose description best fits the conversation as a whole.',
+              ' pick the 0–3 level whose description best fits the conversation as a whole. Each level shows an "e.g." line — those are hypothetical illustrations of the level, never taken from any case.',
+            ),
+            e(
+              'li',
+              null,
+              e('b', null, 'Worked examples for Met / Not met'),
+              ' (all hypothetical):',
+              e(
+                'ul',
+                null,
+                e(
+                  'li',
+                  null,
+                  e('b', null, 'Met'),
+                  ' — SE1 "Elicited/confirmed budget": the agent asked "aapka budget range kya hai?" and got an answer → Met.',
+                ),
+                e(
+                  'li',
+                  null,
+                  e('b', null, 'Not met — absence counts:'),
+                  ' if the agent never asked about budget anywhere, that is Not met. For "did the agent do X" items you don’t need a quote of a failure — the absence is the failure.',
+                ),
+                e(
+                  'li',
+                  null,
+                  e('b', null, 'Violation — happened'),
+                  ' — CP5: "this flat will double in value, guaranteed" → violation (note the turn, e.g. "t6: guaranteed doubling"). But "prices can move either way; I can’t promise returns" → No violation.',
+                ),
+                e(
+                  'li',
+                  null,
+                  e('b', null, 'Can’t decide'),
+                  ' — the agent claims "only 2 units left in tower B" and the Units tab shows more available at conversation start, but bookings you cannot see could have changed it mid-chat → genuinely undecidable.',
+                ),
+              ),
+            ),
+            e(
+              'li',
+              null,
+              e('b', null, 'Finding things:'),
+              ' the search box at the top of the Ground truth panel looks across every document, unit, slot and policy field (try "gst"). Column headers in the Units/Slots tabs sort on click, and the Summary tab shows floor, size and price ranges per BHK type and tower.',
             ),
             e(
               'li',
@@ -914,7 +1457,11 @@
                     c.endedBy === 'buyer'
                       ? 'ended by: buyer'
                       : c.endedBy === 'agent'
-                        ? 'ended by: agent (tool action)'
+                        ? c.endedByTool === 'escalate_to_human'
+                          ? 'ended by: agent — escalated to human'
+                          : c.endedByTool === 'log_qualification'
+                            ? 'ended by: agent — logged & closed the lead'
+                            : 'ended by: agent (tool action)'
                         : 'ended by: step limit',
                   )
                 : null,
@@ -974,7 +1521,7 @@
               e(
                 'div',
                 { className: 'sub' },
-                'Pick the level whose description best fits the whole conversation.',
+                'Pick the level whose description best fits the whole conversation. The "e.g." lines are hypothetical illustrations, not from any case.',
               ),
               anchorList.map((a) =>
                 e(
@@ -984,7 +1531,13 @@
                   e(
                     'div',
                     { className: 'scaleHint' },
-                    [0, 1, 2, 3].map((v) => `${v}: ${a.scale[v]}`).join('\n'),
+                    [0, 1, 2, 3]
+                      .map(
+                        (v) =>
+                          `${v}: ${a.scale[v]}` +
+                          (a.examples ? `\n      e.g. ${a.examples[v]}` : ''),
+                      )
+                      .join('\n'),
                   ),
                   e(
                     'div',

@@ -15,7 +15,13 @@ import { sha256 } from '../env/db.js';
 import { cacheCallOptions, resolveModel, supportsSamplingParams } from '../providers/registry.js';
 import { meterCall, type CostMeter } from '../telemetry/cost.js';
 import type { JudgeDimension, JudgeItems } from '../run/judgeItems.js';
-import { anchorsFor, buildJudgeSystem, buildJudgeUser, type JudgeCaseInput } from './prompt.js';
+import {
+  anchorsFor,
+  buildJudgeSystem,
+  buildJudgeUser,
+  type JudgeCaseInput,
+  type JudgeItemOrder,
+} from './prompt.js';
 import { parseJudgeOutput, type JudgeVerdict } from './schema.js';
 
 export type JudgeCallFn = (system: string, user: string) => Promise<string>;
@@ -38,10 +44,12 @@ export async function judgeCase(opts: {
   dimension: JudgeDimension;
   input: JudgeCaseInput;
   sourceDocuments: string;
+  /** ADR-0030 order-robustness ablation; per-pass, defaults to 'original'. */
+  itemOrder?: JudgeItemOrder;
 }): Promise<JudgeCaseResult> {
-  const { call, items, dimension, input } = opts;
-  const system = buildJudgeSystem(items, dimension, opts.sourceDocuments);
-  const user = buildJudgeUser(input);
+  const { call, items, dimension, input, itemOrder = 'original' } = opts;
+  const system = buildJudgeSystem(items, dimension, opts.sourceDocuments, itemOrder);
+  const user = buildJudgeUser(input, itemOrder);
   const anchorIds = anchorsFor(items, dimension).map((a) => a.id);
   const promptSha = sha256(system);
 

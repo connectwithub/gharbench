@@ -68,3 +68,62 @@ export function bootstrapMeanCi(
     means[Math.min(means.length - 1, Math.max(0, Math.round(q * (means.length - 1))))] ?? mean;
   return { lower: at(alpha), upper: at(1 - alpha), mean };
 }
+
+/**
+ * Cluster (block) bootstrap CI for the mean (ADR-0030; SISTER's story-clustered
+ * bootstrap, here clustered by scenario/family/persona).
+ *
+ * The K trials of one scenario share the persona, the traps and the gold DB,
+ * so they are correlated; treating the ~5,300 conversations as independent
+ * (bootstrapMeanCi above) understates the variance and yields too-narrow CIs.
+ * Resampling whole CLUSTERS with replacement - every observation of a sampled
+ * cluster comes along, unequal cluster sizes and all - preserves the
+ * within-cluster correlation in each replicate (Davison & Hinkley 1997, ch. 3).
+ *
+ * Deterministic like everything else: seeded xorshift32, clusters keyed in
+ * first-appearance order of the input. Fewer than two clusters returns null -
+ * between-cluster variance cannot be estimated, and a zero-width interval
+ * would be a lie shaped like a number (same "fewer than two" honesty as the
+ * panel aggregation).
+ */
+export function clusteredBootstrapMeanCi(
+  values: readonly number[],
+  clusterIds: readonly (string | number)[],
+  options: { seed?: number; resamples?: number; level?: number } = {},
+): { lower: number; upper: number; mean: number; clusters: number } | null {
+  if (values.length === 0 || values.length !== clusterIds.length) return null;
+  const byCluster = new Map<string | number, number[]>();
+  for (let i = 0; i < values.length; i += 1) {
+    const id = clusterIds[i];
+    const v = values[i];
+    if (id === undefined || v === undefined) continue;
+    const bucket = byCluster.get(id);
+    if (bucket) bucket.push(v);
+    else byCluster.set(id, [v]);
+  }
+  if (byCluster.size < 2) return null;
+
+  const { seed = 20260828, resamples = 2000, level = 0.95 } = options;
+  const clusters = [...byCluster.values()];
+  const rand = xorshift32(seed);
+  const mean = values.reduce((a, b) => a + b, 0) / values.length;
+
+  const means: number[] = [];
+  for (let r = 0; r < resamples; r += 1) {
+    let sum = 0;
+    let n = 0;
+    for (let c = 0; c < clusters.length; c += 1) {
+      const picked = clusters[Math.floor(rand() * clusters.length)] ?? [];
+      for (const v of picked) {
+        sum += v;
+        n += 1;
+      }
+    }
+    means.push(n === 0 ? mean : sum / n);
+  }
+  means.sort((a, b) => a - b);
+  const alpha = (1 - level) / 2;
+  const at = (q: number): number =>
+    means[Math.min(means.length - 1, Math.max(0, Math.round(q * (means.length - 1))))] ?? mean;
+  return { lower: at(alpha), upper: at(1 - alpha), mean, clusters: byCluster.size };
+}

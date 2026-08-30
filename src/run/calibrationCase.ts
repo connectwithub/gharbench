@@ -23,48 +23,66 @@ export const calibrationMessageSchema = z.strictObject({
   text: z.string().min(1),
 });
 
-export const calibrationCaseSchema = z.strictObject({
-  caseId: z.string().regex(/^cal_[a-z0-9_.-]+$/),
-  /** Where the transcript came from. */
-  source: z.enum(['synthetic', 'real', 'adversarial']),
-  /** §4.5 stratification band. Synthetic anchors pin the extremes. */
-  band: z.enum(['known_fail', 'borderline', 'known_pass']),
-  family: z.enum([
-    'cold_inquiry',
-    'deep_factual',
-    'budget_mismatch',
-    'compliance_trap',
-    'site_visit_scheduling',
-    'reengagement_24h',
-    'hinglish_variant',
-  ]),
-  language: z.enum(['english', 'hinglish']),
-  /**
-   * Who ended the conversation. 'agent' means a flow-ending tool action
-   * (log_qualification / escalate_to_human), which has NO text bubble - so a
-   * final buyer message with no visible reply is the agent closing the lead,
-   * not ignoring the buyer. Both raters and judges see this (ADR-0027);
-   * error terminations never become cases.
-   */
-  endedBy: z.enum(['buyer', 'agent', 'harness']),
-  /** For real cases: the scenario instance and run they were sampled from. */
-  provenance: z
-    .strictObject({
-      runId: z.string(),
-      conversationId: z.string(),
-      scenarioId: z.string(),
-      contestantRef: z.string(),
-    })
-    .optional(),
-  /** The binary items the labeler (and later the judges) must answer. */
-  judgeApplicability: z.strictObject({
-    factuality: z.array(JUDGE_ITEM_ID),
-    compliance: z.array(JUDGE_ITEM_ID),
-    salesEffectiveness: z.array(JUDGE_ITEM_ID),
-    conversationQuality: z.array(JUDGE_ITEM_ID),
-  }),
-  messages: z.array(calibrationMessageSchema).min(2),
-});
+export const calibrationCaseSchema = z
+  .strictObject({
+    caseId: z.string().regex(/^cal_[a-z0-9_.-]+$/),
+    /** Where the transcript came from. */
+    source: z.enum(['synthetic', 'real', 'adversarial']),
+    /** §4.5 stratification band. Synthetic anchors pin the extremes. */
+    band: z.enum(['known_fail', 'borderline', 'known_pass']),
+    family: z.enum([
+      'cold_inquiry',
+      'deep_factual',
+      'budget_mismatch',
+      'compliance_trap',
+      'site_visit_scheduling',
+      'reengagement_24h',
+      'hinglish_variant',
+    ]),
+    language: z.enum(['english', 'hinglish']),
+    /**
+     * Who ended the conversation. 'agent' means a flow-ending tool action
+     * (log_qualification / escalate_to_human), which has NO text bubble - so a
+     * final buyer message with no visible reply is the agent closing the lead,
+     * not ignoring the buyer. Both raters and judges see this (ADR-0027);
+     * error terminations never become cases.
+     */
+    endedBy: z.enum(['buyer', 'agent', 'harness']),
+    /**
+     * The flow-ending tool behind an 'agent' close (ADR-0029), present exactly
+     * when endedBy === 'agent'. The two closes read identically in the
+     * transcript (neither has a bubble) but mean opposite things for e.g.
+     * SE5/CP10: log_qualification = the agent logged the lead and closed;
+     * escalate_to_human = the agent handed the buyer to a human colleague.
+     * Both raters and judges see it.
+     */
+    endedByTool: z.enum(['escalate_to_human', 'log_qualification']).optional(),
+    /** For real cases: the scenario instance and run they were sampled from. */
+    provenance: z
+      .strictObject({
+        runId: z.string(),
+        conversationId: z.string(),
+        scenarioId: z.string(),
+        contestantRef: z.string(),
+      })
+      .optional(),
+    /** The binary items the labeler (and later the judges) must answer. */
+    judgeApplicability: z.strictObject({
+      factuality: z.array(JUDGE_ITEM_ID),
+      compliance: z.array(JUDGE_ITEM_ID),
+      salesEffectiveness: z.array(JUDGE_ITEM_ID),
+      conversationQuality: z.array(JUDGE_ITEM_ID),
+    }),
+    messages: z.array(calibrationMessageSchema).min(2),
+  })
+  .superRefine((c, ctx) => {
+    if ((c.endedBy === 'agent') !== (c.endedByTool !== undefined)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: "endedByTool must be present exactly when endedBy === 'agent' (ADR-0029)",
+      });
+    }
+  });
 
 export type CalibrationCase = z.infer<typeof calibrationCaseSchema>;
 export type CalibrationMessage = z.infer<typeof calibrationMessageSchema>;

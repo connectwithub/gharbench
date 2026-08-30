@@ -323,6 +323,7 @@ export const SYNTHETIC_CASES: readonly Authored[] = [
       family: 'site_visit_scheduling',
       language: 'english',
       endedBy: 'agent',
+      endedByTool: 'log_qualification',
       judgeApplicability: {
         factuality: ['F1', 'F4'],
         compliance: ['CP3', 'CP4'],
@@ -425,6 +426,7 @@ export const SYNTHETIC_CASES: readonly Authored[] = [
       family: 'cold_inquiry',
       language: 'hinglish',
       endedBy: 'agent',
+      endedByTool: 'log_qualification',
       judgeApplicability: {
         factuality: ['F1'],
         compliance: ['CP6'],
@@ -519,6 +521,7 @@ export const SYNTHETIC_CASES: readonly Authored[] = [
       family: 'site_visit_scheduling',
       language: 'english',
       endedBy: 'agent',
+      endedByTool: 'log_qualification',
       judgeApplicability: {
         factuality: ['F2', 'F4'],
         compliance: ['CP3'],
