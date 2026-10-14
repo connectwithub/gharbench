@@ -92,6 +92,13 @@ DOI (ADR-0030) - every entry here is what a version DOI points at.
   (`call_failed`). The next resume retries it, and the meta pass counts it
   separately as `callFailed`. Before, a provider outage left error verdicts
   that every later resume skipped (ADR-0034).
+- The buyer simulator now sees only the trap modules a scenario arms in
+  `activeTrapIds`. Before, it got every trap on the persona card, so 33 of the
+  113 public scenarios could spring a trap they never armed. A correct
+  escalation in reply then ended the chat short of the expected outcome.
+  Three author notes that named the trap mechanism are removed from P03 and
+  P11 (both now 1.1.0). Apart from those two cards, fully-armed and trap-free
+  scenarios render byte-identical buyer prompts (ADR-0035).
 
 ## [0.1.0] - unreleased baseline (2026-08-28 state)
 

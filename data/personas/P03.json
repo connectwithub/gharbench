@@ -1,6 +1,6 @@
 {
   "personaId": "P03",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "displayName": "Suresh",
   "segment": "Upgrader / end-user (joint family)",
   "difficulty": "hard",
@@ -72,7 +72,7 @@
       "financingMode": "mixed",
       "loanPercent": 50,
       "downPaymentAvailableInr": 9000000,
-      "notes": "Half self-funded, half loan. Has cash liquidity beyond documented business income - which is exactly what the cash-component trap draws on. Flexible on timing, rigid on configuration."
+      "notes": "Half self-funded, half loan. Has cash liquidity beyond documented business income. Flexible on timing, rigid on configuration."
     },
     "privateFacts": [
       "Elderly parents need a low floor (4th or below) - he will not say this until units are discussed",

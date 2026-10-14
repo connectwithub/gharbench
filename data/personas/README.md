@@ -43,6 +43,8 @@ ones with the widest scenario coverage (P03, P04, P06, P11), then the rest.
   failure-mode mandates in Master Plan 3.9 for why this is load-bearing.
 - Traps are typed against the Master Plan 3.8 taxonomy and carry the
   known-correct agent response, so judges score against ground truth.
+- A card's trap modules reach the buyer simulator only when the scenario lists them
+  in `activeTrapIds`; other card fields always render (ADR-0035).
 - Bump a card's `version` on any behavioral change; run manifests record
   persona versions, and a result produced against persona 1.0.0 is not
   comparable to one against 1.1.0.

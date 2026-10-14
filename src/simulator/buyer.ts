@@ -6,7 +6,8 @@
  * the environment - exactly like a real person on the other end of WhatsApp.
  *
  * Information asymmetry is the whole point. The persona's `hidden` block
- * (budget ceiling, walk-away triggers, traps) is read HERE and only here. If a
+ * (budget ceiling, walk-away triggers, ARMED traps) is read HERE and only here.
+ * Only trap modules the scenario arms are rendered (ADR-0035). If a
  * hidden field ever reaches the contestant's context the scenario is void,
  * because the contestant can then satisfy the trap without earning it.
  */
@@ -100,7 +101,11 @@ export function buildBuyerSystemPrompt(persona: PersonaCard, scenario: ScenarioC
     personaVersion: persona.version,
     displayName: persona.displayName,
     public: persona.public,
-    hidden: persona.hidden,
+    // Only ARMED trap modules are rendered (ADR-0035); key order is unchanged.
+    hidden: {
+      ...persona.hidden,
+      traps: persona.hidden.traps.filter((t) => scenario.activeTrapIds.includes(t.id)),
+    },
     consistencyAnchors: persona.consistencyAnchors,
     situation: {
       channel: scenario.channel,

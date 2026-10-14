@@ -7,7 +7,8 @@
  * (trap module), and the 3-5 immutable facts re-injected every turn so a
  * long conversation cannot drift them (consistency anchors).
  *
- * The whole card is simulator-side: the contestant never sees any of it.
+ * The whole card is simulator-side: the contestant never sees any of it, and
+ * the buyer sees a trap module only when the scenario arms it.
  * The public/hidden split is *behavioral*, not access control - `public`
  * is what the buyer may reveal in conversation; `hidden` is what must be
  * elicited legitimately or never surfaced at all. src/simulator/buyer.ts

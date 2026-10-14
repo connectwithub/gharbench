@@ -3,11 +3,12 @@
 Generated from `decisions.jsonl` — do not edit by hand.
 Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 
-33 decisions.
+34 decisions.
 
 ## By date
 
 - **ADR-0034** (2026-10-14) — [Maverick judge re-pinned from DeepInfra to Novita after DeepInfra was delisted; transport failures are no longer persisted as verdicts](ADR-0034-maverick-judge-repinned-to-novita.md)
+- **ADR-0035** (2026-10-14) — [The buyer simulator sees only the trap modules a scenario arms](ADR-0035-buyer-sees-only-armed-traps.md)
 - **ADR-0033** (2026-09-21) — [Rubric v2: the judge items are revised after G8a fell below the floor on every dimension](ADR-0033-rubric-v2-calibration-revision.md)
 - **ADR-0032** (2026-09-20) — [Judge panel serving ids verified; all three judges route through OpenRouter, Mistral slot resolves to Medium 3.5](ADR-0032-judge-panel-openrouter-routing.md)
 - **ADR-0031** (2026-08-30) — [Operational profile: latency published as serving telemetry, never scored](ADR-0031-operational-profile.md)
@@ -100,6 +101,7 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 ### `checks`
 
 - ADR-0024 — [Pre-run pipeline hardening: contestant-aware check reports and gate completeness floors](ADR-0024-prerun-pipeline-hardening.md)
+- ADR-0035 — [The buyer simulator sees only the trap modules a scenario arms](ADR-0035-buyer-sees-only-armed-traps.md)
 
 ### `contamination`
 
@@ -244,6 +246,7 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 - ADR-0014 — [Personas are public; scenarios are persona-bound instance files split at authoring time](ADR-0014-personas-are-public-scenarios-are-persona-bound-instance-files.md)
 - ADR-0016 — [OpenRouter routing is not behaviour-neutral: pin the host, use the chat surface](ADR-0016-openrouter-routing-is-not-behaviour-neutral.md)
 - ADR-0034 — [Maverick judge re-pinned from DeepInfra to Novita after DeepInfra was delisted; transport failures are no longer persisted as verdicts](ADR-0034-maverick-judge-repinned-to-novita.md)
+- ADR-0035 — [The buyer simulator sees only the trap modules a scenario arms](ADR-0035-buyer-sees-only-armed-traps.md)
 
 ### `rubric`
 
@@ -251,6 +254,10 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 - ADR-0027 — [Every calibration case records who ended the conversation](ADR-0027-endedby-on-calibration-cases.md)
 - ADR-0029 — [Agent-ended cases carry the closing tool; the answer key shows the agent's full capability surface](ADR-0029-ended-by-tool.md)
 - ADR-0033 — [Rubric v2: the judge items are revised after G8a fell below the floor on every dimension](ADR-0033-rubric-v2-calibration-revision.md)
+
+### `scenarios`
+
+- ADR-0035 — [The buyer simulator sees only the trap modules a scenario arms](ADR-0035-buyer-sees-only-armed-traps.md)
 
 ### `schema`
 
@@ -265,6 +272,7 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 
 - ADR-0021 — [Buyer guardrails hardened with an anti-repetition mandate after the G6 pilot audit](ADR-0021-anti-repetition-guardrail-after-g6-audit.md)
 - ADR-0028 — [Buyer scaffolding leaks: 17 calibration cases purged, leak screen added, buyer prompt hardened](ADR-0028-buyer-scaffolding-leak-purge.md)
+- ADR-0035 — [The buyer simulator sees only the trap modules a scenario arms](ADR-0035-buyer-sees-only-armed-traps.md)
 
 ### `stack`
 
@@ -283,6 +291,10 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 ### `tooling`
 
 - ADR-0011 — [AI SDK v6 surface: five places reality differed from the plan](ADR-0011-ai-sdk-v6-surface-deviations.md)
+
+### `traps`
+
+- ADR-0035 — [The buyer simulator sees only the trap modules a scenario arms](ADR-0035-buyer-sees-only-armed-traps.md)
 
 ### `ui`
 
