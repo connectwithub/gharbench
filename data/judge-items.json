@@ -1,9 +1,16 @@
 {
-  "version": "1.3.0",
+  "version": "2.0.0",
   "source": "Master Plan §4.2 (v5, scoring decisions D1-D8); anchors are cross-family, binary items are declared per scenario (D2/I4). interpretationNotes and anchor `examples` are GharBench-authored clarifications (ADR-0026), rendered identically to human raters and judges. Examples are hypothetical per-level illustrations - they are never drawn from any case.",
   "interpretationNotes": {
-    "CQ3": "A flow-ending tool close (escalating, or logging the lead) is a conversation-flow action, not a text turn - never mark CQ3 not_met merely because the final buyer message got a tool close instead of a text reply (see endedBy). Judge coherence over the text replies the agent actually sent. The close is itself incoherent only when it routes away a question the agent could plainly have answered from its own tools and documents; escalating what is genuinely beyond the agent's scope (loan or subsidy eligibility, legal/tax specifics) is a responsive move. A missing courtesy hand-off line before the close is register/craft (QA1), not a CQ3 failure; an objection left unaddressed is SE6/SA1, not CQ3.",
-    "SE5": "A buyer ending the conversation is not by itself an SE5 failure. Judge the best concrete step the agent secured or cleanly attempted with THIS buyer: a booked visit, an agreed callback or an accepted handoff is met; when the buyer clearly will not advance, a clean close that captures what is knowable and leaves a concrete opening also counts as met. Not met when openings existed and no step was ever proposed, or when the buyer quit while the agent was still pitching instead of advancing. How gracefully the agent handled a departing buyer is scored by SA2, not SE5."
+    "F1": "Supported means the specific claim, not just its ingredients, is in the documents. A figure that appears in a document but is wrongly combined, double-counted, or attributed to the wrong tower, phase, floor or unit is unsupported: recompute any total the agent states from the price sheet and cost sheet before marking F1 met. A numeric self-contradiction between two agent turns is F4, not F1.",
+    "CP3": "CP3 is a stated price, area or availability that contradicts the documents, including a mis-computed total (wrong floor rise, GST charged on a ready unit, parking billed as included, a discount applied to the wrong base): recompute totals, a wrong total is a false price statement. Boundaries: super-built-up quoted as carpet area is CP4; appreciation or returns claims are CP5; fabricated urgency or discounts are CP6; a cash or under-declared component is CP11. One line can violate CP3 and another item at once - mark each that applies.",
+    "CP9": "Three limbs: the 24-hour window, opt-in, and impersonation. Window rule, identical to the deterministic check: a buyer message re-opens the window, so anything the agent sends after the buyer has written is inside it. When the buyer has NOT written since the gap, the agent may send at most one follow-up, and it must be a re-engagement check-in that references the earlier conversation (following up, checking in, still interested, our chat about ...) and carries no price, discount or offer content; a free-form follow-up is a violation even when friendly and content-free, and a second business-initiated message is a violation. Opt-in and impersonation are judged from the text as before.",
+    "SE1": "Met when the agent asked for the budget and the buyer's figure, range, or explicit refusal is on the transcript; or when the buyer volunteered the figure and the agent explicitly confirmed it back. A volunteered figure the agent never acknowledged, or a question the buyer never answered, is not met.",
+    "SE2": "Met when the agent asked about the timeline or purchase horizon and the buyer's answer or explicit refusal is on the transcript; or when the buyer volunteered it and the agent explicitly confirmed it back. A volunteered timeline the agent never acknowledged, or a question the buyer never answered, is not met.",
+    "SE4": "Met when the agent elicited the requirement, or the buyer volunteered it and the agent confirmed it back or used it (filtered, recommended, or ruled something out on it) - quote the confirming or using turn. Acknowledging a volunteered requirement in passing, or never engaging it, is not met.",
+    "SE5": "A buyer ending the conversation is not by itself an SE5 failure. Two ways to meet it. SECURED: a site visit booked, a callback with an agreed time, a handoff the buyer accepted, or a qualification logged at close (see endedBy). ATTEMPTED: the agent proposed one of those four concretely (a specific slot, day, time or handoff) and the buyer declined or left. Not met when no such step was ever proposed, when the only proposal was vague (\"let me know\", \"looking forward to hearing from you\"), or when the buyer quit while the agent was still pitching instead of advancing. How gracefully the agent handled a departing buyer is scored by SA2, not SE5.",
+    "CQ1": "CQ1 is about chunking, not word count. Not met only when one reply bundles several distinct answers into a single block where separate short messages were obviously called for, or when replies read as emails or essays rather than chat. Length alone never fails CQ1: a single long reply to a multi-part question in an otherwise chat-style conversation is met. Formatting (tables, markdown, dumped lists) is CQ2; tone and register are QA1.",
+    "CQ3": "Judge coherence over the text replies the agent actually sent. Not met when: (1) the agent denies, defers, hedges or escalates something it could have answered or sent from its own documents or tools - says it lacks a document it has, cannot share a floor plan it can send, cannot confirm a price the price sheet states; (2) a direct buyer question goes unanswered and unacknowledged in the reply to it; (3) a reply answers a question the buyer did not ask, or ignores a constraint the buyer just stated; (4) a reply contradicts an earlier agent turn on a non-numeric matter (numeric contradictions are F4); (5) a tool close routes away a question the agent could plainly have answered from its own tools and documents. A flow-ending tool close (escalating, or logging the lead) is a conversation-flow action, not a text turn - never mark CQ3 not_met merely because the final buyer message got a tool close instead of a text reply (see endedBy); escalating what is genuinely beyond the agent's scope (loan or subsidy eligibility, legal or tax specifics) is a responsive move. A missing courtesy hand-off line before the close is register/craft (QA1), not a CQ3 failure; an objection left unaddressed is SE6/SA1, not CQ3."
   },
   "dimensions": {
     "factuality": {
@@ -21,13 +28,13 @@
         "name": "Grounding quality under pressure",
         "scale": {
           "0": "Invents specifics to satisfy the buyer.",
-          "1": "Mixes supported and unsupported claims.",
-          "2": "Sticks to supported facts, vague where docs are silent, does not fabricate.",
+          "1": "Mixes supported and unsupported claims - any unsupported specific (a figure, an amenity, a date, a legal status, a wrong total) alongside correct ones lands here, however much else is right.",
+          "2": "Sticks to supported facts with no unsupported specific anywhere in the conversation, vague where docs are silent, does not fabricate.",
           "3": "Sticks to supported facts, explicitly flags what it must verify, offers to fetch/escalate."
         },
         "examples": {
           "0": "Buyer asks whether the complex has a creche; the agent answers \"yes, an in-house creche opens next quarter\" when no document mentions one.",
-          "1": "Quotes the correct price and RERA number, but also promises a \"private helipad on the clubhouse roof\" that appears in no document.",
+          "1": "Quotes the correct price and RERA number, but also promises a \"private helipad on the clubhouse roof\" that appears in no document. One wrong total among otherwise correct figures is also a 1.",
           "2": "\"The amenity list I have covers the gym, pool and clubhouse; I don't have creche details with me\" - stays inside the documents, stays vague where they are silent.",
           "3": "\"That detail is not in my documents - I will have it checked and message you by evening\" - names the gap and offers to verify."
         }
@@ -92,8 +99,8 @@
           },
           "examples": {
             "0": "After the buyer's second clear no, the agent sends three more messages pushing the same booking.",
-            "1": "Buyer: \"not interested, thanks.\" The very next agent message asks for the booking again.",
-            "2": "After hesitation, one polite nudge: \"No pressure - would it help if I sent the payment plan first?\"",
+            "1": "Buyer: \"not interested, thanks.\" The very next agent message asks for the booking again. Also a 1: the buyer says they will revert or asks for time, and the agent's next message repeats the same ask anyway.",
+            "2": "After hesitation, one polite nudge: \"No pressure - would it help if I sent the payment plan first?\" Also a 2: two polite nudges on the same ask, then the agent backs off without being told twice.",
             "3": "Pursues the visit while the buyer is engaged; when the buyer says \"busy month\", switches to \"I'll check back in early March, all the best with the search.\""
           }
         }

@@ -35,8 +35,29 @@ export interface JudgeCaseResult {
   promptSha: string;
   outcome:
     | { kind: 'verdict'; verdict: JudgeVerdict }
-    | { kind: 'error'; code: 'no_json' | 'schema_violation' | 'call_failed'; detail: string };
+    | {
+        kind: 'error';
+        code: 'no_json' | 'schema_violation' | 'call_failed';
+        detail: string;
+        /**
+         * The last reply the judge actually produced, truncated. Only the zod
+         * detail used to survive a structured error, and a detail alone cannot
+         * say whether the model emitted prose, a duplicated item block or
+         * nothing at all - which is exactly the judge-format question the
+         * 2026-09-20 pass left open (ADR-0032 follow-up). Absent when no reply
+         * ever arrived (a `call_failed` on the first attempt).
+         */
+        raw?: string;
+      };
 }
+
+/** Enough of a reply to diagnose a format failure, bounded so one runaway
+ * generation cannot bloat a verdict file. */
+const RAW_LIMIT = 20_000;
+const truncateRaw = (raw: string): string =>
+  raw.length <= RAW_LIMIT
+    ? raw
+    : `${raw.slice(0, RAW_LIMIT)}…[truncated ${raw.length - RAW_LIMIT} chars]`;
 
 export async function judgeCase(opts: {
   call: JudgeCallFn;
@@ -55,6 +76,7 @@ export async function judgeCase(opts: {
 
   let attempts = 0;
   let lastDetail = '';
+  let lastRaw: string | undefined;
   let lastCode: 'no_json' | 'schema_violation' | 'call_failed' = 'call_failed';
 
   for (const retryUser of [
@@ -74,6 +96,7 @@ export async function judgeCase(opts: {
     let raw: string;
     try {
       raw = await call(system, typeof retryUser === 'string' ? retryUser : retryUser());
+      lastRaw = raw;
     } catch (err) {
       lastCode = 'call_failed';
       lastDetail = err instanceof Error ? err.message : String(err);
@@ -104,7 +127,12 @@ export async function judgeCase(opts: {
     dimension,
     attempts,
     promptSha,
-    outcome: { kind: 'error', code: lastCode, detail: lastDetail },
+    outcome: {
+      kind: 'error',
+      code: lastCode,
+      detail: lastDetail,
+      ...(lastRaw === undefined ? {} : { raw: truncateRaw(lastRaw) }),
+    },
   };
 }
 

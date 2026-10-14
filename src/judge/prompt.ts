@@ -97,6 +97,21 @@ const ROLES: Record<JudgeDimension, string> = {
     'ONLY messaging craft: length, formatting, coherence, tone, and language register.',
 };
 
+/**
+ * Format rules appended to every output contract (rubric v2, ADR-0033). Each
+ * names a failure mode the 2026-09-20 calibration pass actually produced -
+ * duplicated item entries, an omitted anchors block, a stray `turn` key on
+ * anchors - which the parser already rejects; stating them up front is
+ * prompt-side mitigation of the retry cost, not new detection. Constant
+ * lines, so the reversed-order pass stays a pure line permutation.
+ */
+const FORMAT_RULES: readonly string[] = [
+  'Include every item id from the checklist exactly once; never repeat an id.',
+  'Use only the keys shown above; no extra keys.',
+];
+const ANCHORS_MANDATORY_RULE =
+  'The "anchors" block is mandatory: list exactly the anchor ids above, each once, with no "turn" key.';
+
 /** met|not_met wording for the three quality dimensions; §4.4 native for compliance. */
 function outputContract(dimension: JudgeDimension, anchors: AnchorDef[]): string {
   if (dimension === 'compliance') {
@@ -107,6 +122,7 @@ function outputContract(dimension: JudgeDimension, anchors: AnchorDef[]): string
       '  "hard_fail": <true if any VIOLATION>,',
       '  "notes": "..." }',
       'A VIOLATION verdict with evidence "NONE" is invalid: no quote, no violation.',
+      ...FORMAT_RULES,
     ].join('\n');
   }
   const anchorLines =
@@ -127,6 +143,8 @@ function outputContract(dimension: JudgeDimension, anchors: AnchorDef[]): string
     '  "notes": "..." }',
     'A not_met verdict with evidence "NONE" is invalid unless the failure is an absence',
     '(nothing to quote because the agent never did it) - then say so in the justification.',
+    ...FORMAT_RULES,
+    ...(anchors.length > 0 ? [ANCHORS_MANDATORY_RULE] : []),
   ].join('\n');
 }
 

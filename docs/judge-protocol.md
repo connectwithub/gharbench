@@ -85,6 +85,43 @@ anywhere. The paper claims this explicitly and credits the convergent design.
 - **Pre-registration**: composite weights (§4.3), the ablation set above and
   these thresholds are fixed as of 2026-08-28 - post-hoc weight tuning is out.
 
+## 7. Rubric revision log
+
+Pre-registration freezes the composite weights (§4.3), the ablation set in
+sections 1-4 and their thresholds. It does **not** freeze item wording: a
+rubric that no two raters read the same way is a measurement fault, and
+Master Plan §8/§11 pre-commit the response to one - rewrite the item text
+below kappa 0.6, redesign the dimension below 0.4, and publish no score until
+the floor is met.
+
+**v2, 2026-09-21 (ADR-0033).** Trigger: the 2026-09-20 calibration pass put
+G8a below 0.6 on every dimension (factuality 0.345, compliance 0.454,
+salesEffectiveness 0.454, conversationQuality -0.003). Item wording was
+clarified; weights, the ablation set and the thresholds were not touched.
+
+Rules that hold for this and every future revision:
+
+1. Every revision bumps the `version` field in `data/judge-items.json`. Each
+   verdict, meta file and label file records the `itemsVersion` it was
+   produced under, and the agreement readers refuse to mix two versions or
+   two prompt hashes inside one (judge, dimension) pair.
+2. Verdicts from the prior version are archived to a **sibling** folder
+   (`calibration/archive/v<n>-<date>/`), never left inside
+   `calibration/judgments/`, which the readers would otherwise load as an
+   extra judge.
+3. The paper reports both kappa sets, v1 and v2, side by side, with the
+   trigger and the wording changes. Reporting only the revised number would
+   make the published figure a best-of over rubric drafts, which is precisely
+   what pre-registration exists to prevent.
+
+**Disclosed breach.** The anchor exact-score order-flip rate in the 2026-09-20
+pass was 0.254, above the 0.10 threshold set in section 1, driven by SA2 and
+QA1. QA1's text is left **unchanged** in v2 pending CQ1 and CQ3
+re-validation: QA1 scores the register of replies whose content CQ1 and CQ3
+now judge differently, so re-anchoring it before those settle would tune two
+coupled items against a single run. The breach is reported in the paper
+whatever the v2 re-run shows.
+
 ## Runbook
 
 ```sh

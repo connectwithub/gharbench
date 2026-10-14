@@ -7,14 +7,22 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import {
   adjudicatedReference,
   assembleUnits,
   binaryAgreement,
   compliancePrf,
+  itemsVersionsOf,
+  listRaters,
+  loadJudgments,
   referenceFromLabels,
   retestAgreement,
+  versionWarnings,
+  versionsFromLabels,
   type BridgeFn,
 } from '../src/run/judgeAgreement.js';
 import type { StoredJudgment } from '../src/run/judgeRun.js';
@@ -225,5 +233,154 @@ describe('retestAgreement', () => {
     const second = [sj('j/a', 'cal_1', 'compliance', { CP5: 'VIOLATION', CP6: 'VIOLATION' })];
     const out = retestAgreement(first, second);
     expect(out['j-a']).toEqual({ units: 2, agreementPct: 50 });
+  });
+});
+
+describe('compliancePrf alsoCovered', () => {
+  it('a flag on a second item wording is neither TP nor FP, and recall is untouched', () => {
+    // cal_f seeds CP11; CP3's text ("misleading price statement") covers the
+    // same line, so a judge flagging CP3 caught the seeded act under another
+    // name. Counting that as a false positive would measure the sidecar's
+    // under-specification as judge error (ADR-0025 keeps violatedItems the
+    // sole recall authority, hence the unchanged denominator).
+    const cases = [
+      makeCase('cal_f', 'known_fail', ['CP3', 'CP11']),
+      makeCase('cal_p', 'known_pass', ['CP3']),
+    ];
+    const judgments = JUDGES.flatMap((j) => [
+      sj(j, 'cal_f', 'compliance', { CP3: 'VIOLATION', CP11: 'VIOLATION' }),
+      sj(j, 'cal_p', 'compliance', { CP3: 'VIOLATION' }), // a real false positive
+    ]);
+    const { binaries } = assembleUnits(cases, judgments, JUDGES);
+    const expected = new Map<string, readonly string[]>([
+      ['cal_f', ['CP11']],
+      ['cal_p', []],
+    ]);
+
+    const without = compliancePrf(cases, binaries, expected);
+    expect(without.confusion).toEqual({ tp: 1, fp: 2, fn: 0, tn: 0 });
+    expect(without.alsoCoveredFlags).toBe(0);
+
+    const with_ = compliancePrf(cases, binaries, expected, new Map([['cal_f', ['CP3']]]));
+    expect(with_.confusion).toEqual({ tp: 1, fp: 1, fn: 0, tn: 0 });
+    expect(with_.alsoCoveredFlags).toBe(1);
+    expect(with_.precision).toBeCloseTo(0.5); // was 1/3
+    expect(with_.recall).toBe(without.recall); // denominator unchanged
+    expect(with_.recallSeededKnownFails).toBe(without.recallSeededKnownFails);
+    expect(with_.seededFailUnits).toBe(without.seededFailUnits);
+  });
+});
+
+describe('loadJudgments rubric guards', () => {
+  function writeVerdict(
+    base: string,
+    judgeDir: string,
+    caseId: string,
+    dimension: JudgeDimension,
+    extra: Partial<StoredJudgment>,
+  ): void {
+    const stored: StoredJudgment = {
+      ...sj(`j/${judgeDir}`, caseId, dimension, { CP5: 'OK' }),
+      ...extra,
+    };
+    mkdirSync(join(base, judgeDir), { recursive: true });
+    writeFileSync(join(base, judgeDir, `${caseId}.${dimension}.json`), JSON.stringify(stored));
+  }
+
+  function fixture(fn: (base: string) => void): string {
+    const base = mkdtempSync(join(tmpdir(), 'gb-judgments-'));
+    fn(base);
+    return base;
+  }
+
+  it('throws when one (judge, dimension) mixes prompt shas', () => {
+    const base = fixture((b) => {
+      writeVerdict(b, 'a', 'cal_1', 'compliance', { promptSha: 'sha_old' });
+      writeVerdict(b, 'a', 'cal_2', 'compliance', { promptSha: 'sha_new' });
+    });
+    try {
+      expect(() => loadJudgments(base)).toThrow(/judge j\/a, dimension compliance/);
+      expect(() => loadJudgments(base)).toThrow(/sha_new, sha_old/);
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
+
+  it('throws when one (judge, dimension) mixes rubric versions', () => {
+    const base = fixture((b) => {
+      writeVerdict(b, 'a', 'cal_1', 'compliance', {}); // no itemsVersion
+      writeVerdict(b, 'a', 'cal_2', 'compliance', { itemsVersion: '2.0.0' });
+    });
+    try {
+      expect(() => loadJudgments(base)).toThrow(/itemsVersion 2\.0\.0, unversioned/);
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
+
+  it('allows different shas across judges and across dimensions', () => {
+    const base = fixture((b) => {
+      writeVerdict(b, 'a', 'cal_1', 'compliance', { promptSha: 's1', itemsVersion: '2.0.0' });
+      writeVerdict(b, 'a', 'cal_1', 'factuality', { promptSha: 's2', itemsVersion: '2.0.0' });
+      writeVerdict(b, 'c', 'cal_1', 'compliance', { promptSha: 's3', itemsVersion: '2.0.0' });
+    });
+    try {
+      expect(loadJudgments(base)).toHaveLength(3);
+      expect(itemsVersionsOf(loadJudgments(base))).toEqual(['2.0.0']);
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
+
+  it('never ingests an archived-* directory as a judge', () => {
+    const base = fixture((b) => {
+      writeVerdict(b, 'a', 'cal_1', 'compliance', { promptSha: 's1', itemsVersion: '2.0.0' });
+      // The superseded pass parked next to the live one: same judge, old
+      // rubric. Ingesting it would both mix versions and double-count.
+      writeVerdict(b, 'archived-v1', 'cal_1', 'compliance', { promptSha: 's0' });
+      mkdirSync(join(b, 'meta'), { recursive: true });
+    });
+    try {
+      const loaded = loadJudgments(base);
+      expect(loaded).toHaveLength(1);
+      expect(itemsVersionsOf(loaded)).toEqual(['2.0.0']);
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('rubric version reporting', () => {
+  it('reads label versions, defaulting an unversioned label to "unversioned"', () => {
+    const labels = new Map([
+      ['cal_1', { ...label('cal_1', 'self', { F1: 'met' }), itemsVersion: '2.0.0' }],
+      ['cal_2', label('cal_2', 'self', { F1: 'met' })],
+    ]);
+    expect(versionsFromLabels(labels)).toEqual(['2.0.0', 'unversioned']);
+  });
+
+  it('warns (never throws) when a rater answered a different rubric', () => {
+    const warnings = versionWarnings({
+      judgments: ['2.0.0'],
+      labels: { self: ['2.0.0'], colleague_a: ['1.0.0'], colleague_b: [] },
+    });
+    expect(warnings).toHaveLength(1); // self matches; the empty set is silent
+    expect(warnings[0]).toContain('labels/colleague_a');
+    expect(warnings[0]).toContain('[1.0.0]');
+    expect(warnings[0]).toContain('[2.0.0]');
+    expect(versionWarnings({ judgments: ['2.0.0'], labels: { self: ['2.0.0'] } })).toEqual([]);
+  });
+});
+
+describe('listRaters', () => {
+  it('lists rater folders and skips archived-* folders', () => {
+    const base = mkdtempSync(join(tmpdir(), 'gb-raters-'));
+    try {
+      for (const d of ['self', 'rater_b', 'archived-purged'])
+        mkdirSync(join(base, 'labels', d), { recursive: true });
+      expect(listRaters(base)).toEqual(['rater_b', 'self']);
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
   });
 });

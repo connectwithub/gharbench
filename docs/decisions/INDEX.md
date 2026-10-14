@@ -3,10 +3,12 @@
 Generated from `decisions.jsonl` — do not edit by hand.
 Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 
-30 decisions.
+32 decisions.
 
 ## By date
 
+- **ADR-0033** (2026-09-21) — [Rubric v2: the judge items are revised after G8a fell below the floor on every dimension](ADR-0033-rubric-v2-calibration-revision.md)
+- **ADR-0032** (2026-09-20) — [Judge panel serving ids verified; all three judges route through OpenRouter, Mistral slot resolves to Medium 3.5](ADR-0032-judge-panel-openrouter-routing.md)
 - **ADR-0031** (2026-08-30) — [Operational profile: latency published as serving telemetry, never scored](ADR-0031-operational-profile.md)
 - **ADR-0030** (2026-08-28) — [SISTER work order: judge-robustness machinery, clustered CIs, canary, release hygiene](ADR-0030-sister-workorder.md)
 - **ADR-0029** (2026-08-27) — [Agent-ended cases carry the closing tool; the answer key shows the agent's full capability surface](ADR-0029-ended-by-tool.md)
@@ -39,6 +41,10 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 - **ADR-0002** (2026-08-01) — [Cache-first prompt layout: stable prefix first, variable content last](ADR-0002-cache-first-prompt-layout.md)
 
 ## By tag
+
+### `agreement`
+
+- ADR-0033 — [Rubric v2: the judge items are revised after G8a fell below the floor on every dimension](ADR-0033-rubric-v2-calibration-revision.md)
 
 ### `architecture`
 
@@ -88,6 +94,7 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 - ADR-0027 — [Every calibration case records who ended the conversation](ADR-0027-endedby-on-calibration-cases.md)
 - ADR-0028 — [Buyer scaffolding leaks: 17 calibration cases purged, leak screen added, buyer prompt hardened](ADR-0028-buyer-scaffolding-leak-purge.md)
 - ADR-0029 — [Agent-ended cases carry the closing tool; the answer key shows the agent's full capability surface](ADR-0029-ended-by-tool.md)
+- ADR-0033 — [Rubric v2: the judge items are revised after G8a fell below the floor on every dimension](ADR-0033-rubric-v2-calibration-revision.md)
 
 ### `checks`
 
@@ -148,6 +155,8 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 - ADR-0027 — [Every calibration case records who ended the conversation](ADR-0027-endedby-on-calibration-cases.md)
 - ADR-0029 — [Agent-ended cases carry the closing tool; the answer key shows the agent's full capability surface](ADR-0029-ended-by-tool.md)
 - ADR-0030 — [SISTER work order: judge-robustness machinery, clustered CIs, canary, release hygiene](ADR-0030-sister-workorder.md)
+- ADR-0032 — [Judge panel serving ids verified; all three judges route through OpenRouter, Mistral slot resolves to Medium 3.5](ADR-0032-judge-panel-openrouter-routing.md)
+- ADR-0033 — [Rubric v2: the judge items are revised after G8a fell below the floor on every dimension](ADR-0033-rubric-v2-calibration-revision.md)
 
 ### `judge-panel`
 
@@ -165,6 +174,19 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 
 - ADR-0030 — [SISTER work order: judge-robustness machinery, clustered CIs, canary, release hygiene](ADR-0030-sister-workorder.md)
 - ADR-0031 — [Operational profile: latency published as serving telemetry, never scored](ADR-0031-operational-profile.md)
+
+### `phase-5`
+
+- ADR-0032 — [Judge panel serving ids verified; all three judges route through OpenRouter, Mistral slot resolves to Medium 3.5](ADR-0032-judge-panel-openrouter-routing.md)
+- ADR-0033 — [Rubric v2: the judge items are revised after G8a fell below the floor on every dimension](ADR-0033-rubric-v2-calibration-revision.md)
+
+### `pinning`
+
+- ADR-0032 — [Judge panel serving ids verified; all three judges route through OpenRouter, Mistral slot resolves to Medium 3.5](ADR-0032-judge-panel-openrouter-routing.md)
+
+### `pricing`
+
+- ADR-0032 — [Judge panel serving ids verified; all three judges route through OpenRouter, Mistral slot resolves to Medium 3.5](ADR-0032-judge-panel-openrouter-routing.md)
 
 ### `process`
 
@@ -199,6 +221,7 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 ### `providers`
 
 - ADR-0016 — [OpenRouter routing is not behaviour-neutral: pin the host, use the chat surface](ADR-0016-openrouter-routing-is-not-behaviour-neutral.md)
+- ADR-0032 — [Judge panel serving ids verified; all three judges route through OpenRouter, Mistral slot resolves to Medium 3.5](ADR-0032-judge-panel-openrouter-routing.md)
 
 ### `release`
 
@@ -220,6 +243,7 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 - ADR-0026 — [Shared rubric interpretation notes; disclosed rater-baseline adjudication](ADR-0026-shared-interpretation-notes-rater-baseline.md)
 - ADR-0027 — [Every calibration case records who ended the conversation](ADR-0027-endedby-on-calibration-cases.md)
 - ADR-0029 — [Agent-ended cases carry the closing tool; the answer key shows the agent's full capability surface](ADR-0029-ended-by-tool.md)
+- ADR-0033 — [Rubric v2: the judge items are revised after G8a fell below the floor on every dimension](ADR-0033-rubric-v2-calibration-revision.md)
 
 ### `schema`
 

@@ -459,6 +459,41 @@ export function supportsSamplingParams(ref: string): boolean {
   return !REJECTS_SAMPLING_PARAMS.test(modelId);
 }
 
+/**
+ * Model FAMILY for the §6.1 separation rule (family-level self-preference
+ * bias: a Grok judge must not score a Grok contestant, whichever host serves
+ * either of them). A direct provider is its own family. Through a gateway the
+ * family is the vendor segment of the nested model id, normalised to the
+ * direct-provider spelling; a gateway id with no vendor segment (Fireworks
+ * account paths, Groq bare ids) falls back to the gateway id, which is an
+ * honest "unknown family" rather than a false match.
+ */
+const GATEWAY_PROVIDERS = new Set(['openrouter', 'deepinfra', 'fireworks', 'groq']);
+const VENDOR_FAMILY: Readonly<Record<string, string>> = {
+  'x-ai': 'xai',
+  xai: 'xai',
+  mistralai: 'mistral',
+  mistral: 'mistral',
+  'meta-llama': 'meta',
+  meta: 'meta',
+  moonshotai: 'moonshot',
+  moonshot: 'moonshot',
+  qwen: 'qwen',
+  openai: 'openai',
+  anthropic: 'anthropic',
+  google: 'google',
+  deepseek: 'deepseek',
+};
+
+export function modelFamily(ref: string): string {
+  const { provider, modelId } = parseModelRef(ref);
+  if (!GATEWAY_PROVIDERS.has(provider)) return provider;
+  const slash = modelId.indexOf('/');
+  if (slash <= 0) return provider;
+  const vendor = modelId.slice(0, slash).toLowerCase();
+  return VENDOR_FAMILY[vendor] ?? vendor;
+}
+
 /** Endpoint recorded in the run manifest, so a result names where it came from. */
 export function providerEndpoint(providerId: string): string {
   const spec = getProvider(providerId);

@@ -85,6 +85,29 @@ describe('synthetic calibration anchors', () => {
     }
   });
 
+  it('alsoCovered is asked, disjoint from the key, and never scored for recall', () => {
+    // A second item whose TEXT covers the same seeded act (an under-declared
+    // price is CP11 and equally a misleading price statement, CP3). It only
+    // suppresses a false positive, so listing an item the raters were never
+    // asked, or one already in violatedItems, would quietly move the recall
+    // denominator - the one number ADR-0025 freezes.
+    let listed = 0;
+    for (const { case: c, expected } of SYNTHETIC_CASES) {
+      for (const id of expected.alsoCovered ?? []) {
+        listed += 1;
+        expect(
+          c.judgeApplicability.compliance,
+          `${c.caseId}: alsoCovered ${id} is not an asked compliance item`,
+        ).toContain(id);
+        expect(
+          expected.violatedItems,
+          `${c.caseId}: ${id} is both the key and alsoCovered`,
+        ).not.toContain(id);
+      }
+    }
+    expect(listed).toBeGreaterThan(0); // the three under-specified seeds
+  });
+
   it('covers the §4.5 anchor list and both languages', () => {
     const ids = SYNTHETIC_CASES.map((x) => x.case.caseId).join(' ');
     for (const needle of [

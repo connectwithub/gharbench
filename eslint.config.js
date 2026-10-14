@@ -8,6 +8,12 @@ export default tseslint.config(
       'node_modules/**',
       'runs/**',
       'private-pool/**',
+      // Gitignored calibration store (cases, labels, verdicts, one-off analysis
+      // scripts): data and scratch, never part of the harness build.
+      'calibration/**',
+      'human-validation/**',
+      // Private-tracked sync folder (claude.ai project mirror + its render script).
+      'docs/claude-project/**',
       'stats-bridge/.venv/**',
       'dist/**',
       // Vendored verbatim under someone else's licence. Never lint or reformat.

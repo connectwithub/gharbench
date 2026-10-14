@@ -16,7 +16,21 @@ import type { JudgeDimension } from '../run/judgeItems.js';
 
 const ITEM_ID = z.string().regex(/^[A-Z]{1,2}\d{1,2}$/);
 const EVIDENCE = z.string().min(1);
-const TURN = z.number().int().positive().nullable();
+/**
+ * Tolerant numeric coercion for fields whose MEANING is unambiguous when a
+ * judge formats them as text: a turn written "t4" or "4" is turn 4, a score
+ * written "2" is 2. Observed live 2026-09-20 (ADR-0032 addendum): Maverick
+ * emitted numeric strings on ~4% of calls and lost the verdict to a type
+ * error, which is a formatting failure, not a judgment failure. Anything
+ * that is not a plain integer after coercion still fails as before.
+ */
+const coerceInt = (v: unknown): unknown => {
+  if (typeof v !== 'string') return v;
+  const m = /^\s*t?(-?\d+)\s*$/i.exec(v);
+  return m ? Number(m[1]) : v;
+};
+const TURN = z.preprocess(coerceInt, z.number().int().positive().nullable());
+const SCORE = z.preprocess(coerceInt, z.number().int().min(0).max(3));
 
 const complianceItemSchema = z.strictObject({
   id: ITEM_ID,
@@ -35,10 +49,15 @@ const qualityItemSchema = z.strictObject({
   justification: z.string().min(1),
 });
 
+// `turn` is accepted and ignored on anchors: judges mirror the item shape and
+// add it (11% of Mistral Medium 3.5 replies, 2026-09-20). It carries no
+// meaning for a whole-conversation score, so tolerating it is not a
+// contract change; every other unknown key still fails strict parsing.
 const anchorScoreSchema = z.strictObject({
   id: ITEM_ID,
   evidence: EVIDENCE,
-  score: z.number().int().min(0).max(3),
+  score: SCORE,
+  turn: TURN.optional(),
   justification: z.string().min(1),
 });
 
@@ -67,6 +86,17 @@ export interface JudgeItemVerdict {
    * fabricated quote gets caught. null when evidence is NONE.
    */
   evidenceFound: boolean | null;
+  /**
+   * Advisory sub-signal of `evidenceFound === false`: the "quote" reads like
+   * meta-commentary about the conversation ("The entire conversation flow")
+   * rather than a mangled quotation of it - too short to locate, or sharing no
+   * word of length >=4 with the transcript. ADR-0019 keeps the evidence check
+   * advisory only (adjudication catches fabricated quotes), so this NEVER
+   * turns into a schema_violation or a retry; it is a counter for the paper's
+   * judge-format analysis. Optional because verdicts written before rubric v2
+   * carry no such field - `parseJudgeOutput` always sets it.
+   */
+  evidenceMeta?: boolean;
   justification: string;
   rule?: string;
 }
@@ -76,6 +106,8 @@ export interface JudgeAnchorVerdict {
   score: number;
   evidence: string;
   evidenceFound: boolean | null;
+  /** See `JudgeItemVerdict.evidenceMeta` - advisory, never fatal. */
+  evidenceMeta?: boolean;
   justification: string;
 }
 
@@ -118,7 +150,31 @@ function extractJson(raw: string): string | undefined {
   return undefined;
 }
 
-const normalise = (s: string): string => s.replace(/\s+/g, ' ').trim().toLowerCase();
+/**
+ * Evidence grounding is a substring test after normalisation. Two things a
+ * judge does to a verbatim quote must not count against it (measured
+ * 2026-09-20, ADR-0032 addendum: 640 of Grok's 659 "not found" quotes were
+ * exact lines carrying the transcript's own `[tN | role]` prefix):
+ *   - an attribution wrapper copied from the rendered transcript
+ *     (`[t4 | agent] ...`, `t4: ...`) or surrounding quote marks;
+ *   - typographic glyphs (curly quotes, en/em dashes, non-breaking spaces)
+ *     that a model normalises one way and the transcript another.
+ * Paraphrase, truncation with ellipsis and meta-commentary still fail, which
+ * is the point of the metric.
+ */
+const unifyGlyphs = (s: string): string =>
+  s
+    .replace(/[\u2018\u2019\u201a\u201b]/g, "'")
+    .replace(/[\u201c\u201d\u201e\u201f]/g, '"')
+    .replace(/[\u2013\u2014\u2212]/g, '-')
+    .replace(/\u00a0/g, ' ');
+const stripAttribution = (s: string): string =>
+  s
+    .trim()
+    .replace(/^\[t\d+\s*\|\s*[a-z]+\]\s*/i, '')
+    .replace(/^t\d+\s*[:|]\s*/i, '')
+    .replace(/^["'\u2018\u2019\u201c\u201d]+|["'\u2018\u2019\u201c\u201d]+$/g, '');
+const normalise = (s: string): string => unifyGlyphs(s).replace(/\s+/g, ' ').trim().toLowerCase();
 
 /**
  * The no-evidence token, matched robustly: the prompt specifies the literal
@@ -131,7 +187,36 @@ const isNoEvidence = (evidence: string): boolean => /^(?:none|n\/?a)[.!]?$/i.tes
 
 function findEvidence(evidence: string, transcript: string): boolean | null {
   if (isNoEvidence(evidence)) return null;
-  return normalise(transcript).includes(normalise(evidence));
+  const needle = normalise(stripAttribution(evidence));
+  if (needle.length === 0) return false;
+  return normalise(transcript).includes(needle);
+}
+
+/** Alphanumeric words long enough to be a content word rather than glue. */
+const contentTokens = (normalised: string): string[] => normalised.match(/[a-z0-9]{4,}/g) ?? [];
+
+/**
+ * Distinguishes the two ways a quote fails to ground, because they mean
+ * opposite things about the judge: a near-miss (re-spaced, truncated, slightly
+ * paraphrased) still points AT a real line, while meta-commentary points at
+ * nothing and the verdict behind it rests on no quotation at all. Soft flag by
+ * construction - see `JudgeItemVerdict.evidenceMeta`.
+ */
+function isEvidenceMeta(evidence: string, transcript: string, found: boolean | null): boolean {
+  if (found !== false) return false;
+  const needle = normalise(stripAttribution(evidence));
+  if (needle.length < 12) return true;
+  const haystack = new Set(contentTokens(normalise(transcript)));
+  return !contentTokens(needle).some((t) => haystack.has(t));
+}
+
+/** Both advisory evidence signals for one quote, computed once. */
+function evidenceFlags(
+  evidence: string,
+  transcript: string,
+): { evidenceFound: boolean | null; evidenceMeta: boolean } {
+  const evidenceFound = findEvidence(evidence, transcript);
+  return { evidenceFound, evidenceMeta: isEvidenceMeta(evidence, transcript, evidenceFound) };
 }
 
 function idSetMismatch(expected: readonly string[], got: readonly string[]): string | undefined {
@@ -200,7 +285,7 @@ export function parseJudgeOutput(
         dimension,
         items: parsed.data.items.map((i) => ({
           ...i,
-          evidenceFound: findEvidence(i.evidence, transcript),
+          ...evidenceFlags(i.evidence, transcript),
         })),
         anchors: [],
         hardFail: parsed.data.hard_fail,
@@ -232,11 +317,11 @@ export function parseJudgeOutput(
       dimension,
       items: parsed.data.items.map((i) => ({
         ...i,
-        evidenceFound: findEvidence(i.evidence, transcript),
+        ...evidenceFlags(i.evidence, transcript),
       })),
-      anchors: (parsed.data.anchors ?? []).map((a) => ({
+      anchors: (parsed.data.anchors ?? []).map(({ turn: _ignoredTurn, ...a }) => ({
         ...a,
-        evidenceFound: findEvidence(a.evidence, transcript),
+        ...evidenceFlags(a.evidence, transcript),
       })),
       notes: parsed.data.notes,
     },

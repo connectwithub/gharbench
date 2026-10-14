@@ -13,6 +13,7 @@ import {
   providerEndpoint,
   resolveModel,
   supportsSamplingParams,
+  modelFamily,
 } from '../src/providers/registry.js';
 
 describe('provider cache flags', () => {
@@ -245,5 +246,25 @@ describe('providerEndpoint', () => {
   it('records a concrete endpoint for the manifest', () => {
     expect(providerEndpoint('openai')).toMatch(/api\.openai\.com/);
     expect(providerEndpoint('openrouter')).toBe('https://openrouter.ai/api/v1');
+  });
+});
+
+describe('modelFamily (§6.1 separation is by family, not by serving host)', () => {
+  it('a direct provider is its own family', () => {
+    expect(modelFamily('xai/grok-4.3')).toBe('xai');
+    expect(modelFamily('openai/gpt-4.1-mini')).toBe('openai');
+    expect(modelFamily('anthropic/claude-haiku-4-5')).toBe('anthropic');
+  });
+
+  it('a gateway ref resolves to the vendor family, host pin ignored', () => {
+    expect(modelFamily('openrouter/x-ai/grok-4.3@xAI')).toBe('xai');
+    expect(modelFamily('openrouter/mistralai/mistral-medium-3-5@Mistral')).toBe('mistral');
+    expect(modelFamily('openrouter/meta-llama/llama-4-maverick@DeepInfra')).toBe('meta');
+    expect(modelFamily('openrouter/qwen/qwen3-235b-a22b-2507@DeepInfra')).toBe('qwen');
+    expect(modelFamily('deepinfra/moonshotai/Kimi-K2-Thinking')).toBe('moonshot');
+  });
+
+  it('a gateway id with no vendor segment falls back to the gateway, never a false match', () => {
+    expect(modelFamily('groq/llama-3.3-70b-versatile')).toBe('groq');
   });
 });

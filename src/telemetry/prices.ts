@@ -128,16 +128,44 @@ export const PRICES: Readonly<Record<string, ModelPrice>> = {
     confidence: 'unverified',
   },
 
-  // --- Phase 5 judge panel (§6.4). Only Grok has a researched figure (model
-  // lineup pricing snapshot 2026-07-30); Mistral Large 3 and Llama 4 Maverick
-  // prices depend on the serving host and are deliberately ABSENT - a judge
-  // dry-run on them reports UNPRICED rather than a guessed dollar figure.
-  // Verify all three (OpenRouter models API / official pages) at the Phase-5
-  // batch+cache smoke, before the panel run.
+  // --- Phase 5 judge panel (§6.4), verified live 2026-09-20 (ADR-0032) ------
+  // All three judges route through OpenRouter with an @Host pin, so the keys
+  // are the OpenRouter nested ids (what resolveModel returns as modelId) and
+  // the figures are the PINNED host's endpoint price from
+  // openrouter.ai/api/v1/models/<id>/endpoints, not the default-routing price.
+  // Grok 4.3 is a reasoning model: reasoning tokens bill as output.
+  'x-ai/grok-4.3': {
+    inputPerMTok: 1.25,
+    outputPerMTok: 2.5,
+    cacheReadPerMTok: 0.2,
+    source:
+      'openrouter.ai/api/v1/models/x-ai/grok-4.3/endpoints, xAI host (x-ai/grok-4.3-20260430)',
+    lastVerified: '2026-09-20',
+    confidence: 'verified',
+  },
+  'mistralai/mistral-medium-3-5': {
+    inputPerMTok: 1.5,
+    outputPerMTok: 7.5,
+    source:
+      'openrouter.ai/api/v1/models/mistralai/mistral-medium-3-5/endpoints, Mistral host (mistral-medium-3.5-20260430)',
+    lastVerified: '2026-09-20',
+    confidence: 'verified',
+  },
+  'meta-llama/llama-4-maverick': {
+    inputPerMTok: 0.2,
+    outputPerMTok: 0.8,
+    source:
+      'openrouter.ai/api/v1/models/meta-llama/llama-4-maverick/endpoints, DeepInfra host (fp8)',
+    lastVerified: '2026-09-20',
+    confidence: 'verified',
+  },
+  // Direct xAI id, kept for a direct-key run; the OpenRouter figure above is
+  // the same list price but this row was never confirmed at api.x.ai.
   'grok-4.3': {
     inputPerMTok: 1.25,
     outputPerMTok: 2.5,
-    source: 'Model lineup v2 pricing snapshot 2026-07-30 - verify at Phase-5 smoke',
+    source:
+      'Model lineup v2 pricing snapshot 2026-07-30 - matches the OpenRouter xAI endpoint 2026-09-20; direct endpoint unconfirmed',
     lastVerified: 'never',
     confidence: 'unverified',
   },

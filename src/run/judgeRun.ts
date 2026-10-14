@@ -72,6 +72,11 @@ export const DIMENSIONS: readonly JudgeDimension[] = [
 export interface StoredJudgment extends JudgeCaseResult {
   judgeRef: string;
   ts: string;
+  /**
+   * `data/judge-items.json` `version` the verdict was produced under. Absent on
+   * verdicts written before rubric v2 (treated as "unversioned" by readers).
+   */
+  itemsVersion?: string;
 }
 
 /** A unit of judgeable work, whatever its source. */
@@ -390,7 +395,8 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    `judge pass: ${judgeables.length} case(s) x ${options.dimensions.length} dimension(s) x ` +
+    `judge pass: rubric v${items.version}, ${judgeables.length} case(s) x ` +
+      `${options.dimensions.length} dimension(s) x ` +
       `${options.judges.length} judge(s) -> ${work.length} call(s)` +
       (options.itemOrder === 'reversed' ? ' [item-order REVERSED ablation]' : '') +
       (skippedExisting > 0 ? ` (${skippedExisting} already judged, skipped)` : ''),
@@ -473,7 +479,7 @@ async function main(): Promise<void> {
           sourceDocuments,
           itemOrder: options.itemOrder,
         });
-        const stored: StoredJudgment = { ...result, judgeRef, ts };
+        const stored: StoredJudgment = { ...result, judgeRef, ts, itemsVersion: items.version };
         mkdirSync(join(baseDir, judgeSlug(judgeRef)), { recursive: true });
         writeFileSync(
           judgmentPath(baseDir, judgeRef, j.caseId, dimension),
@@ -506,6 +512,11 @@ async function main(): Promise<void> {
         errored,
         skippedExisting,
         budgetStopped,
+        // The rubric the whole pass ran under. promptSha pins the exact bytes,
+        // but only the version says whether two passes are COMPARABLE - a
+        // mixed-version verdict directory is an agreement statistic computed
+        // over two different questionnaires.
+        itemsVersion: items.version,
         promptShas: Object.fromEntries(
           options.dimensions.map((d) => [
             d,

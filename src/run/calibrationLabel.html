@@ -1286,6 +1286,12 @@
       function App() {
         const [rubric, setRubric] = React.useState(null);
         const [order, setOrder] = React.useState([]);
+        // The TRUE position of each served case (1-based over the rater's full
+        // set). With --only the sidebar shows a subset, but every number on
+        // screen is still the position it would have unfiltered - positions are
+        // the rater's stable handles across sittings.
+        const [positions, setPositions] = React.useState([]);
+        const [listInfo, setListInfo] = React.useState({ filtered: false, total: 0 });
         const [labeled, setLabeled] = React.useState(new Set());
         const [rater, setRater] = React.useState('self');
         const [idx, setIdx] = React.useState(0);
@@ -1307,6 +1313,8 @@
             setRefData(rf);
             setRubric(ru);
             setOrder(cs.order);
+            setPositions(cs.positions);
+            setListInfo({ filtered: cs.filtered, total: cs.total });
             setLabeled(new Set(cs.labeled));
             setRater(cs.rater);
             const firstOpen = cs.order.findIndex((a) => !cs.labeled.includes(a));
@@ -1428,6 +1436,13 @@
               { className: 'prog' },
               `rater: ${rater} — ${labeled.size}/${order.length} labeled`,
             ),
+            listInfo.filtered
+              ? e(
+                  'div',
+                  { className: 'prog', style: { color: 'var(--warn)' } },
+                  `Re-check mode: ${order.length} of ${listInfo.total} positions`,
+                )
+              : null,
             order.map((a, j) =>
               e(
                 'button',
@@ -1437,7 +1452,7 @@
                   className:
                     'caseBtn' + (labeled.has(a) ? ' done' : '') + (j === idx ? ' cur' : ''),
                 },
-                `case ${j + 1}${labeled.has(a) ? ' ✓' : ''}`,
+                `case ${positions[j]}${labeled.has(a) ? ' ✓' : ''}`,
               ),
             ),
           ),
@@ -1448,7 +1463,7 @@
             e(
               'div',
               { className: 'chatHead' },
-              e('span', { className: 'chip' }, `case ${idx + 1} of ${order.length}`),
+              e('span', { className: 'chip' }, `case ${positions[idx]} of ${listInfo.total}`),
               e('span', { className: 'chip' }, `language: ${c.language}`),
               c.endedBy
                 ? e(

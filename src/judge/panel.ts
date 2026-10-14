@@ -13,12 +13,20 @@
  */
 
 /**
- * RE-VERIFY AT PHASE-5 SMOKE: these refs are the §6.4 panel (Grok 4.3 /
- * Mistral Large 3 / Llama 4 Maverick) written down before any live call has
- * confirmed the exact serving ids. The Phase-5 batch+cache smoke is where the
- * ids get corrected, dated snapshots pinned in MODEL_PINS (ADR-0009), and
- * prices verified. Maverick goes through OpenRouter with the pilot-proven
- * @Host pin (ADR-0016) because host choice is not behaviour-neutral.
+ * Serving ids VERIFIED 2026-09-20 (ADR-0032). All three judges route through
+ * OpenRouter with the pilot-proven `@Host` pin (ADR-0016), because host choice
+ * is not behaviour-neutral and OpenRouter is the one funded, price-verifiable
+ * gateway on the account (the direct xAI and Mistral keys are blank):
+ *   - Grok 4.3: upstream xAI serves `x-ai/grok-4.3-20260430`, $1.25/$2.50,
+ *     $0.20 cached input - the §6.4 figure confirmed live.
+ *   - Mistral slot: Mistral Large 3 has no OpenRouter endpoint (`mistral-large-2512`
+ *     lists zero) and its $0.50/$1.50 price could not be confirmed, so the
+ *     §6.4 I7 rule resolves the slot to Mistral Medium 3.5 (upstream
+ *     `mistralai/mistral-medium-3.5-20260430`, $1.50/$7.50); Large 3 is the
+ *     named reserve.
+ *   - Llama 4 Maverick: DeepInfra fp8, $0.20/$0.80.
+ * Gateway ids are not MODEL_PINS candidates (ADR-0009): the upstream dated
+ * names above are the pin evidence and live in the ADR, not in the registry.
  */
 export interface PanelJudge {
   ref: string;
@@ -26,8 +34,8 @@ export interface PanelJudge {
 }
 
 export const JUDGE_PANEL: readonly PanelJudge[] = [
-  { ref: 'xai/grok-4.3', family: 'xai' },
-  { ref: 'mistral/mistral-large-3', family: 'mistral' },
+  { ref: 'openrouter/x-ai/grok-4.3@xAI', family: 'xai' },
+  { ref: 'openrouter/mistralai/mistral-medium-3-5@Mistral', family: 'mistral' },
   { ref: 'openrouter/meta-llama/llama-4-maverick@DeepInfra', family: 'meta' },
 ];
 

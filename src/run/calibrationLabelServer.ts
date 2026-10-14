@@ -1,5 +1,6 @@
 /**
- * The calibration labeling tool (`pnpm calibration:label [--rater=name]`).
+ * The calibration labeling tool
+ * (`pnpm calibration:label [--rater=name] [--dir=...] [--only=2,5,14]`).
  *
  * Serves the case transcripts with the judge rubric as the question set and
  * writes one label file per case to calibration/labels/<rater>/. Labels are
@@ -88,6 +89,69 @@ export function aliasCaseIds(order: readonly string[]): {
   return { toAlias, toId };
 }
 
+/**
+ * `--only=2,5,14` restricts a sitting to those POSITIONS (re-check mode: an
+ * adjudication pass over a handful of cases without scrolling a 119-button
+ * sidebar). Positions are the rater's stable handles across sittings, so the
+ * filter is applied AFTER aliasing and never renumbers what it shows.
+ *
+ * Validation is strict and up front - a typo here would silently re-label the
+ * wrong case, which is the one failure mode this whole alias scheme exists to
+ * prevent. Duplicates collapse, output is ascending.
+ */
+export function parseOnlyPositions(spec: string, caseCount: number): number[] {
+  const parts = spec
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s !== '');
+  if (parts.length === 0) {
+    throw new Error('--only needs at least one position, e.g. --only=2,5,14');
+  }
+  const picked = new Set<number>();
+  for (const part of parts) {
+    if (!/^[0-9]+$/.test(part)) {
+      throw new Error(`--only: "${part}" is not a positive integer (positions are 1-based)`);
+    }
+    const n = Number(part);
+    if (n < 1 || n > caseCount) {
+      throw new Error(`--only: position ${n} is out of range (this rater has ${caseCount} cases)`);
+    }
+    picked.add(n);
+  }
+  return [...picked].sort((a, b) => a - b);
+}
+
+/**
+ * The list the rater's sidebar gets: the full aliased order, or - under
+ * `--only` - just the named positions, in ascending position order. Pure, so
+ * the filter contract is testable without binding a port. `positions` is what
+ * the UI prints; it is NOT the array index, which is the whole point.
+ */
+export function buildServedList(
+  order: readonly string[],
+  onlySpec?: string,
+): {
+  positions: number[];
+  aliases: string[];
+  ids: string[];
+  filtered: boolean;
+  total: number;
+} {
+  const positions =
+    onlySpec === undefined
+      ? order.map((_, i) => i + 1)
+      : parseOnlyPositions(onlySpec, order.length);
+  const { toAlias } = aliasCaseIds(order);
+  const ids = positions.map((p) => order[p - 1] as string);
+  return {
+    positions,
+    aliases: ids.map((id) => toAlias.get(id) as string),
+    ids,
+    filtered: onlySpec !== undefined,
+    total: order.length,
+  };
+}
+
 /** What the rater may see: no caseId, no band/source/provenance. */
 export function redactCase(raw: CalibrationCase): Record<string, unknown> {
   return {
@@ -162,7 +226,46 @@ export function buildReference(): {
   };
 }
 
-export function startServer(rater: string, baseDir: string = CALIBRATION_DIR): void {
+/**
+ * Assemble one stored label from a rater's POST. Split out of the handler so
+ * the stamping contract is testable without binding a port: the rubric
+ * `itemsVersion` is recorded here and nowhere else, and binary answers are
+ * filtered to the items this case actually asks (a UI navigation race once
+ * left a stale key from the previous case in the posted state, and an un-asked
+ * answer must never be stored).
+ */
+export function buildLabel(opts: {
+  caseId: string;
+  rater: string;
+  itemsVersion: string;
+  judgeApplicability: CalibrationCase['judgeApplicability'];
+  posted: { binary?: unknown; anchors?: unknown; note?: string };
+  labeledAt?: string;
+}): ReturnType<typeof calibrationLabelSchema.safeParse> {
+  const asked = new Set(Object.values(opts.judgeApplicability).flat());
+  const binary = Object.fromEntries(
+    Object.entries((opts.posted.binary ?? {}) as Record<string, unknown>).filter(([k]) =>
+      asked.has(k),
+    ),
+  );
+  return calibrationLabelSchema.safeParse({
+    caseId: opts.caseId,
+    rater: opts.rater,
+    labeledAt: opts.labeledAt ?? new Date().toISOString(),
+    binary,
+    anchors: opts.posted.anchors,
+    itemsVersion: opts.itemsVersion,
+    ...(opts.posted.note !== undefined && opts.posted.note !== ''
+      ? { note: opts.posted.note }
+      : {}),
+  });
+}
+
+export function startServer(
+  rater: string,
+  baseDir: string = CALIBRATION_DIR,
+  onlySpec?: string,
+): void {
   const casesDir = baseDir === CALIBRATION_DIR ? CASES_DIR : join(baseDir, 'cases');
   const labelsDir = join(baseDir, 'labels', rater);
   mkdirSync(labelsDir, { recursive: true });
@@ -178,6 +281,13 @@ export function startServer(rater: string, baseDir: string = CALIBRATION_DIR): v
   const order = shuffledCaseIds(rater, casesDir);
   const { toAlias, toId } = aliasCaseIds(order);
 
+  // Applied AFTER aliasing, so a shown case's position number is exactly what
+  // it would be without the flag. Only the SERVED list narrows; the alias->id
+  // map above stays the full-set map, which is what keeps positions stable.
+  // Throws here (startup) on a bad --only, before a rater can touch anything.
+  const view = buildServedList(order, onlySpec);
+  const served = new Set(view.aliases);
+
   const server = createServer((req, res) => {
     const url = new URL(req.url ?? '/', `http://localhost:${PORT}`);
     const json = (status: number, body: unknown): void => {
@@ -190,14 +300,25 @@ export function startServer(rater: string, baseDir: string = CALIBRATION_DIR): v
         const labeled = readdirSync(labelsDir)
           .filter((f) => f.endsWith('.json'))
           .map((f) => toAlias.get(f.replace(/\.json$/, '')))
-          .filter((a): a is string => a !== undefined);
-        json(200, { rater, order: order.map((id) => toAlias.get(id)), labeled });
+          .filter((a): a is string => a !== undefined && served.has(a));
+        json(200, {
+          rater,
+          order: view.aliases,
+          // The true position of each served alias - the UI numbers buttons
+          // from this, never from its own array index.
+          positions: view.positions,
+          labeled,
+          filtered: view.filtered,
+          total: view.total,
+        });
         return;
       }
 
       if (req.method === 'GET' && url.pathname.startsWith('/api/case/')) {
         const alias = url.pathname.slice('/api/case/'.length);
-        const caseId = toId.get(alias);
+        // A position outside --only is indistinguishable from an unknown alias:
+        // the UI cannot wander out of the re-check set by guessing a URL.
+        const caseId = served.has(alias) ? toId.get(alias) : undefined;
         const path = caseId !== undefined ? join(casesDir, `${caseId}.json`) : '';
         if (caseId === undefined || !existsSync(path)) {
           json(404, { error: 'no such case' });
@@ -249,33 +370,27 @@ export function startServer(rater: string, baseDir: string = CALIBRATION_DIR): v
             return;
           }
           try {
-            const caseId = posted.alias !== undefined ? toId.get(posted.alias) : undefined;
+            const caseId =
+              posted.alias !== undefined && served.has(posted.alias)
+                ? toId.get(posted.alias)
+                : undefined;
             if (caseId === undefined) {
               json(400, { error: `unknown case alias ${posted.alias ?? '(none)'}` });
               return;
             }
             // The client never sees the real id; the full label (real caseId,
-            // rater, timestamp) is assembled here so the stored file keeps the
-            // shape every downstream consumer already expects. Binary answers
-            // are filtered to the items this case actually asks - a UI
-            // navigation race once left a stale key from the previous case in
-            // the posted state, and an un-asked answer must never be stored.
+            // rater, timestamp, rubric version) is assembled server-side so
+            // the stored file keeps the shape every downstream consumer
+            // already expects.
             const caseRaw = JSON.parse(
               readFileSync(join(casesDir, `${caseId}.json`), 'utf8'),
             ) as CalibrationCase;
-            const asked = new Set(Object.values(caseRaw.judgeApplicability).flat());
-            const binary = Object.fromEntries(
-              Object.entries((posted.binary ?? {}) as Record<string, unknown>).filter(([k]) =>
-                asked.has(k),
-              ),
-            );
-            const parsed = calibrationLabelSchema.safeParse({
+            const parsed = buildLabel({
               caseId,
               rater,
-              labeledAt: new Date().toISOString(),
-              binary,
-              anchors: posted.anchors,
-              ...(posted.note !== undefined && posted.note !== '' ? { note: posted.note } : {}),
+              itemsVersion: rubric.version,
+              judgeApplicability: caseRaw.judgeApplicability,
+              posted,
             });
             if (!parsed.success) {
               json(400, { error: parsed.error.message });
@@ -305,14 +420,18 @@ export function startServer(rater: string, baseDir: string = CALIBRATION_DIR): v
   });
 
   server.listen(PORT, '127.0.0.1', () => {
-    console.log(`calibration labeler for rater "${rater}" on http://localhost:${PORT}`);
+    const filter = view.filtered
+      ? ` — re-check mode: positions ${view.positions.join(', ')} (${view.positions.length} of ${view.total})`
+      : '';
+    console.log(`calibration labeler for rater "${rater}" on http://localhost:${PORT}${filter}`);
   });
 }
 
 function main(): void {
   const rater = process.argv.find((a) => a.startsWith('--rater='))?.slice(8) ?? 'self';
   const dir = process.argv.find((a) => a.startsWith('--dir='))?.slice(6);
-  startServer(rater, dir ? join(REPO_ROOT, dir) : CALIBRATION_DIR);
+  const only = process.argv.find((a) => a.startsWith('--only='))?.slice(7);
+  startServer(rater, dir ? join(REPO_ROOT, dir) : CALIBRATION_DIR, only);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {

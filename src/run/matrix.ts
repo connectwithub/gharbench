@@ -22,7 +22,7 @@ import { pathToFileURL } from 'node:url';
 
 import { SCENARIO_FAMILIES, type ScenarioConfig } from '../engine/scenario.js';
 import { JUDGE_PANEL } from '../judge/panel.js';
-import { parseModelRef } from '../providers/registry.js';
+import { modelFamily, parseModelRef } from '../providers/registry.js';
 import { estimateCostUsd } from '../telemetry/prices.js';
 import { loadScenarioSet } from './scenarioSet.js';
 import { selectScenarios, trialsFor, type SweepOptions } from './sweep.js';
@@ -76,18 +76,19 @@ export function planMatrix(
     detail: `${total} instances`,
   });
 
-  // 6.1 family separation: no contestant may share a provider family with
-  // the buyer or any panel judge (family-level self-preference bias).
+  // 6.1 family separation: no contestant may share a model FAMILY with the
+  // buyer or any panel judge (family-level self-preference bias). Families,
+  // not providers: a gateway-routed judge is still its vendor's family.
   const familyWarnings: string[] = [];
-  const judgeProviders = new Set(JUDGE_PANEL.map((j) => parseModelRef(j.ref).provider));
-  const buyerProvider = buyer ? parseModelRef(buyer).provider : undefined;
+  const judgeFamilies = new Set(JUDGE_PANEL.map((j) => j.family));
+  const buyerFamily = buyer ? modelFamily(buyer) : undefined;
   for (const c of contestants) {
-    const provider = parseModelRef(c).provider;
-    if (buyerProvider && provider === buyerProvider) {
-      familyWarnings.push(`contestant ${c} shares provider "${provider}" with the buyer`);
+    const family = modelFamily(c);
+    if (buyerFamily && family === buyerFamily) {
+      familyWarnings.push(`contestant ${c} shares family "${family}" with the buyer`);
     }
-    if (judgeProviders.has(provider)) {
-      familyWarnings.push(`contestant ${c} shares provider "${provider}" with a panel judge`);
+    if (judgeFamilies.has(family)) {
+      familyWarnings.push(`contestant ${c} shares family "${family}" with a panel judge`);
     }
   }
 

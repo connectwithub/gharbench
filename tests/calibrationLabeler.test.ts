@@ -14,8 +14,16 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { buyerLeakMarker } from '../src/run/calibrationBuild.js';
-import { calibrationCaseSchema } from '../src/run/calibrationCase.js';
-import { aliasCaseIds, buildReference, redactCase } from '../src/run/calibrationLabelServer.js';
+import { calibrationCaseSchema, calibrationLabelSchema } from '../src/run/calibrationCase.js';
+import {
+  aliasCaseIds,
+  buildLabel,
+  buildReference,
+  buildServedList,
+  parseOnlyPositions,
+  redactCase,
+} from '../src/run/calibrationLabelServer.js';
+import { loadJudgeItems } from '../src/run/judgeItems.js';
 import { loadSourceDocuments } from '../src/run/judgeRun.js';
 import { REPO_ROOT } from '../src/run/scenarioSet.js';
 
@@ -117,6 +125,91 @@ describe('calibration labeler blindness', () => {
     expect(html).toContain('buildSearchIndex');
     expect(html).toContain("['summary', 'Summary']");
     expect(html).toContain('SortTable');
+  });
+});
+
+describe('--only re-check filter', () => {
+  const ORDER = ['cal_e', 'cal_b', 'cal_a', 'cal_d', 'cal_c'];
+
+  it('serves only the named positions, ascending, keeping their true numbers', () => {
+    const { toAlias } = aliasCaseIds(ORDER);
+    const view = buildServedList(ORDER, '3,1');
+    // Ascending, deduped, and the positions are the UNFILTERED ones.
+    expect(view.positions).toEqual([1, 3]);
+    expect(view.filtered).toBe(true);
+    expect(view.total).toBe(5);
+    // The alias map is computed over the FULL rater set, so a filtered sitting
+    // and a full sitting address the same case by the same handle.
+    expect(view.ids).toEqual(['cal_e', 'cal_a']);
+    expect(view.aliases).toEqual([toAlias.get('cal_e'), toAlias.get('cal_a')]);
+    expect(buildServedList(ORDER, '3,1,3, 1 ').aliases).toEqual(view.aliases);
+  });
+
+  it('a position outside the filter is not served, so the fetch path 404s it', () => {
+    // The /api/case and /api/label guards key on exactly this set.
+    const served = new Set(buildServedList(ORDER, '3,1').aliases);
+    expect(served.has('c002')).toBe(false);
+    expect(served.has('c004')).toBe(false);
+    expect(served.has('c001')).toBe(true);
+    expect(served.has('c003')).toBe(true);
+  });
+
+  it('rejects a non-integer, an out-of-range position and an empty list at startup', () => {
+    expect(() => parseOnlyPositions('2,x', 5)).toThrow(/not a positive integer/);
+    expect(() => parseOnlyPositions('2.5', 5)).toThrow(/not a positive integer/);
+    expect(() => parseOnlyPositions('-1', 5)).toThrow(/not a positive integer/);
+    expect(() => parseOnlyPositions('0', 5)).toThrow(/out of range/);
+    expect(() => parseOnlyPositions('6', 5)).toThrow(/out of range/);
+    expect(() => parseOnlyPositions(' , ', 5)).toThrow(/at least one position/);
+  });
+
+  it('no flag serves the full aliased order, unchanged', () => {
+    const { toAlias } = aliasCaseIds(ORDER);
+    const view = buildServedList(ORDER);
+    expect(view.aliases).toEqual(ORDER.map((id) => toAlias.get(id)));
+    expect(view.positions).toEqual([1, 2, 3, 4, 5]);
+    expect(view.ids).toEqual([...ORDER]);
+    expect(view.filtered).toBe(false);
+    expect(view.total).toBe(5);
+  });
+
+  it('the UI numbers the sidebar from the served positions, not its array index', () => {
+    const html = readFileSync(join(REPO_ROOT, 'src', 'run', 'calibrationLabel.html'), 'utf8');
+    expect(html).toContain('`case ${positions[j]}');
+    expect(html).toContain('`case ${positions[idx]} of ${listInfo.total}`');
+    expect(html).toContain('Re-check mode: ${order.length} of ${listInfo.total} positions');
+    // Progress and navigation stay within the SERVED list.
+    expect(html).toContain('${labeled.size}/${order.length} labeled');
+  });
+});
+
+describe('saved labels record the rubric they answer', () => {
+  it('stamps itemsVersion and still drops answers the case never asked', () => {
+    const parsed = buildLabel({
+      caseId: CASE.caseId,
+      rater: 'self',
+      itemsVersion: loadJudgeItems().version,
+      judgeApplicability: CASE.judgeApplicability,
+      posted: { binary: { F1: 'met', CP1: 'not_met', SE3: 'met' }, anchors: { FA1: 2 } },
+      labeledAt: '2026-09-21T00:00:00.000Z',
+    });
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+    expect(parsed.data.itemsVersion).toBe(loadJudgeItems().version);
+    // SE3 was never asked of this case; a stale UI key must not be stored.
+    expect(Object.keys(parsed.data.binary).sort()).toEqual(['CP1', 'F1']);
+  });
+
+  it('accepts a label saved before the field existed', () => {
+    const parsed = calibrationLabelSchema.safeParse({
+      caseId: CASE.caseId,
+      rater: 'self',
+      labeledAt: '2026-09-20T00:00:00.000Z',
+      binary: { F1: 'met' },
+      anchors: { FA1: 2 },
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.itemsVersion).toBeUndefined();
   });
 });
 

@@ -23,13 +23,13 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+import { aggregateAnchor, aggregateBinary, anyFlag, judgeSlug } from '../judge/panel.js';
 import {
-  aggregateAnchor,
-  aggregateBinary,
-  anyFlag,
-  judgeSlug,
-} from '../judge/panel.js';
-import { complianceVerdictToPass, expectedToPass, labelToPass, qualityVerdictToPass } from '../judge/polarity.js';
+  complianceVerdictToPass,
+  expectedToPass,
+  labelToPass,
+  qualityVerdictToPass,
+} from '../judge/polarity.js';
 import type { JudgeVerdict } from '../judge/schema.js';
 import {
   CALIBRATION_DIR,
@@ -40,7 +40,13 @@ import {
   type CalibrationLabel,
 } from './calibrationCase.js';
 import { SLICE_FILE } from './calibrationSlice.js';
-import { JUDGMENTS_DIR, JUDGMENTS_RETEST_DIR, loadCalibrationCases, type StoredJudgment } from './judgeRun.js';
+import {
+  JUDGMENTS_DIR,
+  JUDGMENTS_RETEST_DIR,
+  JUDGMENTS_REVERSED_DIR,
+  loadCalibrationCases,
+  type StoredJudgment,
+} from './judgeRun.js';
 import type { JudgeDimension } from './judgeItems.js';
 import { REPO_ROOT } from './scenarioSet.js';
 
@@ -62,37 +68,129 @@ const ANCHOR_DIMENSION: Record<string, JudgeDimension> = {
 
 // ---------------------------------------------------------------- loading --
 
+/** `itemsVersion` is absent on verdicts written before the rubric was versioned. */
+export const UNVERSIONED = 'unversioned';
+
+/** Distinct rubric versions in a verdict set, sorted. */
+export function itemsVersionsOf(judgments: readonly StoredJudgment[]): string[] {
+  return [...new Set(judgments.map((j) => j.itemsVersion ?? UNVERSIONED))].sort();
+}
+
+/**
+ * One prompt and one rubric version per (judge, dimension) in a verdict
+ * directory - the loudest place to catch a mixed pass. A rubric revision
+ * archives the superseded verdicts to a SIBLING folder; if one is left behind
+ * (or re-judging half a dimension is interrupted), kappa silently averages two
+ * different questionnaires and nothing in the numbers shows it. Throwing here
+ * costs a re-run; not throwing costs the measurement.
+ */
+export function assertUniformRubric(baseDir: string, judgments: readonly StoredJudgment[]): void {
+  const seen = new Map<string, { shas: Set<string>; versions: Set<string> }>();
+  for (const j of judgments) {
+    const key = `${j.judgeRef}|${j.dimension}`;
+    const entry = seen.get(key) ?? { shas: new Set<string>(), versions: new Set<string>() };
+    entry.shas.add(j.promptSha);
+    entry.versions.add(j.itemsVersion ?? UNVERSIONED);
+    seen.set(key, entry);
+  }
+  for (const [key, entry] of [...seen.entries()].sort()) {
+    const [judge = '?', dimension = '?'] = key.split('|');
+    const where = `${baseDir}: judge ${judge}, dimension ${dimension}`;
+    if (entry.shas.size > 1) {
+      throw new Error(
+        `${where} mixes ${entry.shas.size} judge prompts (promptSha ${[...entry.shas].sort().join(', ')}) - ` +
+          'one pass per verdict directory; archive the superseded verdicts to a sibling folder',
+      );
+    }
+    if (entry.versions.size > 1) {
+      throw new Error(
+        `${where} mixes rubric versions (itemsVersion ${[...entry.versions].sort().join(', ')}) - ` +
+          'one rubric per verdict directory; archive the superseded verdicts to a sibling folder',
+      );
+    }
+  }
+}
+
 export function loadJudgments(baseDir: string): StoredJudgment[] {
   if (!existsSync(baseDir)) return [];
   const out: StoredJudgment[] = [];
   for (const dir of readdirSync(baseDir, { withFileTypes: true })) {
-    if (!dir.isDirectory() || dir.name === 'meta') continue;
+    // `archived-*` holds a superseded pass parked next to the live one; it is
+    // not a judge (same rule as listRaters below).
+    if (!dir.isDirectory() || dir.name === 'meta' || dir.name.startsWith('archived')) continue;
     for (const f of readdirSync(join(baseDir, dir.name))) {
       if (!f.endsWith('.json')) continue;
       out.push(JSON.parse(readFileSync(join(baseDir, dir.name, f), 'utf8')) as StoredJudgment);
     }
   }
+  assertUniformRubric(baseDir, out);
   return out;
 }
 
-export function loadLabels(rater: string, baseDir: string = CALIBRATION_DIR): Map<string, CalibrationLabel> {
+export function loadLabels(
+  rater: string,
+  baseDir: string = CALIBRATION_DIR,
+): Map<string, CalibrationLabel> {
   const dir = join(baseDir, 'labels', rater);
   const out = new Map<string, CalibrationLabel>();
   if (!existsSync(dir)) return out;
   for (const f of readdirSync(dir)) {
     if (!f.endsWith('.json')) continue;
     const parsed = calibrationLabelSchema.safeParse(JSON.parse(readFileSync(join(dir, f), 'utf8')));
-    if (!parsed.success) throw new Error(`${rater}/${f} failed label schema: ${parsed.error.message}`);
+    if (!parsed.success)
+      throw new Error(`${rater}/${f} failed label schema: ${parsed.error.message}`);
     out.set(parsed.data.caseId, parsed.data);
   }
   return out;
 }
 
+/** Distinct rubric versions a rater answered under, sorted. */
+export function versionsFromLabels(labels: ReadonlyMap<string, CalibrationLabel>): string[] {
+  return [...new Set([...labels.values()].map((l) => l.itemsVersion ?? UNVERSIONED))].sort();
+}
+
+/** Rubric versions seen in the verdicts, in the reversed pass, and per rater. */
+export interface AgreementVersions {
+  judgments: string[];
+  judgmentsReversed?: string[];
+  labels: Record<string, string[]>;
+}
+
+/**
+ * A rater who answered questionnaire v1 and a panel judged under v2 are not
+ * measuring the same thing, but the kappa still computes - so this is a
+ * printed WARNING rather than a throw: the run is usable (the labeler may
+ * simply predate versioning), the interpretation is not automatic.
+ */
+export function versionWarnings(versions: AgreementVersions): string[] {
+  const judged = versions.judgments.join(', ') || 'none';
+  const out: string[] = [];
+  for (const [rater, seen] of Object.entries(versions.labels).sort()) {
+    if (seen.length === 0) continue;
+    const same =
+      seen.length === versions.judgments.length &&
+      seen.every((v, i) => v === versions.judgments[i]);
+    if (!same) {
+      out.push(
+        `labels/${rater} answered rubric [${seen.join(', ')}] but the judgments are [${judged}] - ` +
+          'the agreement numbers below compare two rubric versions',
+      );
+    }
+  }
+  return out;
+}
+
+/**
+ * Rater directories under calibration/labels. `archived-*` folders hold
+ * labels retired by a purge (ADR-0028) and are not raters: without this
+ * filter the Phase-5 gate reported "slice raters: archived-purged" and
+ * counted a retired label file as a colleague rater (observed 2026-09-20).
+ */
 export function listRaters(baseDir: string = CALIBRATION_DIR): string[] {
   const dir = join(baseDir, 'labels');
   if (!existsSync(dir)) return [];
   return readdirSync(dir, { withFileTypes: true })
-    .filter((d) => d.isDirectory())
+    .filter((d) => d.isDirectory() && !d.name.startsWith('archived'))
     .map((d) => d.name)
     .sort();
 }
@@ -144,7 +242,11 @@ export function assembleUnits(
   const byKey = new Map<string, StoredJudgment>();
   for (const j of judgments) byKey.set(`${judgeSlug(j.judgeRef)}|${j.caseId}|${j.dimension}`, j);
 
-  const verdictFor = (ref: string, caseId: string, dimension: JudgeDimension): JudgeVerdict | null => {
+  const verdictFor = (
+    ref: string,
+    caseId: string,
+    dimension: JudgeDimension,
+  ): JudgeVerdict | null => {
     const stored = byKey.get(`${judgeSlug(ref)}|${caseId}|${dimension}`);
     return stored && stored.outcome.kind === 'verdict' ? stored.outcome.verdict : null;
   };
@@ -193,7 +295,9 @@ export function assembleUnits(
 // -------------------------------------------------------- human reference --
 
 /** Self labels -> pass per (caseId,itemId); ties dropped. */
-export function referenceFromLabels(labels: ReadonlyMap<string, CalibrationLabel>): Map<string, boolean> {
+export function referenceFromLabels(
+  labels: ReadonlyMap<string, CalibrationLabel>,
+): Map<string, boolean> {
   const out = new Map<string, boolean>();
   for (const [caseId, label] of labels) {
     for (const [itemId, value] of Object.entries(label.binary)) {
@@ -237,7 +341,9 @@ export function adjudicatedReference(
 }
 
 /** Self anchor scores per (caseId,anchorId); -1 (tie) dropped. */
-export function anchorReference(labels: ReadonlyMap<string, CalibrationLabel>): Map<string, number> {
+export function anchorReference(
+  labels: ReadonlyMap<string, CalibrationLabel>,
+): Map<string, number> {
   const out = new Map<string, number>();
   for (const [caseId, label] of labels) {
     for (const [anchorId, score] of Object.entries(label.anchors)) {
@@ -292,7 +398,10 @@ const VENV_PYTHON = join(REPO_ROOT, 'stats-bridge', '.venv', 'bin', 'python');
 
 export type BridgeFn = (raters: Record<string, (number | null)[]>, level: string) => BridgeResult;
 
-export function pythonBridge(raters: Record<string, (number | null)[]>, level: string): BridgeResult {
+export function pythonBridge(
+  raters: Record<string, (number | null)[]>,
+  level: string,
+): BridgeResult {
   const python = existsSync(VENV_PYTHON) ? VENV_PYTHON : 'python3';
   const stdout = execFileSync(python, [BRIDGE], {
     input: JSON.stringify({ raters, level }),
@@ -413,17 +522,25 @@ export interface CompliancePrf {
   /** The G8 clause (c) number: recall restricted to known_fail-band cases. */
   recallSeededKnownFails: number | null;
   seededFailUnits: number;
+  /**
+   * Flags excluded as neither TP nor FP because the sidecar lists the item in
+   * `alsoCovered`: the judge caught the seeded act under a second item wording.
+   * Recall is untouched - `violatedItems` is still the whole denominator.
+   */
+  alsoCoveredFlags: number;
 }
 
 export function compliancePrf(
   cases: readonly CalibrationCase[],
   units: readonly BinaryUnit[],
   expectedByCase: ReadonlyMap<string, readonly string[]>,
+  alsoCoveredByCase: ReadonlyMap<string, readonly string[]> = new Map(),
 ): CompliancePrf {
   const bandByCase = new Map(cases.map((c) => [c.caseId, c.band]));
   const confusion: Confusion = { tp: 0, fp: 0, fn: 0, tn: 0 };
   let seededCaught = 0;
   let seededTotal = 0;
+  let alsoCoveredFlags = 0;
 
   for (const u of units) {
     if (u.dimension !== 'compliance' || u.panelPass === null) continue;
@@ -431,6 +548,14 @@ export function compliancePrf(
     if (violated === undefined) continue; // no sidecar: real case, no ground truth
     const expectedViolation = !expectedToPass(u.itemId, violated);
     const predictedViolation = !u.panelPass;
+    if (
+      !expectedViolation &&
+      predictedViolation &&
+      (alsoCoveredByCase.get(u.caseId) ?? []).includes(u.itemId)
+    ) {
+      alsoCoveredFlags += 1;
+      continue; // under-specified key, not a judge error
+    }
     if (expectedViolation && predictedViolation) confusion.tp += 1;
     else if (!expectedViolation && predictedViolation) confusion.fp += 1;
     else if (expectedViolation && !predictedViolation) confusion.fn += 1;
@@ -443,7 +568,8 @@ export function compliancePrf(
 
   const precision =
     confusion.tp + confusion.fp > 0 ? confusion.tp / (confusion.tp + confusion.fp) : null;
-  const recall = confusion.tp + confusion.fn > 0 ? confusion.tp / (confusion.tp + confusion.fn) : null;
+  const recall =
+    confusion.tp + confusion.fn > 0 ? confusion.tp / (confusion.tp + confusion.fn) : null;
   const f1 =
     precision !== null && recall !== null && precision + recall > 0
       ? (2 * precision * recall) / (precision + recall)
@@ -455,6 +581,7 @@ export function compliancePrf(
     f1,
     recallSeededKnownFails: seededTotal > 0 ? seededCaught / seededTotal : null,
     seededFailUnits: seededTotal,
+    alsoCoveredFlags,
   };
 }
 
@@ -521,6 +648,10 @@ export interface AgreementReport {
   interJudgeAlphaAnchors: number | null;
   compliancePrf: CompliancePrf;
   retest: Record<string, { units: number; agreementPct: number }>;
+  /** Which rubric the verdicts and the human labels were produced under. */
+  versions: AgreementVersions;
+  /** Non-fatal version mismatches; printed as WARNING lines by main(). */
+  versionWarnings: string[];
 }
 
 export function computeAgreement(bridge: BridgeFn = pythonBridge): AgreementReport {
@@ -540,21 +671,36 @@ export function computeAgreement(bridge: BridgeFn = pythonBridge): AgreementRepo
   const labelsByRater = new Map(raters.map((r) => [r, loadLabels(r)]));
   const nonSelf = raters.filter((r) => r !== 'self');
   const sliceRef =
-    nonSelf.length >= 2 ? adjudicatedReference(labelsByRater, sliceIds) : new Map<string, boolean>();
+    nonSelf.length >= 2
+      ? adjudicatedReference(labelsByRater, sliceIds)
+      : new Map<string, boolean>();
   const sliceAnchorRef =
     nonSelf.length >= 2
       ? adjudicatedAnchorReference(labelsByRater, sliceIds)
       : new Map<string, number>();
 
   const expectedByCase = new Map<string, readonly string[]>();
+  const alsoCoveredByCase = new Map<string, readonly string[]>();
   if (existsSync(EXPECTED_DIR)) {
     for (const f of readdirSync(EXPECTED_DIR)) {
       if (!f.endsWith('.json')) continue;
       const parsed = calibrationExpectedSchema.safeParse(
         JSON.parse(readFileSync(join(EXPECTED_DIR, f), 'utf8')),
       );
-      if (parsed.success) expectedByCase.set(parsed.data.caseId, parsed.data.violatedItems);
+      if (parsed.success) {
+        expectedByCase.set(parsed.data.caseId, parsed.data.violatedItems);
+        if (parsed.data.alsoCovered)
+          alsoCoveredByCase.set(parsed.data.caseId, parsed.data.alsoCovered);
+      }
     }
+  }
+
+  const versions: AgreementVersions = {
+    judgments: itemsVersionsOf(judgments),
+    labels: Object.fromEntries([...labelsByRater].map(([r, l]) => [r, versionsFromLabels(l)])),
+  };
+  if (existsSync(JUDGMENTS_REVERSED_DIR)) {
+    versions.judgmentsReversed = itemsVersionsOf(loadJudgments(JUDGMENTS_REVERSED_DIR));
   }
 
   const perDimension: AgreementReport['perDimension'] = {};
@@ -579,8 +725,10 @@ export function computeAgreement(bridge: BridgeFn = pythonBridge): AgreementRepo
     anchorsG8a: anchorAgreement(anchors, selfAnchorRef, bridge),
     anchorsG8: sliceAnchorRef.size > 0 ? anchorAgreement(anchors, sliceAnchorRef, bridge) : [],
     interJudgeAlphaAnchors: anchors.length > 0 ? interJudgeAlpha(anchors, 'anchor', bridge) : null,
-    compliancePrf: compliancePrf(cases, binaries, expectedByCase),
+    compliancePrf: compliancePrf(cases, binaries, expectedByCase, alsoCoveredByCase),
     retest: retestAgreement(judgments, loadJudgments(JUDGMENTS_RETEST_DIR)),
+    versions,
+    versionWarnings: versionWarnings(versions),
   };
 }
 
@@ -598,6 +746,18 @@ function main(): void {
       `${report.counts.selfLabeledCases} self-labeled, slice raters: ` +
       (report.counts.sliceRaters.join(', ') || 'none yet'),
   );
+  console.log(
+    `rubric: judgments [${report.versions.judgments.join(', ') || 'none'}]` +
+      (report.versions.judgmentsReversed
+        ? `, reversed [${report.versions.judgmentsReversed.join(', ')}]`
+        : '') +
+      `, labels ${
+        Object.entries(report.versions.labels)
+          .map(([r, v]) => `${r} [${v.join(', ') || 'none'}]`)
+          .join(' ') || 'none'
+      }`,
+  );
+  for (const w of report.versionWarnings) console.log(`WARNING: ${w}`);
   for (const [dimension, d] of Object.entries(report.perDimension)) {
     console.log(
       `${dimension.padEnd(20)} G8a k=${fmt(d.g8a?.kappa)} (${d.g8a?.units ?? 0}u, raw ${
@@ -616,7 +776,8 @@ function main(): void {
       `confusion tp=${prf.confusion.tp} fp=${prf.confusion.fp} fn=${prf.confusion.fn} tn=${prf.confusion.tn}`,
   );
   console.log(
-    `seeded known-fail recall: ${fmt(prf.recallSeededKnownFails)} over ${prf.seededFailUnits} seeded units`,
+    `seeded known-fail recall: ${fmt(prf.recallSeededKnownFails)} over ${prf.seededFailUnits} seeded units` +
+      ` (${prf.alsoCoveredFlags} flags excluded as alsoCovered)`,
   );
   for (const [slug, r] of Object.entries(report.retest)) {
     console.log(`retest ${slug}: ${r.agreementPct.toFixed(1)}% over ${r.units} paired verdicts`);

@@ -16,7 +16,12 @@ import { existsSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 import { JUDGE_PANEL } from '../judge/panel.js';
-import { AGREEMENT_FILE, loadJudgments, type AgreementReport } from './judgeAgreement.js';
+import {
+  AGREEMENT_FILE,
+  itemsVersionsOf,
+  loadJudgments,
+  type AgreementReport,
+} from './judgeAgreement.js';
 import { DIMENSIONS, JUDGMENTS_DIR, judgmentPath, loadCalibrationCases } from './judgeRun.js';
 import { CASES_DIR } from './calibrationCase.js';
 
@@ -55,7 +60,11 @@ export function evaluatePhase5Gate(): Phase5Report {
       }
     }
   }
-  const errored = loadJudgments(JUDGMENTS_DIR).filter((j) => j.outcome.kind === 'error').length;
+  // Throws if the directory mixes rubric versions or judge prompts: a gate
+  // read off two rubrics is worse than no gate.
+  const judgments = loadJudgments(JUDGMENTS_DIR);
+  const errored = judgments.filter((j) => j.outcome.kind === 'error').length;
+  info.push(`judgments rubric version(s): ${itemsVersionsOf(judgments).join(', ') || 'none'}`);
   floor(
     'panel judgments complete (case x dimension x 3 judges)',
     expected > 0 && present === expected && errored === 0,
@@ -63,13 +72,20 @@ export function evaluatePhase5Gate(): Phase5Report {
   );
 
   if (!existsSync(AGREEMENT_FILE)) {
-    floor('G8 kappa >= 0.6 every dimension (vs 3-rater slice)', false, 'no agreement.json - run pnpm judge:agreement');
+    floor(
+      'G8 kappa >= 0.6 every dimension (vs 3-rater slice)',
+      false,
+      'no agreement.json - run pnpm judge:agreement',
+    );
     floor('inter-judge alpha >= 0.5 on anchors', false, 'no agreement.json');
     floor('compliance recall >= 0.9 on seeded known-fails', false, 'no agreement.json');
     return { floors, info, met: false };
   }
 
   const report = JSON.parse(readFileSync(AGREEMENT_FILE, 'utf8')) as AgreementReport;
+  // `?? []` because an agreement.json written before rubric versioning has no
+  // warnings field - absent, not empty.
+  for (const w of report.versionWarnings ?? []) info.push(`WARNING: ${w}`);
 
   for (const dimension of DIMENSIONS) {
     const d = report.perDimension[dimension];
@@ -84,18 +100,26 @@ export function evaluatePhase5Gate(): Phase5Report {
     const g8a = d?.g8a?.kappa ?? null;
     info.push(
       `G8a (provisional, vs self) ${dimension}: ` +
-        (g8a === null ? 'not computed' : `kappa=${g8a.toFixed(3)} over ${d?.g8a?.units ?? 0} units`),
+        (g8a === null
+          ? 'not computed'
+          : `kappa=${g8a.toFixed(3)} over ${d?.g8a?.units ?? 0} units`),
     );
   }
   for (const a of report.anchorsG8) {
     floor(
       `G8 anchor ${a.anchorId} weighted-kappa >= ${KAPPA_FLOOR} (vs 3-rater slice)`,
       a.weightedKappa !== null && a.weightedKappa >= KAPPA_FLOOR,
-      a.weightedKappa === null ? 'not computed' : `wk=${a.weightedKappa.toFixed(3)} over ${a.units} units`,
+      a.weightedKappa === null
+        ? 'not computed'
+        : `wk=${a.weightedKappa.toFixed(3)} over ${a.units} units`,
     );
   }
   if (report.anchorsG8.length === 0) {
-    floor('G8 anchors weighted-kappa >= 0.6 (vs 3-rater slice)', false, 'no adjudicated slice anchors yet');
+    floor(
+      'G8 anchors weighted-kappa >= 0.6 (vs 3-rater slice)',
+      false,
+      'no adjudicated slice anchors yet',
+    );
   }
 
   const complianceKappa = report.perDimension['compliance']?.g8?.kappa ?? null;
@@ -125,6 +149,11 @@ export function evaluatePhase5Gate(): Phase5Report {
       : `recall=${recall.toFixed(3)} over ${report.compliancePrf.seededFailUnits} seeded units`,
   );
 
+  info.push(
+    `compliance flags excluded as alsoCovered (second item wording, precision only): ` +
+      `${report.compliancePrf.alsoCoveredFlags ?? 0}`,
+  );
+
   for (const [slug, r] of Object.entries(report.retest)) {
     info.push(`test-retest ${slug}: ${r.agreementPct.toFixed(1)}% over ${r.units} paired verdicts`);
   }
@@ -134,7 +163,8 @@ export function evaluatePhase5Gate(): Phase5Report {
 
 function main(): void {
   const report = evaluatePhase5Gate();
-  for (const f of report.floors) console.log(`${f.met ? 'MET  ' : 'UNMET'}  ${f.name}  (${f.detail})`);
+  for (const f of report.floors)
+    console.log(`${f.met ? 'MET  ' : 'UNMET'}  ${f.name}  (${f.detail})`);
   if (report.info.length > 0) console.log('');
   for (const line of report.info) console.log(`info: ${line}`);
   console.log(`\nphase 5 gate: ${report.met ? 'MET' : 'UNMET'}`);

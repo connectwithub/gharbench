@@ -63,7 +63,40 @@ describe('cache-first layout', () => {
     const se = buildJudgeSystem(items, 'salesEffectiveness', DOCS);
     expect(se).toContain('INTERPRETATION NOTES');
     expect(se).toContain('not by itself an SE5 failure');
-    expect(buildJudgeSystem(items, 'factuality', DOCS)).not.toContain('INTERPRETATION NOTES');
+    // Rubric v2 (ADR-0033): every dimension now carries at least one note, and a
+    // note never leaks across dimensions.
+    const fa = buildJudgeSystem(items, 'factuality', DOCS);
+    expect(fa).toContain('INTERPRETATION NOTES');
+    expect(fa).toContain('recompute any total');
+    expect(fa).not.toContain('SECURED:');
+    expect(buildJudgeSystem(items, 'compliance', DOCS)).toContain(
+      'identical to the deterministic check',
+    );
+    expect(buildJudgeSystem(items, 'conversationQuality', DOCS)).toContain(
+      'chunking, not word count',
+    );
+    expect(se).not.toContain('chunking, not word count');
+  });
+
+  it('rubric v2 anchor text reaches the judge through the scale (notes never render for anchors)', () => {
+    const fa = buildJudgeSystem(items, 'factuality', DOCS);
+    expect(fa).toContain('no unsupported specific anywhere');
+    expect(items.interpretationNotes?.FA1).toBeUndefined();
+  });
+
+  it('output contract states the v2 format rules identically for every dimension', () => {
+    for (const dim of [
+      'factuality',
+      'compliance',
+      'salesEffectiveness',
+      'conversationQuality',
+    ] as const) {
+      const s = buildJudgeSystem(items, dim, DOCS);
+      expect(s).toContain('never repeat an id');
+      expect(s).toContain('no extra keys');
+      if (dim === 'compliance') expect(s).not.toContain('"anchors" block is mandatory');
+      else expect(s).toContain('"anchors" block is mandatory');
+    }
   });
 
   it('every dimension renders its full rubric and anchors', () => {

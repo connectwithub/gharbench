@@ -8,6 +8,13 @@ DOI (ADR-0030) - every entry here is what a version DOI points at.
 
 ### Added
 
+- `pnpm judge:ablations`: order-robustness flip-rate report over
+  `calibration/judgments` vs `calibration/judgments-reversed` (protocol
+  section 1, threshold 0.10 per dimension), written to
+  `calibration/ablations/order-flip.json`.
+- `modelFamily(ref)` in the provider registry: the §6.1 family-separation
+  rule now compares model families (vendor of a gateway-routed id), not
+  serving providers; `pnpm matrix` warnings use it.
 - Judge order-robustness machinery: `--item-order=reversed` ablation pass,
   flip-rate / self-preference / leave-one-judge-out / length-bias metrics
   (`src/metrics/judgeAblations.ts`), protocol in `docs/judge-protocol.md`
@@ -22,6 +29,53 @@ DOI (ADR-0030) - every entry here is what a version DOI points at.
   leaderboard reports per-reply p50/p95, calls/reply and tok/s as descriptive
   serving data - never scored, never ranked, latency-blindness of the scoring
   stack test-pinned (ADR-0031).
+- `itemsVersion` stamped on every judge verdict, every judging meta pass file
+  and every human label file, plus a loud guard in the agreement and ablation
+  readers: one `promptSha` and one `itemsVersion` per (judge, dimension) or
+  the read throws, `archived*` subfolders are skipped, and a label-versus-
+  judgment version mismatch is warned and recorded in `agreement.json`
+  (ADR-0033).
+- `evidenceMeta`, an advisory flag beside `evidenceFound` for a quote that is
+  unlocatable and either under 12 characters or sharing no 4-character token
+  with the transcript. Advisory by design, never a schema violation, since
+  adjudication is the backstop (ADR-0019). Structured judge errors now also
+  store the raw judge reply, truncated at 20k characters (ADR-0033).
+
+### Changed
+
+- Judge rubric v2 (`data/judge-items.json` 1.3.0 -> 2.0.0, ADR-0033): no item
+  added, removed or renumbered, but F1 and CP3 now cover mis-computed totals,
+  CP9 mirrors the deterministic check L1.9, SE1/SE2 require asked-and-answered
+  or volunteered-and-confirmed, SE5 keeps a sharpened secured/attempted pair
+  (superseding ADR-0026's wording), CQ1 becomes a chunking rule with no length
+  threshold, and CQ3 gets positive failure criteria led by capability denial.
+  FA1 and SA2 change in scale and example text, SA2 gaining level-1 examples
+  no judge ever used.
+- Shared judge output contract gains constant format rules (each item id once,
+  only the shown keys, a mandatory anchors block with exactly the listed ids
+  and no `turn` key). The v2 prompt hash differs from v1, so v1 verdicts are
+  archived to `calibration/archive/v1-2026-09-20/` rather than left where the
+  readers would ingest them as a fourth judge (ADR-0033).
+- Seeded calibration sidecars gain a precision-only `alsoCovered` list, for
+  the three seeds whose seeded line also satisfies a second item's text; a
+  judge flag on an `alsoCovered` item is no longer a false positive, and
+  `violatedItems` remains the sole G9 recall authority (ADR-0025, ADR-0033).
+- Judge panel serving ids verified live and routed through OpenRouter with
+  @Host pins (ADR-0032): Grok 4.3 via xAI, Llama 4 Maverick via DeepInfra,
+  and the Mistral slot resolved to Mistral Medium 3.5 under the Master Plan
+  §6.4 I7 rule (Mistral Large 3 has no reachable endpoint; named reserve).
+  Verified prices added for all three (`src/telemetry/prices.ts`).
+
+### Fixed
+
+- Judge output parser tolerates a `turn` key on anchor entries and integer
+  strings in numeric fields (format artefacts seen live; prompt unchanged).
+- Evidence grounding (`evidenceFound`) strips a copied `[tN | role]` /
+  `tN:` attribution wrapper and unifies typographic glyphs before the
+  substring test; Grok's "unlocatable quote" rate was 78% and is 24% after
+  the fix, Maverick 47% to 30%, Mistral unchanged at 10%.
+- `listRaters` skips `archived-*` label folders; the Phase-5 gate had
+  counted the ADR-0028 purge archive as a colleague rater.
 
 ## [0.1.0] - unreleased baseline (2026-08-28 state)
 

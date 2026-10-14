@@ -1,6 +1,8 @@
 node_modules/
 runs/
 private-pool/
+calibration/
+human-validation/
 stats-bridge/.venv/
 pnpm-lock.yaml
 

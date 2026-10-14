@@ -96,6 +96,16 @@ export type CalibrationMessage = z.infer<typeof calibrationMessageSchema>;
 export const calibrationExpectedSchema = z.strictObject({
   caseId: z.string(),
   violatedItems: z.array(JUDGE_ITEM_ID),
+  /**
+   * Items whose TEXT also covers the seeded violation (one act, two item
+   * wordings - e.g. an under-declared price is CP11 and equally a misleading
+   * price statement, CP3). Precision-only: these are NOT scored for recall,
+   * `violatedItems` stays the sole authority there (ADR-0025), but a judge
+   * that flags one is right, not wrong, so `compliancePrf` excludes the flag
+   * from the false-positive count instead of penalising the panel for the
+   * key being under-specified.
+   */
+  alsoCovered: z.array(JUDGE_ITEM_ID).optional(),
   notes: z.string().min(1),
 });
 
@@ -111,6 +121,13 @@ export const calibrationLabelSchema = z.strictObject({
   /** Anchored 0-3 scales, keyed by anchor id (FA1, SA1, SA2, QA1); -1 = tie. */
   anchors: z.record(JUDGE_ITEM_ID, z.number().int().min(-1).max(3)),
   note: z.string().optional(),
+  /**
+   * `data/judge-items.json` `version` the rater answered under. Optional so
+   * labels saved before rubric v2 still load: a human label is an answer to a
+   * specific questionnaire, and comparing it against verdicts produced under a
+   * different one is the silent way an agreement statistic goes wrong.
+   */
+  itemsVersion: z.string().min(1).optional(),
 });
 
 export type CalibrationLabel = z.infer<typeof calibrationLabelSchema>;

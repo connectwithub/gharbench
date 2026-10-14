@@ -35,6 +35,7 @@
     "judge:calibration": "tsx src/run/judgeRun.ts",
     "judge:run": "tsx src/run/judgeRun.ts",
     "judge:agreement": "tsx src/run/judgeAgreement.ts",
+    "judge:ablations": "tsx src/run/judgeAblationsRun.ts",
     "matrix": "tsx src/run/matrix.ts",
     "leaderboard": "tsx src/run/leaderboard.ts",
     "sample:human": "tsx src/run/humanSample.ts",
