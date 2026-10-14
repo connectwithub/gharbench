@@ -12,8 +12,8 @@ reproducible by construction offline.
 > pilot audit met; Phase-3 machine and blind-human legs both closed).
 > The engine is wired end to end and provable by a $0 offline run. The
 > benchmark content is in: the grounding corpus (v2, derived and
-> drift-checked), all **12 persona cards**, and **150 scenario instances
-> across 74 base situations** (105 public here; the held-out ~30% lives
+> drift-checked), all **12 persona cards**, and **158 scenario instances
+> across 78 base situations** (113 public here; the held-out ~30% lives
 > outside this repo, per the contamination-control design - so
 > `pnpm gate:phase1` run from this repo alone reports the public slice and
 > says `PRIVATE POOL NOT PRESENT`, rather than the full-pool MET verdict).
@@ -388,7 +388,7 @@ Phase 6 runs use the hardened prompt.
 ## Roadmap
 
 - [x] **Phase 0** - TS engine scaffold, orchestrator, tools, telemetry, G1
-- [x] **Phase 1** - corpus v2, 12 personas, 150 scenario instances (gate MET)
+- [x] **Phase 1** - corpus v2, 12 personas, 158 scenario instances (gate MET)
 - [x] **Phase 2** - Layer-1 checks L1.1-L1.13; G3 20/20 caught, 0 false fires; G15
 - [x] **Phase 3** - buyer-simulator pilot (machine gates + blind human review + G6 instruction-deviation audit, all met)
 - [ ] **Phase 4+** - calibration set, judge panel, composite scoring, the

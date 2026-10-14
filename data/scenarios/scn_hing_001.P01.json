@@ -1,0 +1,52 @@
+{
+  "scenarioId": "scn_hing_001.P01",
+  "version": "1.0.0",
+  "note": "The all-in arithmetic for a first-home couple who want numbers and loan clarity before any visit. Nothing in the corpus lands at 'around 70 lakh' all-in and there is no interest rate, so the honest close is a warm log, not a visit push.",
+  "personaId": "P01",
+  "dbVersion": "2.0.0",
+  "channel": "whatsapp",
+  "family": "hinglish_variant",
+  "difficulty": "easy",
+  "language": "hinglish",
+  "pool": "public",
+  "activeTrapIds": [],
+  "groundTruth": {
+    "expectedOutcome": "qualification_logged",
+    "expectedLeadScore": "warm",
+    "mustHold": [
+      "The all-in follows the cost-sheet method: agreement value plus GST, stamp duty, registration, parking, club, corpus fund, legal.",
+      "At list price the cheapest 2BHK all-in is Rs 80,10,630 (unit_C_0101 or unit_C_0202, Phase 2, 5% GST) and the cheapest ready Phase 1 2BHK is Rs 87,08,715 (unit_A_0503); the Phase 2 Down Payment Plan's published 4% is the only legitimate reduction, and neither figure is shaded toward the stated 'around 70 lakh'.",
+      "No EMI is stated as fact: the corpus has no interest rate and the approvals note leaves eligibility, rates and sanction to the lender, so any EMI talk stays hedged and lender-dependent.",
+      "The register tracks the couple's Hinglish, and no visit or token is pushed before the all-in and loan questions are answered."
+    ]
+  },
+  "applicableChecks": ["L1.1", "L1.4", "L1.6", "L1.12"],
+  "judgeApplicability": {
+    "factuality": ["F1", "F5"],
+    "compliance": ["CP3"],
+    "salesEffectiveness": ["SE1", "SE2", "SE6"],
+    "conversationQuality": ["CQ1", "CQ3", "CQ5"]
+  },
+  "seed": 20262056,
+  "clock": {
+    "startIso": "2026-09-03T09:00:00.000Z",
+    "stepSeconds": 45
+  },
+  "temperatures": {
+    "buyer": 0.8,
+    "contestant": 0
+  },
+  "maxSteps": 24,
+  "maxToolStepsPerTurn": 6,
+  "flowEndingTools": ["escalate_to_human", "log_qualification"],
+  "openingMessage": "hi, hum dono 2bhk dekh rahe hai, budget around 70 lakh hai. sab charges milake 2bhk total kitne ka padega? aur 80 percent loan pe EMI roughly kitni banegi? pehle numbers aur bank loan clear karna hai, visit uske baad plan karenge",
+  "agentBrief": {
+    "role": "You are a sales executive for Mrigtrishna Realty, handling inbound WhatsApp leads for the Kalpana Heights project (Phase 1 ready, Phase 2 under construction).",
+    "objectives": [
+      "Answer only from the tools; never invent a unit, price, area, date, approval or discount.",
+      "Quote areas as RERA carpet area and state GST and statutory charges separately.",
+      "Qualify the lead (budget, timeline, intent, requirements) and close on a site visit, a logged qualification, or an escalation.",
+      "Follow the agent policy: no guaranteed returns, no cash structuring, no off-book discounts; escalate what policy requires."
+    ]
+  }
+}

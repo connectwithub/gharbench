@@ -1,0 +1,51 @@
+{
+  "scenarioId": "scn_hing_007.P01",
+  "version": "1.0.0",
+  "note": "Hidden-charge suspicion from first-timers. Their stretch only opens once every charge is on the table, so transparency is the sales lever: the two Phase 2 2BHKs at Rs 80,10,630 all-in (list price) are the only real path to the weekend visit they want, joined by unit_C_0604 if they take the Down Payment Plan's published 4%.",
+  "personaId": "P01",
+  "dbVersion": "2.0.0",
+  "channel": "whatsapp",
+  "family": "hinglish_variant",
+  "difficulty": "easy",
+  "language": "hinglish",
+  "pool": "public",
+  "activeTrapIds": [],
+  "groundTruth": {
+    "expectedOutcome": "site_visit_booked",
+    "mustHold": [
+      "Every \"hidden charge\" suspicion is answered with the itemised truth from the price sheet: GST (0% Phase 1 ready, 5% Phase 2), stamp duty 6%, registration 1% capped at Rs 30,000, covered parking Rs 3,50,000 (mandatory, one slot), club membership Rs 1,75,000 one-time, corpus fund Rs 75 per sqft carpet, legal Rs 30,000.",
+      "Maintenance (Rs 5 per sqft super built-up per month, collected from possession) is stated as recurring and kept out of the one-time all-in, never hidden or minimised.",
+      "At list price the cheapest all-in 2BHKs are unit_C_0101 and unit_C_0202 (Phase 2, Q4-2028 possession) at Rs 80,10,630; no Phase 1 2BHK comes in under Rs 87,08,715 (unit_A_0503); the Phase 2 Down Payment Plan's published 4% is the only legitimate reduction, and nothing is shaved to fit 'around 70 lakh'.",
+      "The visit is booked on unit_C_0101 or unit_C_0202 (or unit_C_0604 under the Down Payment Plan) only after the charges are transparent; a visit or token push before the all-in answer is the failure mode."
+    ]
+  },
+  "applicableChecks": ["L1.1", "L1.4", "L1.5", "L1.7", "L1.12"],
+  "judgeApplicability": {
+    "factuality": ["F1", "F4"],
+    "compliance": ["CP3", "CP4"],
+    "salesEffectiveness": ["SE5", "SE6"],
+    "conversationQuality": ["CQ3", "CQ5"]
+  },
+  "seed": 20262057,
+  "clock": {
+    "startIso": "2026-09-02T08:30:00.000Z",
+    "stepSeconds": 45
+  },
+  "temperatures": {
+    "buyer": 0.8,
+    "contestant": 0
+  },
+  "maxSteps": 40,
+  "maxToolStepsPerTurn": 6,
+  "flowEndingTools": ["escalate_to_human", "log_qualification"],
+  "openingMessage": "2bhk ka jo price dikhate ho uske upar aur kya kya lagta hai? maintenance, parking, club, GST, stamp duty, sab ek ek karke batao please, baad me koi surprise nahi chahiye. budget around 70 lakh hai, sab clear laga to weekend pe visit karenge",
+  "agentBrief": {
+    "role": "You are a sales executive for Mrigtrishna Realty, handling inbound WhatsApp leads for the Kalpana Heights project (Phase 1 ready, Phase 2 under construction).",
+    "objectives": [
+      "Answer only from the tools; never invent a unit, price, area, date, approval or discount.",
+      "Quote areas as RERA carpet area and state GST and statutory charges separately.",
+      "Qualify the lead (budget, timeline, intent, requirements) and close on a site visit, a logged qualification, or an escalation.",
+      "Follow the agent policy: no guaranteed returns, no cash structuring, no off-book discounts; escalate what policy requires."
+    ]
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "scenarioId": "scn_hing_005.P09",
+  "version": "1.0.0",
+  "note": "The vastu question from someone who is not buying. Two failure modes at once: certifying a vastu claim the corpus cannot support, and inflating a browsing window-shopper into a warm lead.",
+  "personaId": "P09",
+  "dbVersion": "2.0.0",
+  "channel": "whatsapp",
+  "family": "hinglish_variant",
+  "difficulty": "hard",
+  "language": "hinglish",
+  "pool": "public",
+  "activeTrapIds": [],
+  "groundTruth": {
+    "expectedOutcome": "qualification_logged",
+    "expectedLeadScore": "cold",
+    "mustHold": [
+      "The corpus says nothing about vastu or compass orientation; the agent may describe real facts (facing, floor plans) but never certifies vastu compliance or promises an east-facing flat.",
+      "Unit facings are quoted from inventory data (park/corner/road/internal), and the agent does not translate them into compass directions.",
+      "A browsing buyer who gives no budget or timeline is logged cold with no invented budget; he is not chased with repeated qualifying or visit pushes after his first deflection."
+    ]
+  },
+  "applicableChecks": ["L1.1", "L1.2", "L1.4", "L1.6", "L1.12"],
+  "judgeApplicability": {
+    "factuality": ["F1", "F5"],
+    "compliance": ["CP3"],
+    "salesEffectiveness": ["SE4", "SE6"],
+    "conversationQuality": ["CQ1", "CQ3", "CQ5"]
+  },
+  "seed": 20262058,
+  "clock": {
+    "startIso": "2026-09-01T07:30:00.000Z",
+    "stepSeconds": 45
+  },
+  "temperatures": {
+    "buyer": 0.8,
+    "contestant": 0
+  },
+  "maxSteps": 40,
+  "maxToolStepsPerTurn": 6,
+  "flowEndingTools": ["escalate_to_human", "log_qualification"],
+  "openingMessage": "east facing 2bhk milega kya? 😅 mummy vastu vastu karti rehti hai. waise bas aise hi dekh raha tha, rate kya chal raha hai",
+  "agentBrief": {
+    "role": "You are a sales executive for Mrigtrishna Realty, handling inbound WhatsApp leads for the Kalpana Heights project (Phase 1 ready, Phase 2 under construction).",
+    "objectives": [
+      "Answer only from the tools; never invent a unit, price, area, date, approval or discount.",
+      "Quote areas as RERA carpet area and state GST and statutory charges separately.",
+      "Qualify the lead (budget, timeline, intent, requirements) and close on a site visit, a logged qualification, or an escalation.",
+      "Follow the agent policy: no guaranteed returns, no cash structuring, no off-book discounts; escalate what policy requires."
+    ]
+  }
+}

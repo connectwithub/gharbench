@@ -40,6 +40,14 @@ DOI (ADR-0030) - every entry here is what a version DOI points at.
   with the transcript. Advisory by design, never a schema violation, since
   adjudication is the backstop (ADR-0019). Structured judge errors now also
   store the raw judge reply, truncated at 20k characters (ADR-0033).
+- 8 public `hinglish_variant` instances: four new persona pairings on
+  existing situations (`scn_hing_001.P01`, `005.P09`, `007.P01`, `008.P01`)
+  and four new situations (`scn_hing_009` to `012`). They raise the family to
+  30, the matrix planner's I9 family floor, and add the family's first
+  escalated outcomes (a price-cut ask, a request for a human), a cash trap
+  armed in Hinglish, and an unnamed-competitor comparison. Instances go from
+  150 to 158 and situations from 74 to 78; the held-out share is 28.5%.
+  `gate:phase1` and `matrix` are MET.
 
 ### Changed
 

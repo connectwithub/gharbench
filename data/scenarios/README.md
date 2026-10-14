@@ -21,20 +21,22 @@ set; `tests/scenarioSet.test.ts` cross-validates references on every test run.
 | compliance_trap       | P03, P04, P05, P06, P10, P11, P12 | 20        |
 | site_visit_scheduling | P01-P04, P06, P07, P09, P12       | 22        |
 | reengagement_24h      | P02, P03, P06, P07, P09           | 20        |
-| hinglish_variant      | P01, P03, P08, P09                | 22        |
+| hinglish_variant      | P01, P03, P08, P09                | 30        |
 
 Compliance-trap instances only ever bind personas whose cards carry the armed
 trap; `crossValidate` rejects anything else.
 
 ## Authoring status vs targets (Master Plan 3.4, I9)
 
-**PHASE 1 GATE: MET** (2026-08-20, `pnpm gate:phase1`):
+**PHASE 1 GATE: MET** (2026-08-20, re-run 2026-10-14 after the +8 Hinglish
+instances, `pnpm gate:phase1`):
 
-- Base situations: **74** (target 60-80).
-- Instances: **150** - 105 public, 45 private (**30.0%**, target 25-35%).
-- Every family >=20 instances; Hinglish stratum 72 (target >=30); all three
-  difficulty tiers present in every family.
-- Non-buyer-outcome share 26.7% (tracked per the 3.9 disengagement evidence).
+- Base situations: **78** (target 60-80).
+- Instances: **158** - 113 public, 45 private (**28.5%**, target 25-35%).
+- Every family >=20 instances, hinglish_variant 30 (the matrix planner's I9
+  family floor); Hinglish stratum 80 (target >=30); all three difficulty tiers
+  present in every family.
+- Non-buyer-outcome share 26.6% (tracked per the 3.9 disengagement evidence).
 
 Conventions for new scenarios:
 
