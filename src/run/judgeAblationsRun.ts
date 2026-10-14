@@ -21,17 +21,25 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { JUDGE_PANEL, judgeSlug } from '../judge/panel.js';
 import { orderFlipRate, type ItemVerdictRecord } from '../metrics/judgeAblations.js';
 import { CALIBRATION_DIR } from './calibrationCase.js';
-import { assertUniformRubric, itemsVersionsOf } from './judgeAgreement.js';
+import {
+  UNVERSIONED,
+  assertUniformRubric,
+  carryForwardGuard,
+  itemsVersionsOf,
+  type CarryForwardGuard,
+} from './judgeAgreement.js';
+import { loadJudgeItems } from './judgeItems.js';
 import {
   DIMENSIONS,
   JUDGMENTS_DIR,
   JUDGMENTS_REVERSED_DIR,
+  loadSourceDocuments,
   type StoredJudgment,
 } from './judgeRun.js';
 
@@ -54,7 +62,11 @@ export const ORDER_FLIP_THRESHOLD = 0.1;
  * judge produced both verdicts), and the directory name is already the slug
  * `judgmentPath()` writes to.
  */
-export function loadJudgeDir(baseDir: string, judgeRef: string): StoredJudgment[] {
+export function loadJudgeDir(
+  baseDir: string,
+  judgeRef: string,
+  guard?: CarryForwardGuard,
+): StoredJudgment[] {
   const dir = join(baseDir, judgeSlug(judgeRef));
   if (!existsSync(dir)) return [];
   const judgments = readdirSync(dir)
@@ -64,7 +76,38 @@ export function loadJudgeDir(baseDir: string, judgeRef: string): StoredJudgment[
   // A flip is only a flip when both passes ran the same rubric under the same
   // prompt; a mixed directory would report rubric churn as judge instability.
   assertUniformRubric(dir, judgments);
+  if (guard) for (const j of judgments) guard(j);
   return judgments;
+}
+
+/**
+ * A flip is only a flip when the original and reversed passes asked the same
+ * questionnaire. Per (judge, dimension), both passes must carry one shared
+ * itemsVersion; anything else would report rubric churn as order sensitivity,
+ * so it throws rather than reporting.
+ */
+export function assertSharedItemsVersion(
+  judgeRef: string,
+  original: readonly StoredJudgment[],
+  reversed: readonly StoredJudgment[],
+): void {
+  const versionsByDimension = (js: readonly StoredJudgment[]): Map<string, string> => {
+    const m = new Map<string, string>();
+    for (const j of js) m.set(j.dimension, j.itemsVersion ?? UNVERSIONED);
+    return m;
+  };
+  const a = versionsByDimension(original);
+  const b = versionsByDimension(reversed);
+  for (const [dimension, va] of [...a.entries()].sort()) {
+    const vb = b.get(dimension);
+    if (vb !== undefined && vb !== va) {
+      throw new Error(
+        `order ablation: judge ${judgeRef}, dimension ${dimension}: original pass is itemsVersion ` +
+          `${va} but reversed pass is ${vb} - flips would measure rubric churn, not order; ` +
+          're-judge one pass so both share a version',
+      );
+    }
+  }
 }
 
 /** Item verdicts from already-loaded judgments; error outcomes have none. */
@@ -210,12 +253,22 @@ export function buildOrderFlipReport(
   originalDir: string,
   reversedDir: string,
   judges: readonly string[] = JUDGE_PANEL.map((j) => j.ref),
+  options: { guard?: boolean } = {},
 ): OrderFlipAblationReport {
+  // The carry-forward guard is for the live calibration dir; an archive
+  // snapshot (--base-dir) is read self-consistently, never against today's builder.
+  const items = options.guard ? loadJudgeItems() : undefined;
+  const docs = options.guard ? loadSourceDocuments() : '';
+  const guardFor = (order: 'original' | 'reversed'): CarryForwardGuard | undefined =>
+    items ? carryForwardGuard(order, items, docs) : undefined;
+  const originalGuard = guardFor('original');
+  const reversedGuard = guardFor('reversed');
   const allOriginal: StoredJudgment[] = [];
   const allReversed: StoredJudgment[] = [];
   const rows: JudgeFlipRow[] = judges.map((judgeRef) => {
-    const original = loadJudgeDir(originalDir, judgeRef);
-    const reversed = loadJudgeDir(reversedDir, judgeRef);
+    const original = loadJudgeDir(originalDir, judgeRef, originalGuard);
+    const reversed = loadJudgeDir(reversedDir, judgeRef, reversedGuard);
+    assertSharedItemsVersion(judgeRef, original, reversed);
     allOriginal.push(...original);
     allReversed.push(...reversed);
     const origItems = itemVerdictsFrom(original);
@@ -301,10 +354,29 @@ function line(who: string, what: string, c: FlipCounts): string {
   );
 }
 
+export function parseAblationArgs(argv: readonly string[]): { baseDir?: string; outFile?: string } {
+  const cli: { baseDir?: string; outFile?: string } = {};
+  for (const arg of argv) {
+    if (arg.startsWith('--base-dir=')) cli.baseDir = arg.slice('--base-dir='.length);
+    else if (arg.startsWith('--out=')) cli.outFile = arg.slice('--out='.length);
+    else throw new Error(`unknown argument ${arg}`);
+  }
+  return cli;
+}
+
 function main(): void {
-  const report = buildOrderFlipReport(JUDGMENTS_DIR, JUDGMENTS_REVERSED_DIR);
-  mkdirSync(ABLATIONS_DIR, { recursive: true });
-  writeFileSync(ORDER_FLIP_FILE, JSON.stringify(report, null, 2) + '\n');
+  const cli = parseAblationArgs(process.argv.slice(2));
+  const live = cli.baseDir === undefined;
+  const originalDir = live ? JUDGMENTS_DIR : join(cli.baseDir as string, 'judgments');
+  const reversedDir = live
+    ? JUDGMENTS_REVERSED_DIR
+    : join(cli.baseDir as string, 'judgments-reversed');
+  const outFile =
+    cli.outFile ??
+    (live ? ORDER_FLIP_FILE : join(cli.baseDir as string, 'ablations', 'order-flip.json'));
+  const report = buildOrderFlipReport(originalDir, reversedDir, undefined, { guard: live });
+  mkdirSync(dirname(outFile), { recursive: true });
+  writeFileSync(outFile, JSON.stringify(report, null, 2) + '\n');
 
   console.log('=== judge order robustness (docs/judge-protocol.md section 1) ===');
   console.log(
@@ -320,7 +392,7 @@ function main(): void {
         `missing ${report.dirs.reversed} - run \`pnpm judge:calibration --item-order=reversed\` first`,
       );
     }
-    console.log(`nothing to compare; empty report written: ${ORDER_FLIP_FILE}`);
+    console.log(`nothing to compare; empty report written: ${outFile}`);
     return;
   }
 
@@ -354,7 +426,7 @@ function main(): void {
       `verdict dirs outside the panel (not compared): ${report.unexpectedJudgeDirs.join(', ')}`,
     );
   }
-  console.log(`written: ${ORDER_FLIP_FILE}`);
+  console.log(`written: ${outFile}`);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {

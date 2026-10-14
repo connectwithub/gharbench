@@ -15,10 +15,11 @@ import { sha256 } from '../env/db.js';
 import { cacheCallOptions, resolveModel, supportsSamplingParams } from '../providers/registry.js';
 import { meterCall, type CostMeter } from '../telemetry/cost.js';
 import type { JudgeDimension, JudgeItems } from '../run/judgeItems.js';
+import { applicableAnchorIds } from './anchorApplicability.js';
 import {
-  anchorsFor,
   buildJudgeSystem,
   buildJudgeUser,
+  withApplicableAnchors,
   type JudgeCaseInput,
   type JudgeItemOrder,
 } from './prompt.js';
@@ -70,8 +71,11 @@ export async function judgeCase(opts: {
 }): Promise<JudgeCaseResult> {
   const { call, items, dimension, input, itemOrder = 'original' } = opts;
   const system = buildJudgeSystem(items, dimension, opts.sourceDocuments, itemOrder);
-  const user = buildJudgeUser(input, itemOrder);
-  const anchorIds = anchorsFor(items, dimension).map((a) => a.id);
+  const user = buildJudgeUser(withApplicableAnchors(items, dimension, input), itemOrder);
+  // ADR-0037: the anchors THIS case is asked - a conditional anchor (SA1) only
+  // where its item is declared - so the parser rejects an unasked anchor as
+  // firmly as a missing one.
+  const anchorIds = applicableAnchorIds(items, dimension, input.applicableItems);
   const promptSha = sha256(system);
 
   let attempts = 0;

@@ -20,21 +20,33 @@
  *   pnpm judge:run --run=<runId> --dry-run
  *   pnpm judge:calibration --retest        # test-retest second pass
  *   pnpm judge:calibration --item-order=reversed   # ADR-0030 order ablation
+ *
+ * One writer per (judge, verdict dir): a real pass holds
+ * `<verdict dir>/meta/<judge slug>.lock` from before the skip-existing scan
+ * until its meta file is written (ADR-0036). A second pass on the same judge
+ * and dir is refused, never merged - two writers on one judge directory is
+ * how the 2026-09-20 stray process silently rewrote verdicts.
  */
 
 import 'dotenv/config';
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import pLimit from 'p-limit';
 
 import { sha256 } from '../env/db.js';
+import {
+  applicableAnchorIds,
+  hasConditionalAnchor,
+  rubricAnchors,
+} from '../judge/anchorApplicability.js';
 import { judgeCase, modelJudgeCaller, type JudgeCaseResult } from '../judge/judge.js';
 import { JUDGE_PANEL, judgeSlug } from '../judge/panel.js';
 import {
   buildJudgeSystem,
   buildJudgeUser,
+  withApplicableAnchors,
   type JudgeCaseInput,
   type JudgeItemOrder,
 } from '../judge/prompt.js';
@@ -358,18 +370,215 @@ export function shouldPersistJudgment(outcome: JudgeCaseResult['outcome']): bool
   return !(outcome.kind === 'error' && outcome.code === 'call_failed');
 }
 
+/** Where a pass writes its verdicts: calibration primary/reversed/retest, or a run's dir. */
+export function verdictBaseDir(
+  options: Pick<CliOptions, 'runId' | 'retest' | 'itemOrder'>,
+): string {
+  if (options.runId) {
+    const runJudgmentsDir = options.itemOrder === 'reversed' ? 'judgments-reversed' : 'judgments';
+    return join(REPO_ROOT, 'runs', options.runId, runJudgmentsDir);
+  }
+  if (options.retest) return JUDGMENTS_RETEST_DIR;
+  return options.itemOrder === 'reversed' ? JUDGMENTS_REVERSED_DIR : JUDGMENTS_DIR;
+}
+
+/**
+ * Meta pass filename: `<stamp>-<judge slug | 'multi'>[-reversed]-pass.json`.
+ * The stamp alone has one-second resolution, so the three per-judge passes of
+ * the documented recipe, started together, overwrote each other's meta file
+ * (ADR-0036). No reader parses these names. `discriminator` is the
+ * collision fallback (see writeMetaPass), never used on the normal path.
+ */
+export function metaPassFilename(
+  stamp: string,
+  judgeRefs: readonly string[],
+  itemOrder: JudgeItemOrder,
+  discriminator?: string,
+): string {
+  const slugs = [...new Set(judgeRefs.map(judgeSlug))];
+  const who = slugs.length === 1 ? (slugs[0] ?? 'multi') : 'multi';
+  return (
+    `${stamp}-${who}` +
+    (itemOrder === 'reversed' ? '-reversed' : '') +
+    (discriminator !== undefined ? `-${discriminator}` : '') +
+    '-pass.json'
+  );
+}
+
+/**
+ * Writes a meta pass file and never overwrites one: two `multi` passes on
+ * disjoint judge sets can share a stamp (the judge locks do not order them),
+ * so a taken name falls back to a pid-suffixed one. Returns the path written.
+ */
+export function writeMetaPass(
+  metaDir: string,
+  stamp: string,
+  judgeRefs: readonly string[],
+  itemOrder: JudgeItemOrder,
+  content: string,
+): string {
+  mkdirSync(metaDir, { recursive: true });
+  const first = join(metaDir, metaPassFilename(stamp, judgeRefs, itemOrder));
+  try {
+    writeFileSync(first, content, { flag: 'wx' });
+    return first;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
+  }
+  const fallback = join(
+    metaDir,
+    metaPassFilename(stamp, judgeRefs, itemOrder, String(process.pid)),
+  );
+  writeFileSync(fallback, content, { flag: 'wx' });
+  return fallback;
+}
+
+/**
+ * The lock for one judge's verdicts under a base dir. It lives in meta/ - the
+ * one subdirectory every verdict reader already skips - and is never a .json
+ * file, so no loader can mistake it for a verdict or a judge directory.
+ */
+export function judgeLockPath(baseDir: string, judgeRef: string): string {
+  return join(baseDir, 'meta', `${judgeSlug(judgeRef)}.lock`);
+}
+
+export interface JudgeLocks {
+  /** Lock files this process holds, in acquisition (sorted slug) order. */
+  readonly paths: readonly string[];
+  /** Removes every lock this process still holds; idempotent. */
+  release(): void;
+}
+
+/** `process.kill(pid, 0)` probes without signalling; EPERM means alive but not ours. */
+function isPidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
+
+function readLockPid(path: string): { pid?: number; ts?: string } {
+  try {
+    const holder = JSON.parse(readFileSync(path, 'utf8')) as { pid?: unknown; ts?: unknown };
+    return {
+      ...(typeof holder.pid === 'number' && Number.isInteger(holder.pid) && holder.pid > 0
+        ? { pid: holder.pid }
+        : {}),
+      ...(typeof holder.ts === 'string' ? { ts: holder.ts } : {}),
+    };
+  } catch {
+    return {};
+  }
+}
+
+/** An existing lock is never stolen: a live holder and a dead one are both refusals. */
+function refuseExistingLock(path: string): never {
+  const { pid, ts } = readLockPid(path);
+  if (pid !== undefined && isPidAlive(pid)) {
+    throw new Error(
+      `judge dir locked: ${path} is held by running pid ${pid}` +
+        (ts !== undefined ? ` (since ${ts})` : '') +
+        ' - another judge pass is writing this judge here. Wait for it to finish or stop ' +
+        'that process; two writers on one judge directory is never allowed (ADR-0036).',
+    );
+  }
+  throw new Error(
+    `stale judge lock: ${path} ` +
+      (pid !== undefined ? `names pid ${pid}, which is not running` : 'has no readable pid') +
+      '. A previous pass ended without releasing it. Confirm nothing is writing to this ' +
+      'directory, then delete the lock file by hand and re-run (locks are never taken over ' +
+      'automatically).',
+  );
+}
+
+/**
+ * Takes the per-(judge, base dir) locks for a real pass, in sorted slug order
+ * so overlapping multi-judge passes contend on the same first lock instead of
+ * each holding part of the set; if any one is refused, every lock already
+ * taken is released before the error propagates.
+ */
+export function acquireJudgeLocks(
+  baseDir: string,
+  judgeRefs: readonly string[],
+  argv: readonly string[],
+): JudgeLocks {
+  const paths = [...new Set(judgeRefs.map((ref) => judgeLockPath(baseDir, ref)))].sort();
+  mkdirSync(join(baseDir, 'meta'), { recursive: true });
+  const body =
+    JSON.stringify({ pid: process.pid, ts: new Date().toISOString(), argv: [...argv] }, null, 2) +
+    '\n';
+  const held: string[] = [];
+  const release = (): void => {
+    for (const path of held.splice(0)) {
+      // Remove only a lock that still names this process.
+      if (readLockPid(path).pid === process.pid) rmSync(path, { force: true });
+    }
+  };
+  try {
+    for (const path of paths) {
+      try {
+        writeFileSync(path, body, { flag: 'wx' });
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code === 'EEXIST') refuseExistingLock(path);
+        throw err;
+      }
+      held.push(path);
+    }
+  } catch (err) {
+    release();
+    throw err;
+  }
+  return { paths: [...held], release };
+}
+
+/**
+ * Ctrl-C / kill releases the locks before exiting (verdicts already written
+ * stay; a resume skips them). Returns the uninstaller for the normal path.
+ */
+function releaseLocksOnExit(locks: JudgeLocks): () => void {
+  const onSignal = (signal: NodeJS.Signals): void => {
+    locks.release();
+    console.error(`${signal}: judge lock(s) released; verdicts written so far are kept.`);
+    process.exit(signal === 'SIGINT' ? 130 : 143);
+  };
+  const onExit = (): void => locks.release();
+  process.once('SIGINT', onSignal);
+  process.once('SIGTERM', onSignal);
+  process.once('exit', onExit);
+  return () => {
+    process.off('SIGINT', onSignal);
+    process.off('SIGTERM', onSignal);
+    process.off('exit', onExit);
+  };
+}
+
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
+  const baseDir = verdictBaseDir(options);
+  // Before the skip-existing scan: a second writer must be refused before it
+  // decides what is "already judged". A dry run writes nothing and locks nothing.
+  const locks = options.dryRun
+    ? undefined
+    : acquireJudgeLocks(baseDir, options.judges, process.argv.slice(2));
+  const uninstall = locks ? releaseLocksOnExit(locks) : undefined;
+  try {
+    await runPass(options, baseDir);
+  } finally {
+    uninstall?.();
+    locks?.release();
+  }
+}
+
+async function runPass(options: CliOptions, baseDir: string): Promise<void> {
   const items: JudgeItems = loadJudgeItems();
   const sourceDocuments = loadSourceDocuments();
 
   let judgeables: Judgeable[];
-  let baseDir: string;
-  const runJudgmentsDir = options.itemOrder === 'reversed' ? 'judgments-reversed' : 'judgments';
   if (options.runId) {
     const loaded = loadRunJudgeables(options.runId);
     judgeables = loaded.judgeables;
-    baseDir = join(REPO_ROOT, 'runs', options.runId, runJudgmentsDir);
     console.log(
       `run ${options.runId}: ${judgeables.length} conversation(s) to judge, ` +
         `${loaded.gated} hard-fail-gated (skipped - composite already 0), ` +
@@ -381,11 +590,6 @@ async function main(): Promise<void> {
     }
   } else {
     judgeables = loadCalibrationJudgeables(options.cases === 'slice', options.caseIds);
-    baseDir = options.retest
-      ? JUDGMENTS_RETEST_DIR
-      : options.itemOrder === 'reversed'
-        ? JUDGMENTS_REVERSED_DIR
-        : JUDGMENTS_DIR;
   }
 
   // Work list: (judge, case, dimension) triples that still need a verdict.
@@ -412,6 +616,29 @@ async function main(): Promise<void> {
   );
 
   if (options.dryRun) {
+    // ADR-0037: which anchors each conditional dimension will ask, from the
+    // same rule the judge call and the parser use.
+    for (const dimension of options.dimensions) {
+      if (!hasConditionalAnchor(items, dimension)) continue;
+      const asked = new Map<string, number>();
+      for (const j of judgeables) {
+        for (const id of applicableAnchorIds(items, dimension, j.applicability[dimension])) {
+          asked.set(id, (asked.get(id) ?? 0) + 1);
+        }
+      }
+      console.log(
+        `  ${dimension} anchors: ` +
+          rubricAnchors(items, dimension)
+            .map(
+              (a) =>
+                `${a.id} on ${asked.get(a.id) ?? 0}/${judgeables.length} case(s)` +
+                (a.appliesWithItem !== undefined
+                  ? ` (where ${a.appliesWithItem} is declared)`
+                  : ''),
+            )
+            .join(', '),
+      );
+    }
     // Estimate at list price; caching makes the real pass cheaper.
     let totalUsd = 0;
     let unpriced = 0;
@@ -424,7 +651,10 @@ async function main(): Promise<void> {
           buildJudgeSystem(items, dimension, sourceDocuments, options.itemOrder),
         );
         for (const j of judgeables) {
-          const user = buildJudgeUser(inputFor(j, dimension), options.itemOrder);
+          const user = buildJudgeUser(
+            withApplicableAnchors(items, dimension, inputFor(j, dimension)),
+            options.itemOrder,
+          );
           const usage = {
             inputTokens: sysTok + estTokens(user),
             outputTokens: 1000,
@@ -511,10 +741,11 @@ async function main(): Promise<void> {
 
   const summary = meter.summary();
   const stamp = ts.replace(/[-:]/g, '').replace(/\..*$/, 'Z');
-  const metaDir = join(baseDir, 'meta');
-  mkdirSync(metaDir, { recursive: true });
-  writeFileSync(
-    join(metaDir, `${stamp}-pass.json`),
+  writeMetaPass(
+    join(baseDir, 'meta'),
+    stamp,
+    options.judges,
+    options.itemOrder,
     JSON.stringify(
       {
         ts,

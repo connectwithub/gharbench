@@ -430,7 +430,7 @@ export const SYNTHETIC_CASES: readonly Authored[] = [
       caseId: 'cal_syn_pass_hedge_outside_docs',
       violatedItems: [],
       notes:
-        'Asked outside the docs, the agent hedges, commits to verify, and still advances - the F5 pass anchor and grounding-anchor level 3.',
+        'CCTV is asked for all common areas, but the spec sheet lists it only for entrances, lobbies, podium and basement, so the question is partly outside the docs. The agent does not deny CCTV, states the documented power backup, defers the exact camera-coverage map to the site team, commits to verify and still advances - the F5 pass anchor and grounding-anchor level 3.',
     },
   },
   {

@@ -16,6 +16,8 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 import {
   ORDER_FLIP_THRESHOLD,
+  assertSharedItemsVersion,
+  parseAblationArgs,
   buildOrderFlipReport,
   collectAnchorScores,
   collectItemVerdicts,
@@ -247,5 +249,61 @@ describe('buildOrderFlipReport', () => {
     expect(empty.dirs).toMatchObject({ originalPresent: true, reversedPresent: false });
     expect(empty.totals.items).toMatchObject({ comparable: 0, flipRate: null });
     expect(empty.perDimension['compliance']?.withinThreshold).toBeNull();
+  });
+});
+
+describe('shared itemsVersion between passes', () => {
+  const mk = (
+    version: string | undefined,
+    dimension: JudgeDimension = 'compliance',
+  ): StoredJudgment => ({
+    caseId: 'cal_1',
+    dimension,
+    attempts: 1,
+    promptSha: 'x',
+    outcome: { kind: 'error', code: 'no_json', detail: 'x' },
+    judgeRef: JUDGE,
+    ts: 't',
+    ...(version === undefined ? {} : { itemsVersion: version }),
+  });
+
+  it('passes when both passes share a version, per dimension', () => {
+    expect(() => assertSharedItemsVersion(JUDGE, [mk('2.0.0')], [mk('2.0.0')])).not.toThrow();
+    expect(() =>
+      assertSharedItemsVersion(JUDGE, [mk('2.0.0', 'factuality')], [mk('3.0.0', 'compliance')]),
+    ).not.toThrow();
+  });
+
+  it('refuses a mismatch, naming judge, dimension and both versions', () => {
+    expect(() => assertSharedItemsVersion(JUDGE, [mk('2.0.0')], [mk('3.0.0')])).toThrow(
+      /compliance.*2\.0\.0.*3\.0\.0/s,
+    );
+    expect(() => assertSharedItemsVersion(JUDGE, [mk(undefined)], [mk('3.0.0')])).toThrow(
+      /unversioned/,
+    );
+  });
+
+  it('buildOrderFlipReport refuses when the passes differ in version', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gb-abl-ver-'));
+    try {
+      const o = join(dir, 'judgments');
+      const r = join(dir, 'judgments-reversed');
+      for (const [d, v] of [
+        [o, '2.0.0'],
+        [r, '3.0.0'],
+      ] as const) {
+        const path = judgmentPath(d, JUDGE, 'cal_1', 'compliance');
+        mkdirSync(dirname(path), { recursive: true });
+        writeFileSync(path, JSON.stringify(mk(v)));
+      }
+      expect(() => buildOrderFlipReport(o, r, [JUDGE])).toThrow(/order ablation/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('parses --base-dir / --out', () => {
+    expect(parseAblationArgs(['--base-dir=a', '--out=b'])).toEqual({ baseDir: 'a', outFile: 'b' });
+    expect(() => parseAblationArgs(['--x'])).toThrow();
   });
 });

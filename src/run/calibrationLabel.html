@@ -499,12 +499,24 @@
         ],
       ];
 
-      function anchorsFor(rubric) {
+      // ADR-0037 applicability, the same rule the judges and the server use:
+      // an anchor with appliesWithItem is asked only where the case declares
+      // that binary item for the same dimension.
+      function anchorsFor(rubric, c) {
         const d = rubric.dimensions;
+        const applies = (a, dimKey) =>
+          a.appliesWithItem === undefined ||
+          (c.judgeApplicability[dimKey] || []).includes(a.appliesWithItem);
         return [
-          { dim: 'Factuality', ...d.factuality.anchor },
-          ...d.salesEffectiveness.anchors.map((x) => ({ dim: 'Sales effectiveness', ...x })),
-          { dim: 'Conversation quality', ...d.conversationQuality.anchor },
+          ...(applies(d.factuality.anchor, 'factuality')
+            ? [{ dim: 'Factuality', ...d.factuality.anchor }]
+            : []),
+          ...d.salesEffectiveness.anchors
+            .filter((x) => applies(x, 'salesEffectiveness'))
+            .map((x) => ({ dim: 'Sales effectiveness', ...x })),
+          ...(applies(d.conversationQuality.anchor, 'conversationQuality')
+            ? [{ dim: 'Conversation quality', ...d.conversationQuality.anchor }]
+            : []),
         ];
       }
 
@@ -1347,7 +1359,7 @@
           if (ids.length > 0)
             items.push({ dimKey, dimName, dimSub, ids, texts: rubric.dimensions[dimKey].binary });
         }
-        const anchorList = anchorsFor(rubric);
+        const anchorList = anchorsFor(rubric, c);
         const allBinary = items.flatMap((g) => g.ids);
         const complete =
           allBinary.every((id) => binary[id] !== undefined) &&
@@ -1550,7 +1562,9 @@
                       .map(
                         (v) =>
                           `${v}: ${a.scale[v]}` +
-                          (a.examples ? `\n      e.g. ${a.examples[v]}` : ''),
+                          (a.examples
+                            ? `\n      e.g. ${a.examples[v]} (hypothetical illustration)`
+                            : ''),
                       )
                       .join('\n'),
                   ),

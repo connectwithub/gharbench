@@ -23,7 +23,9 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+import { isAnchorApplicable, rubricAnchors } from '../judge/anchorApplicability.js';
 import { aggregateAnchor, aggregateBinary, anyFlag, judgeSlug } from '../judge/panel.js';
+import { buildJudgeSystem, type JudgeItemOrder } from '../judge/prompt.js';
 import {
   complianceVerdictToPass,
   expectedToPass,
@@ -33,6 +35,7 @@ import {
 import type { JudgeVerdict } from '../judge/schema.js';
 import {
   CALIBRATION_DIR,
+  CASES_DIR,
   EXPECTED_DIR,
   calibrationExpectedSchema,
   calibrationLabelSchema,
@@ -45,12 +48,66 @@ import {
   JUDGMENTS_RETEST_DIR,
   JUDGMENTS_REVERSED_DIR,
   loadCalibrationCases,
+  loadSourceDocuments,
   type StoredJudgment,
 } from './judgeRun.js';
-import type { JudgeDimension } from './judgeItems.js';
+import { loadJudgeItems, type JudgeDimension, type JudgeItems } from './judgeItems.js';
+import { sha256 } from '../env/db.js';
+import { xorshift32 } from '../metrics/ci.js';
 import { REPO_ROOT } from './scenarioSet.js';
 
 export const AGREEMENT_FILE = join(CALIBRATION_DIR, 'agreement.json');
+
+/** Default permutation count for the within-item null (0 disables it). */
+export const DEFAULT_PERMUTATIONS = 200;
+/** Fixed so the null is reproducible; per-dimension seeds offset from it. */
+export const PERMUTATION_SEED = 20261014;
+
+/**
+ * Every filesystem location computeAgreement reads or writes, derived from one
+ * base directory. No base dir = today's live calibration paths exactly, and
+ * the carry-forward guard is ON; a base dir is a historical snapshot (an
+ * archive), read self-consistently with the guard OFF.
+ */
+export interface AgreementPaths {
+  baseDir: string;
+  casesDir: string;
+  judgmentsDir: string;
+  reversedDir: string;
+  retestDir: string;
+  sliceFile: string;
+  expectedDir: string;
+  outFile: string;
+  /** True for a --base-dir snapshot: no comparison against the current builder. */
+  historical: boolean;
+}
+
+export function agreementPaths(baseDir?: string, outFile?: string): AgreementPaths {
+  if (baseDir === undefined) {
+    return {
+      baseDir: CALIBRATION_DIR,
+      casesDir: CASES_DIR,
+      judgmentsDir: JUDGMENTS_DIR,
+      reversedDir: JUDGMENTS_REVERSED_DIR,
+      retestDir: JUDGMENTS_RETEST_DIR,
+      sliceFile: SLICE_FILE,
+      expectedDir: EXPECTED_DIR,
+      outFile: outFile ?? AGREEMENT_FILE,
+      historical: false,
+    };
+  }
+  return {
+    baseDir,
+    casesDir: join(baseDir, 'cases'),
+    judgmentsDir: join(baseDir, 'judgments'),
+    reversedDir: join(baseDir, 'judgments-reversed'),
+    retestDir: join(baseDir, 'judgments-retest'),
+    sliceFile: join(baseDir, 'slice-50.json'),
+    expectedDir: join(baseDir, 'expected'),
+    outFile: outFile ?? join(baseDir, 'agreement.json'),
+    historical: true,
+  };
+}
 
 const DIMENSIONS: readonly JudgeDimension[] = [
   'factuality',
@@ -111,7 +168,50 @@ export function assertUniformRubric(baseDir: string, judgments: readonly StoredJ
   }
 }
 
-export function loadJudgments(baseDir: string): StoredJudgment[] {
+/** Throws if a verdict may not be read alongside the CURRENT rubric. */
+export type CarryForwardGuard = (j: StoredJudgment) => void;
+
+/**
+ * Carry-forward guard (docs/judge-protocol.md section 7): a verdict written
+ * under an OLDER rubric version may stay in a live verdict directory only if
+ * its promptSha equals the sha the current builder produces for the same
+ * (dimension, item order). That is sha-proven equivalence: the judge saw the
+ * exact bytes it would see today, so nothing was carried over on trust.
+ *
+ * Applies to the LIVE calibration directory only. A `--base-dir` snapshot
+ * (an archive) is a closed historical set; it is checked for internal
+ * uniformity by assertUniformRubric and never against today's builder.
+ */
+export function carryForwardGuard(
+  itemOrder: JudgeItemOrder,
+  items: JudgeItems = loadJudgeItems(),
+  sourceDocuments: string = loadSourceDocuments(),
+): CarryForwardGuard {
+  const shas = new Map<JudgeDimension, string>();
+  const currentSha = (d: JudgeDimension): string => {
+    let sha = shas.get(d);
+    if (sha === undefined) {
+      sha = sha256(buildJudgeSystem(items, d, sourceDocuments, itemOrder));
+      shas.set(d, sha);
+    }
+    return sha;
+  };
+  return (j) => {
+    const version = j.itemsVersion ?? UNVERSIONED;
+    if (version === items.version) return;
+    const current = currentSha(j.dimension);
+    if (j.promptSha !== current) {
+      throw new Error(
+        `carry-forward guard: judge ${j.judgeRef}, dimension ${j.dimension} (${itemOrder} order): ` +
+          `verdict ${j.caseId} is itemsVersion ${version} with promptSha ${j.promptSha}, but the ` +
+          `current rubric ${items.version} builds ${current} - only sha-identical prior verdicts ` +
+          'may stay in the live directory; archive or re-judge it',
+      );
+    }
+  };
+}
+
+export function loadJudgments(baseDir: string, guard?: CarryForwardGuard): StoredJudgment[] {
   if (!existsSync(baseDir)) return [];
   const out: StoredJudgment[] = [];
   for (const dir of readdirSync(baseDir, { withFileTypes: true })) {
@@ -124,6 +224,7 @@ export function loadJudgments(baseDir: string): StoredJudgment[] {
     }
   }
   assertUniformRubric(baseDir, out);
+  if (guard) for (const j of out) guard(j);
   return out;
 }
 
@@ -234,11 +335,33 @@ export interface AnchorUnit {
  * Assemble per-(case,item) units from stored judgments. `judgeRefs` fixes the
  * rater order so inter-judge matrices line up across units.
  */
+export interface AssembleOptions {
+  /**
+   * Opt-in subset for apples-to-apples tables: an anchor with `appliesWithItem`
+   * (SA1 with SE6) is kept only for cases whose applicability declares that
+   * item. Default off - anchor units stay verdict-driven.
+   */
+  declaredOnly?: boolean;
+  items?: JudgeItems;
+}
+
 export function assembleUnits(
   cases: readonly CalibrationCase[],
   judgments: readonly StoredJudgment[],
   judgeRefs: readonly string[],
+  options: AssembleOptions = {},
 ): { binaries: BinaryUnit[]; anchors: AnchorUnit[] } {
+  const conditional = new Map<JudgeDimension, Map<string, string>>();
+  if (options.declaredOnly) {
+    const items = options.items ?? loadJudgeItems();
+    for (const dimension of DIMENSIONS) {
+      const m = new Map<string, string>();
+      for (const a of rubricAnchors(items, dimension)) {
+        if (a.appliesWithItem !== undefined) m.set(a.id, a.appliesWithItem);
+      }
+      conditional.set(dimension, m);
+    }
+  }
   const byKey = new Map<string, StoredJudgment>();
   for (const j of judgments) byKey.set(`${judgeSlug(j.judgeRef)}|${j.caseId}|${j.dimension}`, j);
 
@@ -275,6 +398,13 @@ export function assembleUnits(
       const anchorIds = new Set<string>();
       for (const v of verdicts) for (const a of v?.anchors ?? []) anchorIds.add(a.id);
       for (const anchorId of [...anchorIds].sort()) {
+        const gate = conditional.get(dimension)?.get(anchorId);
+        if (
+          gate !== undefined &&
+          !isAnchorApplicable({ appliesWithItem: gate }, c.judgeApplicability[dimension])
+        ) {
+          continue;
+        }
         const perJudgeScore = verdicts.map(
           (v) => v?.anchors.find((a) => a.id === anchorId)?.score ?? null,
         );
@@ -407,7 +537,9 @@ export function pythonBridge(
     input: JSON.stringify({ raters, level }),
     encoding: 'utf8',
   });
-  return JSON.parse(stdout) as BridgeResult;
+  // Python's json emits bare NaN for undefined statistics (a constant column,
+  // routine per item); read it as null = "not defined", never as a number.
+  return JSON.parse(stdout.replace(/\bNaN\b/g, 'null')) as BridgeResult;
 }
 
 export interface BinaryAgreement {
@@ -438,6 +570,117 @@ export function binaryAgreement(
     units: human.length,
     kappa: stats.cohen_kappa,
     rawAgreementPct: (100 * agree) / human.length,
+  };
+}
+
+/** Per-item kappa (human vs panel), items sorted; same units rule as binaryAgreement. */
+export function perItemAgreement(
+  units: readonly BinaryUnit[],
+  reference: ReadonlyMap<string, boolean>,
+  bridge: BridgeFn,
+): Record<string, BinaryAgreement> {
+  const byItem = new Map<string, BinaryUnit[]>();
+  for (const u of units) {
+    const bucket = byItem.get(u.itemId) ?? [];
+    bucket.push(u);
+    byItem.set(u.itemId, bucket);
+  }
+  // The bridge's alpha raises on a single-valued domain, which is routine per
+  // item (everyone passes CP5); kappa is undefined there, so answer null
+  // without calling it. Raw agreement still reads.
+  const guarded: BridgeFn = (raters, level) => {
+    const constant = Object.values(raters).some((col) => new Set(col).size < 2);
+    return constant
+      ? {
+          krippendorff_alpha: null,
+          cohen_kappa: null,
+          weighted_kappa: null,
+          spearman: null,
+          pearson: null,
+        }
+      : bridge(raters, level);
+  };
+  const out: Record<string, BinaryAgreement> = {};
+  for (const [itemId, bucket] of [...byItem.entries()].sort(([a], [b]) => (a < b ? -1 : 1))) {
+    const agreement = binaryAgreement(bucket, reference, guarded);
+    if (agreement) out[itemId] = agreement;
+  }
+  return out;
+}
+
+export interface PermutationNull {
+  permutations: number;
+  seed: number;
+  /** Pooled observed kappa, repeated here so the null reads next to it. */
+  observedKappa: number | null;
+  /** Mean of the pooled kappa over permutations with a defined kappa. */
+  nullMeanKappa: number | null;
+  nullMinKappa: number | null;
+  nullMaxKappa: number | null;
+  /** Permutations whose kappa was undefined (constant column) and are excluded. */
+  undefinedPermutations: number;
+}
+
+/**
+ * Within-item permutation null for the pooled kappa. Pooled kappa over several
+ * items can be positive purely because items differ in pass rate (a judge and a
+ * human who both pass 95% of one item and 40% of another "agree" without ever
+ * agreeing on a case). Shuffling the panel verdicts across cases WITHIN each
+ * item keeps every item's pass rate and destroys all case-level agreement, so
+ * the null mean is the kappa that item-rate structure alone produces. Seeded
+ * xorshift32 (no Math.random); kappa from the bridge as always.
+ */
+export function withinItemPermutationNull(
+  units: readonly BinaryUnit[],
+  reference: ReadonlyMap<string, boolean>,
+  bridge: BridgeFn,
+  permutations: number,
+  seed: number,
+): PermutationNull {
+  const byItem = new Map<string, { human: number[]; panel: number[] }>();
+  for (const u of units) {
+    const ref = reference.get(`${u.caseId}|${u.itemId}`);
+    if (ref === undefined || u.panelPass === null) continue;
+    const bucket = byItem.get(u.itemId) ?? { human: [], panel: [] };
+    bucket.human.push(ref ? 1 : 0);
+    bucket.panel.push(u.panelPass ? 1 : 0);
+    byItem.set(u.itemId, bucket);
+  }
+  const items = [...byItem.entries()].sort(([a], [b]) => (a < b ? -1 : 1)).map(([, v]) => v);
+  const human = items.flatMap((i) => i.human);
+  const observedKappa =
+    human.length === 0
+      ? null
+      : bridge({ human, panel: items.flatMap((i) => i.panel) }, 'nominal').cohen_kappa;
+  const rand = xorshift32(seed);
+  const kappas: number[] = [];
+  let undefinedPermutations = 0;
+  if (human.length > 0) {
+    for (let p = 0; p < permutations; p += 1) {
+      const panel: number[] = [];
+      for (const item of items) {
+        const shuffled = [...item.panel];
+        for (let i = shuffled.length - 1; i > 0; i -= 1) {
+          const j = Math.floor(rand() * (i + 1));
+          const tmp = shuffled[i] as number;
+          shuffled[i] = shuffled[j] as number;
+          shuffled[j] = tmp;
+        }
+        panel.push(...shuffled);
+      }
+      const k = bridge({ human, panel }, 'nominal').cohen_kappa;
+      if (k === null || Number.isNaN(k)) undefinedPermutations += 1;
+      else kappas.push(k);
+    }
+  }
+  return {
+    permutations,
+    seed,
+    observedKappa,
+    nullMeanKappa: kappas.length > 0 ? kappas.reduce((a, b) => a + b, 0) / kappas.length : null,
+    nullMinKappa: kappas.length > 0 ? Math.min(...kappas) : null,
+    nullMaxKappa: kappas.length > 0 ? Math.max(...kappas) : null,
+    undefinedPermutations,
   };
 }
 
@@ -641,6 +884,10 @@ export interface AgreementReport {
       g8a: BinaryAgreement | null;
       g8: BinaryAgreement | null;
       interJudgeAlphaBinary: number | null;
+      /** Per-item G8a kappa (human self vs panel), items sorted. */
+      perItemG8a?: Record<string, BinaryAgreement>;
+      /** Within-item permutation null for the pooled G8a kappa. */
+      permutationNullG8a?: PermutationNull | null;
     }
   >;
   anchorsG8a: AnchorAgreement[];
@@ -652,23 +899,52 @@ export interface AgreementReport {
   versions: AgreementVersions;
   /** Non-fatal version mismatches; printed as WARNING lines by main(). */
   versionWarnings: string[];
+  /** How this report was produced; absent in files written before v3. */
+  options?: {
+    baseDir: string;
+    historical: boolean;
+    declaredOnly: boolean;
+    permutations: number;
+  };
 }
 
-export function computeAgreement(bridge: BridgeFn = pythonBridge): AgreementReport {
-  const cases = loadCalibrationCases();
-  const judgments = loadJudgments(JUDGMENTS_DIR);
-  const judgeRefs = [...new Set(judgments.map((j) => j.judgeRef))].sort();
-  const { binaries, anchors } = assembleUnits(cases, judgments, judgeRefs);
+export interface ComputeAgreementOptions {
+  baseDir?: string;
+  outFile?: string;
+  declaredOnly?: boolean;
+  permutations?: number;
+}
 
-  const selfLabels = loadLabels('self');
+export function computeAgreement(
+  bridge: BridgeFn = pythonBridge,
+  options: ComputeAgreementOptions = {},
+): AgreementReport {
+  const paths = agreementPaths(options.baseDir, options.outFile);
+  const permutations = options.permutations ?? DEFAULT_PERMUTATIONS;
+  const declaredOnly = options.declaredOnly ?? false;
+  const cases = loadCalibrationCases(paths.casesDir);
+  const guarded = !paths.historical;
+  const items = loadJudgeItems();
+  const sourceDocuments = guarded ? loadSourceDocuments() : '';
+  const judgments = loadJudgments(
+    paths.judgmentsDir,
+    guarded ? carryForwardGuard('original', items, sourceDocuments) : undefined,
+  );
+  const judgeRefs = [...new Set(judgments.map((j) => j.judgeRef))].sort();
+  const { binaries, anchors } = assembleUnits(cases, judgments, judgeRefs, {
+    declaredOnly,
+    items,
+  });
+
+  const selfLabels = loadLabels('self', paths.baseDir);
   const selfRef = referenceFromLabels(selfLabels);
   const selfAnchorRef = anchorReference(selfLabels);
 
-  const raters = listRaters();
-  const sliceIds = existsSync(SLICE_FILE)
-    ? new Set<string>((JSON.parse(readFileSync(SLICE_FILE, 'utf8')) as { ids: string[] }).ids)
+  const raters = listRaters(paths.baseDir);
+  const sliceIds = existsSync(paths.sliceFile)
+    ? new Set<string>((JSON.parse(readFileSync(paths.sliceFile, 'utf8')) as { ids: string[] }).ids)
     : new Set<string>();
-  const labelsByRater = new Map(raters.map((r) => [r, loadLabels(r)]));
+  const labelsByRater = new Map(raters.map((r) => [r, loadLabels(r, paths.baseDir)]));
   const nonSelf = raters.filter((r) => r !== 'self');
   const sliceRef =
     nonSelf.length >= 2
@@ -681,11 +957,11 @@ export function computeAgreement(bridge: BridgeFn = pythonBridge): AgreementRepo
 
   const expectedByCase = new Map<string, readonly string[]>();
   const alsoCoveredByCase = new Map<string, readonly string[]>();
-  if (existsSync(EXPECTED_DIR)) {
-    for (const f of readdirSync(EXPECTED_DIR)) {
+  if (existsSync(paths.expectedDir)) {
+    for (const f of readdirSync(paths.expectedDir)) {
       if (!f.endsWith('.json')) continue;
       const parsed = calibrationExpectedSchema.safeParse(
-        JSON.parse(readFileSync(join(EXPECTED_DIR, f), 'utf8')),
+        JSON.parse(readFileSync(join(paths.expectedDir, f), 'utf8')),
       );
       if (parsed.success) {
         expectedByCase.set(parsed.data.caseId, parsed.data.violatedItems);
@@ -699,8 +975,13 @@ export function computeAgreement(bridge: BridgeFn = pythonBridge): AgreementRepo
     judgments: itemsVersionsOf(judgments),
     labels: Object.fromEntries([...labelsByRater].map(([r, l]) => [r, versionsFromLabels(l)])),
   };
-  if (existsSync(JUDGMENTS_REVERSED_DIR)) {
-    versions.judgmentsReversed = itemsVersionsOf(loadJudgments(JUDGMENTS_REVERSED_DIR));
+  if (existsSync(paths.reversedDir)) {
+    versions.judgmentsReversed = itemsVersionsOf(
+      loadJudgments(
+        paths.reversedDir,
+        guarded ? carryForwardGuard('reversed', items, sourceDocuments) : undefined,
+      ),
+    );
   }
 
   const perDimension: AgreementReport['perDimension'] = {};
@@ -710,6 +991,17 @@ export function computeAgreement(bridge: BridgeFn = pythonBridge): AgreementRepo
       g8a: binaryAgreement(units, selfRef, bridge),
       g8: sliceRef.size > 0 ? binaryAgreement(units, sliceRef, bridge) : null,
       interJudgeAlphaBinary: units.length > 0 ? interJudgeAlpha(units, 'binary', bridge) : null,
+      perItemG8a: perItemAgreement(units, selfRef, bridge),
+      permutationNullG8a:
+        permutations > 0
+          ? withinItemPermutationNull(
+              units,
+              selfRef,
+              bridge,
+              permutations,
+              PERMUTATION_SEED + DIMENSIONS.indexOf(dimension),
+            )
+          : null,
     };
   }
 
@@ -726,9 +1018,15 @@ export function computeAgreement(bridge: BridgeFn = pythonBridge): AgreementRepo
     anchorsG8: sliceAnchorRef.size > 0 ? anchorAgreement(anchors, sliceAnchorRef, bridge) : [],
     interJudgeAlphaAnchors: anchors.length > 0 ? interJudgeAlpha(anchors, 'anchor', bridge) : null,
     compliancePrf: compliancePrf(cases, binaries, expectedByCase, alsoCoveredByCase),
-    retest: retestAgreement(judgments, loadJudgments(JUDGMENTS_RETEST_DIR)),
+    retest: retestAgreement(judgments, loadJudgments(paths.retestDir)),
     versions,
     versionWarnings: versionWarnings(versions),
+    options: {
+      baseDir: paths.baseDir,
+      historical: paths.historical,
+      declaredOnly,
+      permutations,
+    },
   };
 }
 
@@ -736,9 +1034,38 @@ function fmt(n: number | null | undefined): string {
   return n === null || n === undefined ? '-' : n.toFixed(3);
 }
 
+export interface AgreementCli {
+  baseDir?: string;
+  outFile?: string;
+  declaredOnly: boolean;
+  permutations: number;
+}
+
+export function parseAgreementArgs(argv: readonly string[]): AgreementCli {
+  const cli: AgreementCli = { declaredOnly: false, permutations: DEFAULT_PERMUTATIONS };
+  for (const arg of argv) {
+    if (arg === '--declared-only') cli.declaredOnly = true;
+    else if (arg.startsWith('--base-dir=')) cli.baseDir = arg.slice('--base-dir='.length);
+    else if (arg.startsWith('--out=')) cli.outFile = arg.slice('--out='.length);
+    else if (arg.startsWith('--permutations=')) {
+      const n = Number(arg.slice('--permutations='.length));
+      if (!Number.isInteger(n) || n < 0) throw new Error(`bad ${arg}: want an integer >= 0`);
+      cli.permutations = n;
+    } else throw new Error(`unknown argument ${arg}`);
+  }
+  return cli;
+}
+
 function main(): void {
-  const report = computeAgreement();
-  writeFileSync(AGREEMENT_FILE, JSON.stringify(report, null, 2) + '\n');
+  const cli = parseAgreementArgs(process.argv.slice(2));
+  const paths = agreementPaths(cli.baseDir, cli.outFile);
+  const report = computeAgreement(pythonBridge, {
+    ...(cli.baseDir !== undefined ? { baseDir: cli.baseDir } : {}),
+    ...(cli.outFile !== undefined ? { outFile: cli.outFile } : {}),
+    declaredOnly: cli.declaredOnly,
+    permutations: cli.permutations,
+  });
+  writeFileSync(paths.outFile, JSON.stringify(report, null, 2) + '\n');
 
   console.log('=== human-judge agreement (Phase 5) ===');
   console.log(
@@ -762,8 +1089,16 @@ function main(): void {
     console.log(
       `${dimension.padEnd(20)} G8a k=${fmt(d.g8a?.kappa)} (${d.g8a?.units ?? 0}u, raw ${
         d.g8a ? d.g8a.rawAgreementPct.toFixed(1) : '-'
-      }%)  G8 k=${fmt(d.g8?.kappa)} (${d.g8?.units ?? 0}u)  inter-judge a=${fmt(d.interJudgeAlphaBinary)}`,
+      }%)  G8 k=${fmt(d.g8?.kappa)} (${d.g8?.units ?? 0}u)  inter-judge a=${fmt(d.interJudgeAlphaBinary)}` +
+        (d.permutationNullG8a
+          ? `  within-item null k=${fmt(d.permutationNullG8a.nullMeanKappa)} (${d.permutationNullG8a.permutations} perms)`
+          : ''),
     );
+    for (const [itemId, a] of Object.entries(d.perItemG8a ?? {})) {
+      console.log(
+        `    ${itemId.padEnd(6)} k=${fmt(a.kappa)} (${a.units}u, raw ${a.rawAgreementPct.toFixed(1)}%)`,
+      );
+    }
   }
   for (const a of report.anchorsG8a) {
     console.log(
@@ -782,7 +1117,7 @@ function main(): void {
   for (const [slug, r] of Object.entries(report.retest)) {
     console.log(`retest ${slug}: ${r.agreementPct.toFixed(1)}% over ${r.units} paired verdicts`);
   }
-  console.log(`written: ${AGREEMENT_FILE}`);
+  console.log(`written: ${paths.outFile}`);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {

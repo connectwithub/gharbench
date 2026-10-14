@@ -8,6 +8,38 @@ DOI (ADR-0030) - every entry here is what a version DOI points at.
 
 ### Added
 
+- Rubric v3 (`data/judge-items.json` 3.0.0, ADR-0037):
+  - SA1 carries `appliesWithItem: "SE6"`, so it is asked only where the
+    scenario declares an objection. The rule is config-time and
+    implemented once, in `src/judge/anchorApplicability.ts`; the judge
+    prompt, parser, labeler and scoring all use it.
+  - SA1 gets a shared no-objection rule and a concrete-next-step level 3,
+    and SE6 gets a matching note.
+  - CQ1 is judged by message shape.
+  - CQ3 is judged reply by reply against the documents and a listed
+    sendable-asset roster. Truth of figures goes to F1/CP3. A sent RERA
+    certificate counts as an answer.
+  - QA1 is always scored, with observable markers between levels 2 and 3.
+  - Only the salesEffectiveness and conversationQuality prompts change. The
+    factuality and compliance prompts are byte-identical in both item
+    orders, pinned by a golden-sha test.
+- `judge:agreement --base-dir --out --declared-only --permutations`:
+  - any archived snapshot is recomputed without touching the live
+    `agreement.json`;
+  - per-item kappa and a within-item permutation null are reported beside
+    pooled G8a;
+  - a carry-forward guard (judge-protocol section 7 rule 4) admits a
+    prior-version verdict only when its promptSha equals the current
+    builder's.
+  - `judge:ablations` gains `--base-dir` and refuses mismatched rubric
+    versions between the original and reversed passes.
+- Judge runner lock: one writer per judge verdict directory
+  (`<baseDir>/meta/<slug>.lock`). Meta pass files are named per judge, so
+  concurrent passes no longer overwrite each other's records (ADR-0036).
+- Canonical v1 verdict set: the 2026-09-20 private-repo snapshot, extracted
+  to the calibration archive. Every v1 figure is recomputed from it
+  (ADR-0036).
+
 - `pnpm judge:ablations`: order-robustness flip-rate report over
   `calibration/judgments` vs `calibration/judgments-reversed` (protocol
   section 1, threshold 0.10 per dimension), written to
@@ -51,6 +83,13 @@ DOI (ADR-0030) - every entry here is what a version DOI points at.
 
 ### Changed
 
+- SalesScore's anchor term is the mean over the sales anchors that apply.
+  The binary fraction alone is used only when none applies. This is a dated
+  pre-registration amendment (judge-protocol section 6, ADR-0037) and
+  affects v3 verdicts only; the literal frozen reading is reported as a
+  sensitivity row.
+- The calibration labeler shows SA1 under the same applicability rule and
+  renders the judges' "(hypothetical illustration)" suffix on examples.
 - Judge rubric v2 (`data/judge-items.json` 1.3.0 -> 2.0.0, ADR-0033): no item
   added, removed or renumbered, but F1 and CP3 now cover mis-computed totals,
   CP9 mirrors the deterministic check L1.9, SE1/SE2 require asked-and-answered

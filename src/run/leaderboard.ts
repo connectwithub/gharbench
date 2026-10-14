@@ -20,6 +20,11 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import type { CheckReport } from '../checks/types.js';
+import {
+  applicableAnchorIds,
+  isAnchorApplicable,
+  rubricAnchors,
+} from '../judge/anchorApplicability.js';
 import { aggregateAnchor, aggregateBinary, anyFlag } from '../judge/panel.js';
 import { qualityVerdictToPass } from '../judge/polarity.js';
 import type { JudgeVerdict } from '../judge/schema.js';
@@ -31,6 +36,7 @@ import {
 } from '../metrics/operationalProfile.js';
 import {
   V_WEIGHTS,
+  appliesAnchorRule,
   blendSubScore,
   composite,
   d4Success,
@@ -49,7 +55,7 @@ import { readCheckReports } from './checkReports.js';
 import { loadJudgments } from './judgeAgreement.js';
 import { DIMENSIONS, runCaseId, type StoredJudgment } from './judgeRun.js';
 import { REPO_ROOT, loadScenarioSet } from './scenarioSet.js';
-import type { JudgeDimension } from './judgeItems.js';
+import { loadJudgeItems, type JudgeDimension, type JudgeItems } from './judgeItems.js';
 
 interface DimRaw {
   fraction: number | null;
@@ -67,8 +73,16 @@ export interface ScoredConversation {
   activeTrapIds: string[];
   status: 'scored' | 'gated' | 'unjudged' | 'unchecked';
   sub: SubScores | null;
-  /** Unblended dimension inputs, kept for the D1 0.67/0.33 ablation. */
-  dims: { fact: DimRaw; sales: DimRaw; qual: DimRaw } | null;
+  /**
+   * Unblended dimension inputs, kept for the D1 0.67/0.33 ablation and the
+   * literal frozen-D1 sensitivity. `anchorInapplicable` is set when the
+   * scenario config flags a sales anchor inapplicable (SA1 without SE6).
+   */
+  dims: {
+    fact: DimRaw;
+    sales: DimRaw & { anchorInapplicable?: boolean };
+    qual: DimRaw;
+  } | null;
   hardFailSources: string[];
 }
 
@@ -83,6 +97,33 @@ export function reblend(c: ScoredConversation, binaryWeight: number): SubScores 
     sales: blendSubScore(c.dims.sales.fraction, c.dims.sales.anchor, binaryWeight) ?? 0,
     qual: blendSubScore(c.dims.qual.fraction, c.dims.qual.anchor, binaryWeight) ?? 0,
   };
+}
+
+/**
+ * Sensitivity only (ADR-0037): the LITERAL frozen-D1 reading, under which a
+ * conversation with a config-inapplicable sales anchor scores its sales
+ * dimension on the binary fraction alone. Not the headline; the amended rule
+ * (mean over applicable anchors) is what `reblend` and the headline use.
+ */
+export function literalD1Sub(c: ScoredConversation): SubScores | null {
+  if (!c.sub) return null;
+  if (!c.dims) return c.sub; // gated: composite is 0 under any reading
+  const sales = c.dims.sales.anchorInapplicable
+    ? (c.dims.sales.fraction ?? 0)
+    : (blendSubScore(c.dims.sales.fraction, c.dims.sales.anchor) ?? 0);
+  return { ...c.sub, sales };
+}
+
+/**
+ * The ADR-0037 applicability rule at the verdict boundary: anchors the
+ * scenario config does not ask are dropped, so the panel's anchor mean is
+ * over the applicable anchors only. Applied to v3+ verdicts by the caller.
+ */
+export function applicableVerdict(
+  verdict: JudgeVerdict,
+  applicable: ReadonlySet<string>,
+): JudgeVerdict {
+  return { ...verdict, anchors: verdict.anchors.filter((a) => applicable.has(a.id)) };
 }
 
 /** Aggregate the 3-judge panel for one conversation x dimension. */
@@ -128,6 +169,16 @@ export function panelDimension(
   return { fraction: scored > 0 ? met / scored : null, anchor, flagged };
 }
 
+/** True when the scenario config flags any sales anchor inapplicable. */
+function salesAnchorInapplicable(
+  rubric: JudgeItems,
+  applicability: { salesEffectiveness: readonly string[] },
+): boolean {
+  return rubricAnchors(rubric, 'salesEffectiveness').some(
+    (a) => !isAnchorApplicable(a, applicability.salesEffectiveness),
+  );
+}
+
 export function scoreRun(
   runId: string,
   // Injectable so a multi-run board loads/validates the ~150-scenario set once.
@@ -146,6 +197,7 @@ export function scoreRun(
   }
 
   const scenarioById = new Map(set.scenarios.map((s) => [s.scenarioId, s]));
+  const rubric = loadJudgeItems();
 
   const out: ScoredConversation[] = [];
   for (const record of readTranscripts(transcriptPath)) {
@@ -190,10 +242,19 @@ export function scoreRun(
 
     const caseId = runCaseId(record.contestantId, record.conversationId);
     const caseJudgments = byCase.get(caseId) ?? [];
-    const verdictsFor = (dimension: JudgeDimension): JudgeVerdict[] =>
-      caseJudgments
+    const verdictsFor = (dimension: JudgeDimension): JudgeVerdict[] => {
+      const applicable = new Set(
+        applicableAnchorIds(rubric, dimension, scenario.judgeApplicability[dimension]),
+      );
+      return caseJudgments
         .filter((j) => j.dimension === dimension && j.outcome.kind === 'verdict')
-        .map((j) => (j.outcome as { kind: 'verdict'; verdict: JudgeVerdict }).verdict);
+        .map((j) => {
+          const verdict = (j.outcome as { kind: 'verdict'; verdict: JudgeVerdict }).verdict;
+          return appliesAnchorRule(j.itemsVersion)
+            ? applicableVerdict(verdict, applicable)
+            : verdict;
+        });
+    };
 
     // Panel minimum is 2 usable verdicts per dimension (aggregateBinary and
     // aggregateAnchor both return "no signal" below that). A conversation
@@ -250,7 +311,16 @@ export function scoreRun(
       sub,
       dims: {
         fact: { fraction: fact.fraction, anchor: fact.anchor },
-        sales: { fraction: sales.fraction, anchor: sales.anchor },
+        sales: {
+          fraction: sales.fraction,
+          anchor: sales.anchor,
+          // Only a v3+ panel was asked under the applicability rule; a pre-v3
+          // run asked SA1 everywhere, so its literal-D1 row must not drop it.
+          anchorInapplicable:
+            caseJudgments.some(
+              (j) => j.dimension === 'salesEffectiveness' && appliesAnchorRule(j.itemsVersion),
+            ) && salesAnchorInapplicable(rubric, scenario.judgeApplicability),
+        },
         qual: { fraction: qual.fraction, anchor: qual.anchor },
       },
       hardFailSources: compliance.flagged ? ['CP-panel-any-flag'] : [],
@@ -281,6 +351,8 @@ export interface LeaderboardEntry {
   microV1: number | null;
   variants: Record<string, number | null>;
   blendAblationV1: number | null;
+  /** Sensitivity: V1 under the LITERAL frozen-D1 reading (ADR-0037). */
+  d1LiteralV1: number | null;
   wfSweep: Record<string, number | null>;
   v5Keys: number[];
   perFamily: Record<string, FamilyRow>;
@@ -476,6 +548,22 @@ export function buildLeaderboard(runIds: readonly string[]): Leaderboard {
           V4: macroOf(V_WEIGHTS.V4),
           V6: v6,
         },
+        // Literal frozen-D1 sensitivity (ADR-0037): config-inapplicable sales
+        // anchor -> binary fraction alone. Reported beside the headline, never
+        // in place of it.
+        d1LiteralV1: macroMean(
+          (() => {
+            const m = new Map<string, number[]>();
+            for (const c of usable) {
+              const sub = literalD1Sub(c);
+              if (!sub) continue;
+              const bucket = m.get(c.family) ?? [];
+              bucket.push(composite(sub, V_WEIGHTS.V1));
+              m.set(c.family, bucket);
+            }
+            return m;
+          })(),
+        ),
         // D1 ablation: V1 recomputed with the 0.67/0.33 binary-heavy blend.
         blendAblationV1: macroMean(
           (() => {
@@ -574,12 +662,16 @@ function main(): void {
     `pairwise orderings: ${robust} ROBUST, ${board.robustPairs.length - robust} non-separable (D7)`,
   );
 
-  console.log('=== operational profile (descriptive serving telemetry - NOT scored, NOT ranked) ===');
+  console.log(
+    '=== operational profile (descriptive serving telemetry - NOT scored, NOT ranked) ===',
+  );
   const secs = (ms: number): string => `${(ms / 1000).toFixed(1)}s`;
   for (const e of board.entries) {
     const p = e.operationalProfile;
     if (p === null) {
-      console.log(`${e.contestantId.padEnd(30)} latency telemetry unavailable (pre-ADR-0031 costs.json)`);
+      console.log(
+        `${e.contestantId.padEnd(30)} latency telemetry unavailable (pre-ADR-0031 costs.json)`,
+      );
       continue;
     }
     const tps = p.outputTokensPerSecond === null ? '-' : p.outputTokensPerSecond.toFixed(0);

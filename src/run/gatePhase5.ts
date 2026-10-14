@@ -18,11 +18,19 @@ import { pathToFileURL } from 'node:url';
 import { JUDGE_PANEL } from '../judge/panel.js';
 import {
   AGREEMENT_FILE,
+  carryForwardGuard,
   itemsVersionsOf,
   loadJudgments,
   type AgreementReport,
 } from './judgeAgreement.js';
-import { DIMENSIONS, JUDGMENTS_DIR, judgmentPath, loadCalibrationCases } from './judgeRun.js';
+import {
+  DIMENSIONS,
+  JUDGMENTS_DIR,
+  judgmentPath,
+  loadCalibrationCases,
+  loadSourceDocuments,
+} from './judgeRun.js';
+import { loadJudgeItems } from './judgeItems.js';
 import { CASES_DIR } from './calibrationCase.js';
 
 export interface Phase5Floor {
@@ -62,7 +70,12 @@ export function evaluatePhase5Gate(): Phase5Report {
   }
   // Throws if the directory mixes rubric versions or judge prompts: a gate
   // read off two rubrics is worse than no gate.
-  const judgments = loadJudgments(JUDGMENTS_DIR);
+  // The live gate also refuses a prior-version verdict whose promptSha is not
+  // the current builder's (carry-forward rule, judge-protocol section 7).
+  const judgments = loadJudgments(
+    JUDGMENTS_DIR,
+    carryForwardGuard('original', loadJudgeItems(), loadSourceDocuments()),
+  );
   const errored = judgments.filter((j) => j.outcome.kind === 'error').length;
   info.push(`judgments rubric version(s): ${itemsVersionsOf(judgments).join(', ') || 'none'}`);
   floor(

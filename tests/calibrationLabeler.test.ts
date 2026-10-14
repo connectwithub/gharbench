@@ -188,7 +188,7 @@ describe('saved labels record the rubric they answer', () => {
     const parsed = buildLabel({
       caseId: CASE.caseId,
       rater: 'self',
-      itemsVersion: loadJudgeItems().version,
+      rubric: loadJudgeItems(),
       judgeApplicability: CASE.judgeApplicability,
       posted: { binary: { F1: 'met', CP1: 'not_met', SE3: 'met' }, anchors: { FA1: 2 } },
       labeledAt: '2026-09-21T00:00:00.000Z',
@@ -210,6 +210,57 @@ describe('saved labels record the rubric they answer', () => {
     });
     expect(parsed.success).toBe(true);
     if (parsed.success) expect(parsed.data.itemsVersion).toBeUndefined();
+  });
+});
+
+describe('anchor applicability parity (ADR-0037)', () => {
+  const rubric = loadJudgeItems();
+  const declared = { ...CASE.judgeApplicability, salesEffectiveness: ['SE5', 'SE6'] };
+  const undeclared = { ...CASE.judgeApplicability, salesEffectiveness: ['SE5'] };
+  const posted = { binary: {}, anchors: { FA1: 2, SA1: 3, SA2: 1 } };
+
+  it('stores SA1 only where the case declares SE6; SA2 is always asked', () => {
+    const without = buildLabel({
+      caseId: CASE.caseId,
+      rater: 'self',
+      rubric,
+      judgeApplicability: undeclared,
+      posted,
+    });
+    expect(without.success).toBe(true);
+    if (without.success) expect(Object.keys(without.data.anchors).sort()).toEqual(['FA1', 'SA2']);
+
+    const withSe6 = buildLabel({
+      caseId: CASE.caseId,
+      rater: 'self',
+      rubric,
+      judgeApplicability: declared,
+      posted,
+    });
+    expect(withSe6.success).toBe(true);
+    if (withSe6.success)
+      expect(Object.keys(withSe6.data.anchors).sort()).toEqual(['FA1', 'SA1', 'SA2']);
+  });
+
+  it('the rater UI shows SA1 only on SE6-declared cases, same rule as the server', () => {
+    const html = readFileSync(join(REPO_ROOT, 'src', 'run', 'calibrationLabel.html'), 'utf8');
+    const src = html.match(/\x20{6}function anchorsFor\(rubric, c\) \{[\s\S]*?\n\x20{6}\}\n/)?.[0];
+    expect(src).toBeDefined();
+    const anchorsFor = new Function(`${src}; return anchorsFor;`)() as (
+      r: unknown,
+      c: unknown,
+    ) => Array<{ id: string }>;
+    const ids = (app: typeof declared) =>
+      anchorsFor(rubric, { judgeApplicability: app }).map((a) => a.id);
+    expect(ids(undeclared)).toEqual(['FA1', 'SA2', 'QA1']);
+    expect(ids(declared)).toEqual(['FA1', 'SA1', 'SA2', 'QA1']);
+  });
+
+  it('renders the judge hypothetical-illustration suffix on anchor examples', () => {
+    const html = readFileSync(join(REPO_ROOT, 'src', 'run', 'calibrationLabel.html'), 'utf8');
+    expect(html).toContain('e.g. ${a.examples[v]} (hypothetical illustration)');
+    const prompt = readFileSync(join(REPO_ROOT, 'src', 'judge', 'prompt.ts'), 'utf8');
+    expect(prompt).toContain('e.g. ${a.examples[k]} (hypothetical illustration)');
   });
 });
 

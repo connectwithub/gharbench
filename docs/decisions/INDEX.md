@@ -3,12 +3,14 @@
 Generated from `decisions.jsonl` — do not edit by hand.
 Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 
-34 decisions.
+36 decisions.
 
 ## By date
 
 - **ADR-0034** (2026-10-14) — [Maverick judge re-pinned from DeepInfra to Novita after DeepInfra was delisted; transport failures are no longer persisted as verdicts](ADR-0034-maverick-judge-repinned-to-novita.md)
 - **ADR-0035** (2026-10-14) — [The buyer simulator sees only the trap modules a scenario arms](ADR-0035-buyer-sees-only-armed-traps.md)
+- **ADR-0036** (2026-10-14) — [Canonical v1 verdict set; a stray judge process explains the 2026-09-20 spend gap; the runner locks verdict dirs](ADR-0036-canonical-v1-and-judge-dir-lock.md)
+- **ADR-0037** (2026-10-14) — [Rubric v3: SA1 asked only where an objection is declared, SalesScore reads applicable anchors, CQ judged reply by reply](ADR-0037-rubric-v3-sa1-applicability-cq-per-reply.md)
 - **ADR-0033** (2026-09-21) — [Rubric v2: the judge items are revised after G8a fell below the floor on every dimension](ADR-0033-rubric-v2-calibration-revision.md)
 - **ADR-0032** (2026-09-20) — [Judge panel serving ids verified; all three judges route through OpenRouter, Mistral slot resolves to Medium 3.5](ADR-0032-judge-panel-openrouter-routing.md)
 - **ADR-0031** (2026-08-30) — [Operational profile: latency published as serving telemetry, never scored](ADR-0031-operational-profile.md)
@@ -47,6 +49,7 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 ### `agreement`
 
 - ADR-0033 — [Rubric v2: the judge items are revised after G8a fell below the floor on every dimension](ADR-0033-rubric-v2-calibration-revision.md)
+- ADR-0037 — [Rubric v3: SA1 asked only where an objection is declared, SalesScore reads applicable anchors, CQ judged reply by reply](ADR-0037-rubric-v3-sa1-applicability-cq-per-reply.md)
 
 ### `architecture`
 
@@ -97,11 +100,17 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 - ADR-0028 — [Buyer scaffolding leaks: 17 calibration cases purged, leak screen added, buyer prompt hardened](ADR-0028-buyer-scaffolding-leak-purge.md)
 - ADR-0029 — [Agent-ended cases carry the closing tool; the answer key shows the agent's full capability surface](ADR-0029-ended-by-tool.md)
 - ADR-0033 — [Rubric v2: the judge items are revised after G8a fell below the floor on every dimension](ADR-0033-rubric-v2-calibration-revision.md)
+- ADR-0036 — [Canonical v1 verdict set; a stray judge process explains the 2026-09-20 spend gap; the runner locks verdict dirs](ADR-0036-canonical-v1-and-judge-dir-lock.md)
+- ADR-0037 — [Rubric v3: SA1 asked only where an objection is declared, SalesScore reads applicable anchors, CQ judged reply by reply](ADR-0037-rubric-v3-sa1-applicability-cq-per-reply.md)
 
 ### `checks`
 
 - ADR-0024 — [Pre-run pipeline hardening: contestant-aware check reports and gate completeness floors](ADR-0024-prerun-pipeline-hardening.md)
 - ADR-0035 — [The buyer simulator sees only the trap modules a scenario arms](ADR-0035-buyer-sees-only-armed-traps.md)
+
+### `composite`
+
+- ADR-0037 — [Rubric v3: SA1 asked only where an objection is declared, SalesScore reads applicable anchors, CQ judged reply by reply](ADR-0037-rubric-v3-sa1-applicability-cq-per-reply.md)
 
 ### `contamination`
 
@@ -148,6 +157,7 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 ### `harness`
 
 - ADR-0016 — [OpenRouter routing is not behaviour-neutral: pin the host, use the chat surface](ADR-0016-openrouter-routing-is-not-behaviour-neutral.md)
+- ADR-0036 — [Canonical v1 verdict set; a stray judge process explains the 2026-09-20 spend gap; the runner locks verdict dirs](ADR-0036-canonical-v1-and-judge-dir-lock.md)
 
 ### `judge`
 
@@ -161,6 +171,8 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 - ADR-0032 — [Judge panel serving ids verified; all three judges route through OpenRouter, Mistral slot resolves to Medium 3.5](ADR-0032-judge-panel-openrouter-routing.md)
 - ADR-0033 — [Rubric v2: the judge items are revised after G8a fell below the floor on every dimension](ADR-0033-rubric-v2-calibration-revision.md)
 - ADR-0034 — [Maverick judge re-pinned from DeepInfra to Novita after DeepInfra was delisted; transport failures are no longer persisted as verdicts](ADR-0034-maverick-judge-repinned-to-novita.md)
+- ADR-0036 — [Canonical v1 verdict set; a stray judge process explains the 2026-09-20 spend gap; the runner locks verdict dirs](ADR-0036-canonical-v1-and-judge-dir-lock.md)
+- ADR-0037 — [Rubric v3: SA1 asked only where an objection is declared, SalesScore reads applicable anchors, CQ judged reply by reply](ADR-0037-rubric-v3-sa1-applicability-cq-per-reply.md)
 
 ### `judge-panel`
 
@@ -184,6 +196,8 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 - ADR-0032 — [Judge panel serving ids verified; all three judges route through OpenRouter, Mistral slot resolves to Medium 3.5](ADR-0032-judge-panel-openrouter-routing.md)
 - ADR-0033 — [Rubric v2: the judge items are revised after G8a fell below the floor on every dimension](ADR-0033-rubric-v2-calibration-revision.md)
 - ADR-0034 — [Maverick judge re-pinned from DeepInfra to Novita after DeepInfra was delisted; transport failures are no longer persisted as verdicts](ADR-0034-maverick-judge-repinned-to-novita.md)
+- ADR-0036 — [Canonical v1 verdict set; a stray judge process explains the 2026-09-20 spend gap; the runner locks verdict dirs](ADR-0036-canonical-v1-and-judge-dir-lock.md)
+- ADR-0037 — [Rubric v3: SA1 asked only where an objection is declared, SalesScore reads applicable anchors, CQ judged reply by reply](ADR-0037-rubric-v3-sa1-applicability-cq-per-reply.md)
 
 ### `pinning`
 
@@ -216,6 +230,10 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 - ADR-0021 — [Buyer guardrails hardened with an anti-repetition mandate after the G6 pilot audit](ADR-0021-anti-repetition-guardrail-after-g6-audit.md)
 - ADR-0025 — [Calibration judging: uniform prompt shape and no conduct-only item lists](ADR-0025-calibration-blindness-uniform-prompt.md)
 
+### `provenance`
+
+- ADR-0036 — [Canonical v1 verdict set; a stray judge process explains the 2026-09-20 spend gap; the runner locks verdict dirs](ADR-0036-canonical-v1-and-judge-dir-lock.md)
+
 ### `provider`
 
 - ADR-0003 — [Split "can place a breakpoint" from "reports cache reads"](ADR-0003-split-explicit-caching-from-cache-reporting.md)
@@ -247,6 +265,7 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 - ADR-0016 — [OpenRouter routing is not behaviour-neutral: pin the host, use the chat surface](ADR-0016-openrouter-routing-is-not-behaviour-neutral.md)
 - ADR-0034 — [Maverick judge re-pinned from DeepInfra to Novita after DeepInfra was delisted; transport failures are no longer persisted as verdicts](ADR-0034-maverick-judge-repinned-to-novita.md)
 - ADR-0035 — [The buyer simulator sees only the trap modules a scenario arms](ADR-0035-buyer-sees-only-armed-traps.md)
+- ADR-0036 — [Canonical v1 verdict set; a stray judge process explains the 2026-09-20 spend gap; the runner locks verdict dirs](ADR-0036-canonical-v1-and-judge-dir-lock.md)
 
 ### `rubric`
 
@@ -254,6 +273,7 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 - ADR-0027 — [Every calibration case records who ended the conversation](ADR-0027-endedby-on-calibration-cases.md)
 - ADR-0029 — [Agent-ended cases carry the closing tool; the answer key shows the agent's full capability surface](ADR-0029-ended-by-tool.md)
 - ADR-0033 — [Rubric v2: the judge items are revised after G8a fell below the floor on every dimension](ADR-0033-rubric-v2-calibration-revision.md)
+- ADR-0037 — [Rubric v3: SA1 asked only where an objection is declared, SalesScore reads applicable anchors, CQ judged reply by reply](ADR-0037-rubric-v3-sa1-applicability-cq-per-reply.md)
 
 ### `scenarios`
 

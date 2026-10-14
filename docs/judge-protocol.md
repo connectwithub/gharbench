@@ -84,6 +84,19 @@ anywhere. The paper claims this explicitly and credits the convergent design.
   stay in Python per repo convention).
 - **Pre-registration**: composite weights (§4.3), the ablation set above and
   these thresholds are fixed as of 2026-08-28 - post-hoc weight tuning is out.
+- **Amendment, 2026-10-14 (ADR-0037), recorded before any Phase 6 result.**
+  SA1 now applies only where the scenario declares SE6, a config-time rule
+  (I4). The amendment fixes how SalesScore reads that. Its anchor term is
+  the mean over the sales anchors that apply to the conversation. Where SA1
+  does not apply, SA2 alone forms the anchor term. The binary fraction
+  alone is used only when no sales anchor applies. The 0.5/0.5 blend and
+  every weight are unchanged.
+
+  The literal frozen reading is reported as a sensitivity row beside the D1
+  blend ablation. That reading is: any config-flagged inapplicable anchor
+  makes SalesScore fall back to the binary fraction alone. Under the
+  amendment, SA2's effective weight inside SalesScore rises from 0.25 to
+  0.5 on scenarios that declare no objection. The paper states that shift.
 
 ## 7. Rubric revision log
 
@@ -99,6 +112,64 @@ G8a below 0.6 on every dimension (factuality 0.345, compliance 0.454,
 salesEffectiveness 0.454, conversationQuality -0.003). Item wording was
 clarified; weights, the ablation set and the thresholds were not touched.
 
+Correction, 2026-10-14 (ADR-0036): the canonical v1 verdict set is the
+2026-09-20 snapshot in the private overlay repo. It reproduces
+conversationQuality at 0.024. The -0.003 above traces to no committed
+agreement file.
+
+**v3, 2026-10-14 (ADR-0037).**
+
+_Trigger._ The v2 re-judge left G8a below 0.6 on every dimension:
+
+|     | factuality | compliance | salesEffectiveness | conversationQuality | SA1   | QA1   |
+| --- | ---------- | ---------- | ------------------ | ------------------- | ----- | ----- |
+| G8a | 0.413      | 0.464      | 0.446              | 0.154               | 0.053 | 0.170 |
+
+The pooled anchor order-flip rate was 0.280, again above 0.10.
+
+_Diagnoses._
+
+- SA1: the whole drop came from conversations with no buyer objection.
+  There is no not-applicable rule, so raters invented a default. Judges
+  moved that default from 3 to 0 once the surrounding SE notes changed.
+- conversationQuality: CQ3 asked judges for checks they could not make, and
+  CQ1 asked for a message shape the harness cannot produce.
+
+_Changes._
+
+- SA1 is asked only where the scenario declares SE6 (config-time). It has a
+  shared no-objection rule and a concrete-next-step level 3, and SE6 has a
+  matching note.
+- CQ1 is judged by message shape.
+- CQ3 is judged reply by reply against the documents and the sendable list.
+  Whether a figure is true belongs to F1 and CP3, not CQ3.
+- QA1 is always scored, with observable markers separating 2 from 3.
+
+_Scope._ Only the salesEffectiveness and conversationQuality prompts
+changed. The factuality and compliance prompts are byte-identical, pinned
+by test, and their v2 verdicts carry forward under rule 4. The SalesScore
+reading change is the section 6 amendment.
+
+_Result, 2026-10-14._ These are the SE and CQ re-judge numbers, against
+self labels not yet re-checked under v3:
+
+|                     | v3 G8a | within-item null |
+| ------------------- | ------ | ---------------- |
+| salesEffectiveness  | 0.465  | 0.101            |
+| conversationQuality | 0.361  | 0.052            |
+
+Anchors (weighted kappa):
+
+| anchor                  | v3                                            |
+| ----------------------- | --------------------------------------------- |
+| SA1, SE6-declared cases | 0.417 (v1 0.242, v2 0.153 on the same subset) |
+| SA2                     | 0.487                                         |
+| QA1                     | 0.193                                         |
+
+Inter-judge alpha on the anchors is 0.586. Every dimension is still below
+0.6. The pooled order-flip rates (SE 0.138, CQ 0.136, anchors 0.238) all
+breach the 0.10 threshold, and the paper reports them as a breach.
+
 Rules that hold for this and every future revision:
 
 1. Every revision bumps the `version` field in `data/judge-items.json`. Each
@@ -109,10 +180,16 @@ Rules that hold for this and every future revision:
    (`calibration/archive/v<n>-<date>/`), never left inside
    `calibration/judgments/`, which the readers would otherwise load as an
    extra judge.
-3. The paper reports both kappa sets, v1 and v2, side by side, with the
-   trigger and the wording changes. Reporting only the revised number would
-   make the published figure a best-of over rubric drafts, which is precisely
-   what pre-registration exists to prevent.
+3. The paper reports every version's kappa set side by side (v1 canonical
+   per ADR-0036, v2, v3, ...), with the trigger and the wording changes.
+   Reporting only the revised number would make the published figure a
+   best-of over rubric drafts, which is precisely what pre-registration
+   exists to prevent.
+4. Carry-forward (added 2026-10-14). A prior-version verdict may stay in
+   `calibration/judgments/` only when its `promptSha` equals the current
+   builder's `promptSha` for that dimension and item order. That equality
+   must be proven by test, and the readers enforce it. Otherwise rule 2
+   applies.
 
 **Disclosed breach.** The anchor exact-score order-flip rate in the 2026-09-20
 pass was 0.254, above the 0.10 threshold set in section 1, driven by SA2 and

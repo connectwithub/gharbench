@@ -28,6 +28,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { TOOL_SPECS } from '../env/tools.js';
+import { applicableAnchorIds } from '../judge/anchorApplicability.js';
 import {
   CALIBRATION_DIR,
   CASES_DIR,
@@ -35,7 +36,7 @@ import {
   type CalibrationCase,
 } from './calibrationCase.js';
 import { SLICE_FILE } from './calibrationSlice.js';
-import { loadJudgeItems } from './judgeItems.js';
+import { loadJudgeItems, type JudgeItems } from './judgeItems.js';
 import { REPO_ROOT } from './scenarioSet.js';
 
 const PORT = 4174;
@@ -237,7 +238,7 @@ export function buildReference(): {
 export function buildLabel(opts: {
   caseId: string;
   rater: string;
-  itemsVersion: string;
+  rubric: JudgeItems;
   judgeApplicability: CalibrationCase['judgeApplicability'];
   posted: { binary?: unknown; anchors?: unknown; note?: string };
   labeledAt?: string;
@@ -248,13 +249,27 @@ export function buildLabel(opts: {
       asked.has(k),
     ),
   );
+  // ADR-0026 parity: an anchor is answered only where the judges are asked it
+  // (SA1 only on SE6-declared cases). Same rule as the judge parser.
+  const askedAnchors = new Set(
+    (['factuality', 'salesEffectiveness', 'conversationQuality'] as const).flatMap((d) =>
+      applicableAnchorIds(opts.rubric, d, opts.judgeApplicability[d]),
+    ),
+  );
+  const posted = opts.posted.anchors;
+  const anchors =
+    posted !== null && typeof posted === 'object' && !Array.isArray(posted)
+      ? Object.fromEntries(
+          Object.entries(posted as Record<string, unknown>).filter(([k]) => askedAnchors.has(k)),
+        )
+      : posted;
   return calibrationLabelSchema.safeParse({
     caseId: opts.caseId,
     rater: opts.rater,
     labeledAt: opts.labeledAt ?? new Date().toISOString(),
     binary,
-    anchors: opts.posted.anchors,
-    itemsVersion: opts.itemsVersion,
+    anchors,
+    itemsVersion: opts.rubric.version,
     ...(opts.posted.note !== undefined && opts.posted.note !== ''
       ? { note: opts.posted.note }
       : {}),
@@ -388,7 +403,7 @@ export function startServer(
             const parsed = buildLabel({
               caseId,
               rater,
-              itemsVersion: rubric.version,
+              rubric,
               judgeApplicability: caseRaw.judgeApplicability,
               posted,
             });

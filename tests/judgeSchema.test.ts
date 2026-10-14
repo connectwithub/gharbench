@@ -357,3 +357,108 @@ describe('judgeCase retry path', () => {
     }
   });
 });
+
+/**
+ * ADR-0037: the anchors a case must answer are config-derived per case. SA1
+ * is expected only where SE6 is declared, so an SA1 score on an undeclared
+ * case is rejected exactly like a missing SA2 - and the judge is told which
+ * set to answer on the scenario card.
+ */
+describe('judgeCase per-case anchor set (salesEffectiveness)', () => {
+  const seInput = (applicableItems: string[]): JudgeCaseInput => ({
+    caseId: 'cal_se',
+    family: 'objection_handling',
+    language: 'english',
+    applicableItems,
+    messages,
+  });
+  const seReply = (itemIds: string[], anchorIds: string[]): string =>
+    JSON.stringify({
+      items: itemIds.map((id) => ({
+        id,
+        evidence: 'NONE',
+        turn: null,
+        verdict: 'met',
+        justification: 'ok',
+      })),
+      anchors: anchorIds.map((id) => ({ id, evidence: 'NONE', score: 2, justification: 'ok' })),
+      notes: '',
+    });
+
+  it('an SE6-declared case expects SA1 and SA2', async () => {
+    const users: string[] = [];
+    const ok = await judgeCase({
+      call: (_s, user) => {
+        users.push(user);
+        return Promise.resolve(seReply(['SE5', 'SE6'], ['SA1', 'SA2']));
+      },
+      items,
+      dimension: 'salesEffectiveness',
+      input: seInput(['SE5', 'SE6']),
+      sourceDocuments: 'docs',
+    });
+    expect(ok.outcome.kind).toBe('verdict');
+    expect(users[0]).toContain('Then score the applicable anchors: SA1, SA2.');
+
+    const missingSa1 = await judgeCase({
+      call: () => Promise.resolve(seReply(['SE5', 'SE6'], ['SA2'])),
+      items,
+      dimension: 'salesEffectiveness',
+      input: seInput(['SE5', 'SE6']),
+      sourceDocuments: 'docs',
+    });
+    expect(missingSa1.outcome.kind).toBe('error');
+    if (missingSa1.outcome.kind === 'error') {
+      expect(missingSa1.outcome.detail).toContain('anchors: expected exactly items [SA1,SA2]');
+    }
+  });
+
+  it('an undeclared case expects SA2 only and rejects an unasked SA1', async () => {
+    const ok = await judgeCase({
+      call: () => Promise.resolve(seReply(['SE5'], ['SA2'])),
+      items,
+      dimension: 'salesEffectiveness',
+      input: seInput(['SE5']),
+      sourceDocuments: 'docs',
+    });
+    expect(ok.outcome.kind).toBe('verdict');
+    if (ok.outcome.kind === 'verdict') {
+      expect(ok.outcome.verdict.anchors.map((a) => a.id)).toEqual(['SA2']);
+    }
+
+    const users: string[] = [];
+    const extra = await judgeCase({
+      call: (_s, user) => {
+        users.push(user);
+        return Promise.resolve(seReply(['SE5'], ['SA1', 'SA2']));
+      },
+      items,
+      dimension: 'salesEffectiveness',
+      input: seInput(['SE5']),
+      sourceDocuments: 'docs',
+    });
+    expect(extra.outcome.kind).toBe('error');
+    if (extra.outcome.kind === 'error') {
+      expect(extra.outcome.detail).toContain('anchors: expected exactly items [SA2]');
+    }
+    expect(users[0]).not.toContain('SA1');
+  });
+
+  it('dimensions without a conditional anchor keep the full anchor set', async () => {
+    const result = await judgeCase({
+      call: () =>
+        Promise.resolve(
+          JSON.stringify({
+            items: [{ id: 'F1', evidence: 'NONE', turn: null, verdict: 'met', justification: 'x' }],
+            anchors: [{ id: 'FA1', evidence: 'NONE', score: 3, justification: 'x' }],
+            notes: '',
+          }),
+        ),
+      items,
+      dimension: 'factuality',
+      input: { ...seInput(['F1']), family: 'deep_factual' },
+      sourceDocuments: 'docs',
+    });
+    expect(result.outcome.kind).toBe('verdict');
+  });
+});

@@ -6,7 +6,7 @@
  * judge is broken.
  */
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -14,6 +14,8 @@ import { SYNTHETIC_CASES } from '../src/run/calibrationSeed.js';
 import { calibrationCaseSchema, calibrationExpectedSchema } from '../src/run/calibrationCase.js';
 import { binaryItemIds, loadJudgeItems } from '../src/run/judgeItems.js';
 import { REPO_ROOT } from '../src/run/scenarioSet.js';
+
+const HEDGE_ID = 'cal_syn_pass_hedge_outside_docs';
 
 const rubric = binaryItemIds(loadJudgeItems());
 const allIds = new Set([
@@ -156,5 +158,32 @@ describe('synthetic calibration anchors', () => {
     expect(gold.project.amenities).not.toContain('rooftop_infinity_pool');
     expect(gold.project.amenities.join(' ')).not.toMatch(/theatre|theater/);
     expect(gold.project.charges.stampDutyPercent).toBe(6);
+  });
+});
+
+describe('hedge_outside_docs premise (corpus-true)', () => {
+  const hedge = SYNTHETIC_CASES.find((s) => s.case.caseId === HEDGE_ID);
+
+  it('the seed notes match the corpus: CCTV is documented for some common areas only', () => {
+    const spec = readFileSync(
+      join(REPO_ROOT, 'data', 'corpus', 'documents', 'spec-sheet.md'),
+      'utf8',
+    );
+    expect(spec).toContain('CCTV coverage of entrances, lobbies, podium and basement');
+    expect(hedge?.expected.notes).toMatch(/partly outside the docs/);
+    expect(hedge?.expected.notes).not.toMatch(/Asked outside the docs/);
+  });
+
+  it('the on-disk sidecar and case file are exactly what the generator writes', () => {
+    if (hedge === undefined) throw new Error(`${HEDGE_ID} missing from SYNTHETIC_CASES`);
+    const dir = join(REPO_ROOT, 'calibration');
+    // calibration/ is gitignored (the answer key); CI has no copy to compare.
+    if (!existsSync(join(dir, 'cases', `${HEDGE_ID}.json`))) return;
+    expect(readFileSync(join(dir, 'cases', `${HEDGE_ID}.json`), 'utf8')).toBe(
+      JSON.stringify(hedge.case, null, 2) + '\n',
+    );
+    expect(readFileSync(join(dir, 'expected', `${HEDGE_ID}.json`), 'utf8')).toBe(
+      JSON.stringify(hedge.expected, null, 2) + '\n',
+    );
   });
 });

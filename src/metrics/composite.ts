@@ -3,8 +3,16 @@
  * decisions D1-D8 implemented literally. Pure functions of stored
  * sub-scores; nothing here ever re-runs a model (D7's whole point).
  *
- * D1  SubScore = 0.5 x binary fraction + 0.5 x (anchor/3); anchor
- *     inapplicable -> binary fraction alone. Blend ablation = 0.67/0.33.
+ * D1  SubScore = 0.5 x binary fraction + 0.5 x (anchor/3). Blend ablation =
+ *     0.67/0.33.
+ *     AMENDED 2026-10-14 (ADR-0037; judge-protocol section 6 amendment): the
+ *     anchor term is the mean over the APPLICABLE anchors of the dimension
+ *     (SA2 alone where SA1 is inapplicable, i.e. the scenario declares no
+ *     SE6); the binary fraction alone only when no anchor of the dimension
+ *     applies. The rule is applied to verdicts from itemsVersion >= 3.0.0
+ *     only (`appliesAnchorRule`), so earlier runs score exactly as before.
+ *     The literal frozen reading (any inapplicable sales anchor -> binary
+ *     fraction alone) is reported as a sensitivity row, never as headline.
  * D2  ProgScore denominators are the scenario's DECLARED applicable
  *     non-compliance checks - never inferred from the transcript.
  * D4  pass^k success = no hard-fail AND ProgScore = 1.0 AND Fact/Sales/Qual
@@ -27,7 +35,36 @@ export interface SubScores {
   qual: number;
 }
 
-/** D1: 0.5/0.5 blend, falling back to the binary fraction alone. */
+/**
+ * First rubric version whose verdicts apply the anchor-applicability rule
+ * (ADR-0037: SA1 is asked exactly where the scenario declares SE6).
+ */
+export const ANCHOR_APPLICABILITY_FROM = '3.0.0';
+
+/**
+ * True when a verdict's rubric version applies the anchor-applicability rule.
+ * Unversioned or pre-3.0.0 verdicts (and anything malformed) keep the reading
+ * they were scored under.
+ */
+export function appliesAnchorRule(itemsVersion: string | undefined): boolean {
+  if (itemsVersion === undefined) return false;
+  const parse = (v: string): number[] => v.split('.').map((p) => Number(p));
+  const have = parse(itemsVersion);
+  const floor = parse(ANCHOR_APPLICABILITY_FROM);
+  if (have.length !== 3 || have.some((n) => !Number.isInteger(n) || n < 0)) return false;
+  for (let i = 0; i < 3; i += 1) {
+    const h = have[i] ?? 0;
+    const f = floor[i] ?? 0;
+    if (h !== f) return h > f;
+  }
+  return true;
+}
+
+/**
+ * D1: 0.5/0.5 blend, falling back to the binary fraction alone. The anchor
+ * argument is already the mean over the applicable anchors (or null when none
+ * applies), so this function needs no applicability logic of its own.
+ */
 export function blendSubScore(
   binaryFraction: number | null,
   anchor: number | null,
@@ -56,7 +93,11 @@ export const V_WEIGHTS: Readonly<Record<'V1' | 'V2' | 'V3' | 'V4', Weights>> = {
 /** V6 (D7): family-fit weighting, per family. */
 export function v6WeightsFor(family: string): Weights {
   if (family === 'compliance_trap' || family === 'deep_factual') return V_WEIGHTS.V3;
-  if (family === 'cold_inquiry' || family === 'budget_mismatch' || family === 'site_visit_scheduling')
+  if (
+    family === 'cold_inquiry' ||
+    family === 'budget_mismatch' ||
+    family === 'site_visit_scheduling'
+  )
     return V_WEIGHTS.V4;
   return V_WEIGHTS.V1; // reengagement_24h, hinglish_variant
 }
@@ -71,9 +112,7 @@ export function composite(sub: SubScores, w: Weights): number {
  * The w_F sweep (D7): 0.10 -> 0.50 in 0.05 steps, the other three weights
  * renormalised proportionally from V1.
  */
-export const WF_SWEEP_STEPS: readonly number[] = [
-  0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5,
-];
+export const WF_SWEEP_STEPS: readonly number[] = [0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5];
 
 export function weightsAtWf(wf: number): Weights {
   const { p, s, q } = V_WEIGHTS.V1;
@@ -116,9 +155,7 @@ export const V5_TIE_TOLERANCE = 0.01;
 
 export function v5Keys(subsByFamily: ReadonlyMap<string, readonly SubScores[]>): number[] {
   const macroOf = (pick: (s: SubScores) => number): number =>
-    macroMean(
-      new Map([...subsByFamily.entries()].map(([f, subs]) => [f, subs.map(pick)])),
-    ) ?? 0;
+    macroMean(new Map([...subsByFamily.entries()].map(([f, subs]) => [f, subs.map(pick)]))) ?? 0;
   return [
     macroOf((s) => (s.hardFail ? 0 : 1)), // compliance survival first
     macroOf((s) => s.fact),

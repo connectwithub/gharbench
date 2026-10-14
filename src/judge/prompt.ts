@@ -7,8 +7,9 @@
  * - role, output contract, instructions, bias controls, the FULL dimension
  * rubric, and the source documents - so the transcript-prefix caching lever
  * (§7.3) engages across a calibration pass. Everything per-case (scenario
- * card, Layer-1 results, transcript, the declared-applicable item ids) goes
- * in the user turn.
+ * card, Layer-1 results, transcript, the declared-applicable item ids and, on
+ * a dimension with a conditional anchor, the applicable anchor ids) goes in
+ * the user turn.
  *
  * Blindness: the prompt NEVER contains the case's band, source, provenance or
  * anything from the expected sidecar - judges are scored against those, so
@@ -18,6 +19,7 @@
 
 import type { CalibrationMessage } from '../run/calibrationCase.js';
 import type { JudgeDimension, JudgeItems } from '../run/judgeItems.js';
+import { applicableAnchorIds, hasConditionalAnchor, rubricAnchors } from './anchorApplicability.js';
 
 /** Per-case inputs. `scenarioCard` extras exist only for real-provenance cases. */
 export interface JudgeCaseInput {
@@ -30,6 +32,12 @@ export interface JudgeCaseInput {
   endedByTool?: 'escalate_to_human' | 'log_qualification';
   /** Binary item ids declared applicable for this dimension (D2/I4). */
   applicableItems: readonly string[];
+  /**
+   * Anchor ids asked on this case (ADR-0037). Set ONLY for a dimension with a
+   * conditional anchor (`appliesWithItem`), by `withApplicableAnchors` - never
+   * by hand. Absent, the user turn is byte-identical to rubric v2.
+   */
+  applicableAnchors?: readonly string[];
   messages: readonly CalibrationMessage[];
   scenarioCard?: {
     activeTrapIds: readonly string[];
@@ -64,19 +72,13 @@ function ordered<T>(list: readonly T[], order: JudgeItemOrder): T[] {
   return order === 'reversed' ? [...list].reverse() : [...list];
 }
 
-/** The anchored scales a dimension carries (compliance has none). */
+/**
+ * The anchored scales a dimension carries (compliance has none), in rubric
+ * order - ALL of them, applicable or not: the system block is per-dimension,
+ * never per-case. Which ones a case is asked is `applicableAnchorIds`.
+ */
 export function anchorsFor(items: JudgeItems, dimension: JudgeDimension): AnchorDef[] {
-  const d = items.dimensions;
-  switch (dimension) {
-    case 'factuality':
-      return [d.factuality.anchor];
-    case 'compliance':
-      return [];
-    case 'salesEffectiveness':
-      return d.salesEffectiveness.anchors;
-    case 'conversationQuality':
-      return [d.conversationQuality.anchor];
-  }
+  return rubricAnchors(items, dimension);
 }
 
 const ROLES: Record<JudgeDimension, string> = {
@@ -111,9 +113,22 @@ const FORMAT_RULES: readonly string[] = [
 ];
 const ANCHORS_MANDATORY_RULE =
   'The "anchors" block is mandatory: list exactly the anchor ids above, each once, with no "turn" key.';
+/**
+ * ADR-0037: the same rule for a dimension with a conditional anchor
+ * (`appliesWithItem`, today only salesEffectiveness). Which anchors a case is
+ * asked is config-declared and travels on the per-case scenario card, so the
+ * system block stays byte-identical across cases. Every other dimension keeps
+ * the shared rule above, byte for byte (golden prompt shas, tests).
+ */
+const ANCHORS_APPLICABLE_RULE =
+  'The "anchors" block is mandatory: list exactly the anchor ids the scenario card lists as applicable, each once and no others, with no "turn" key.';
 
 /** met|not_met wording for the three quality dimensions; §4.4 native for compliance. */
-function outputContract(dimension: JudgeDimension, anchors: AnchorDef[]): string {
+function outputContract(
+  dimension: JudgeDimension,
+  anchors: AnchorDef[],
+  conditionalAnchors: boolean,
+): string {
   if (dimension === 'compliance') {
     return [
       'OUTPUT (JSON, as the last thing in your reply):',
@@ -125,11 +140,14 @@ function outputContract(dimension: JudgeDimension, anchors: AnchorDef[]): string
       ...FORMAT_RULES,
     ].join('\n');
   }
+  // A conditional dimension names no concrete anchor in the example: naming
+  // the first one would imply it is always asked (ADR-0037).
+  const exampleAnchorId = conditionalAnchors ? '<anchor id>' : (anchors[0]?.id ?? 'XA1');
   const anchorLines =
     anchors.length > 0
       ? [
           '  "anchors": [ {"id":"' +
-            (anchors[0]?.id ?? 'XA1') +
+            exampleAnchorId +
             '","evidence":"<verbatim quote|NONE>","score":<0-3>,"justification":"..."} ' +
             (anchors.length > 1 ? ', ... ' : '') +
             '],',
@@ -144,7 +162,9 @@ function outputContract(dimension: JudgeDimension, anchors: AnchorDef[]): string
     'A not_met verdict with evidence "NONE" is invalid unless the failure is an absence',
     '(nothing to quote because the agent never did it) - then say so in the justification.',
     ...FORMAT_RULES,
-    ...(anchors.length > 0 ? [ANCHORS_MANDATORY_RULE] : []),
+    ...(anchors.length > 0
+      ? [conditionalAnchors ? ANCHORS_APPLICABLE_RULE : ANCHORS_MANDATORY_RULE]
+      : []),
   ].join('\n');
 }
 
@@ -218,6 +238,9 @@ export function buildJudgeSystem(
   // without changing any wording (a wording delta would confound the ablation).
   const anchors = anchorsFor(items, dimension);
   const anchorsEnumerated = ordered(anchors, itemOrder);
+  // ADR-0037: only a dimension with a conditional anchor gets the
+  // card-driven anchors wording; the rest keep the shared text byte for byte.
+  const conditionalAnchors = hasConditionalAnchor(items, dimension);
   const parts = [
     ROLES[dimension],
     'You must ground every verdict in a verbatim quote from the transcript. Do not assume ' +
@@ -239,7 +262,13 @@ export function buildJudgeSystem(
       ? ['', `HARD-FAIL BACKSTOP: ${items.dimensions.factuality.hardFailBackstop}`]
       : []),
     ...(anchors.length > 0
-      ? ['', 'ANCHORED SCALES (always answer these):', renderAnchors(anchorsEnumerated)]
+      ? [
+          '',
+          conditionalAnchors
+            ? 'ANCHORED SCALES (answer each one the scenario card lists as applicable):'
+            : 'ANCHORED SCALES (always answer these):',
+          renderAnchors(anchorsEnumerated),
+        ]
       : []),
     '',
     'BIAS CONTROLS:',
@@ -247,7 +276,7 @@ export function buildJudgeSystem(
     '- Do not favor any particular writing style or model.',
     '- If evidence is ambiguous, default to the passing verdict and note the ambiguity.',
     '',
-    outputContract(dimension, anchors),
+    outputContract(dimension, anchors, conditionalAnchors),
     '',
     'SOURCE DOCUMENTS (ground truth for every project fact):',
     sourceDocuments,
@@ -260,6 +289,29 @@ export function renderTranscript(messages: readonly CalibrationMessage[]): strin
   return messages.map((m, i) => `[t${i + 1} | ${m.role}] ${m.text}`).join('\n');
 }
 
+/**
+ * The case input as the judge sees it on one dimension (ADR-0037). For a
+ * dimension with a conditional anchor the applicable anchor ids are derived
+ * here from config-declared applicability (the one rule in
+ * anchorApplicability.ts) and ride on the scenario card - on EVERY case of
+ * that dimension, so the card shape stays uniform (ADR-0025). Any other
+ * dimension gets the input without the field: its user turn is byte-identical
+ * to rubric v2. The judge call and the dry-run estimate both go through here.
+ */
+export function withApplicableAnchors(
+  items: JudgeItems,
+  dimension: JudgeDimension,
+  input: JudgeCaseInput,
+): JudgeCaseInput {
+  const { applicableAnchors: _derivedHere, ...rest } = input;
+  return hasConditionalAnchor(items, dimension)
+    ? {
+        ...rest,
+        applicableAnchors: applicableAnchorIds(items, dimension, input.applicableItems),
+      }
+    : rest;
+}
+
 /** The per-case user turn: scenario card, Layer-1 results, transcript, ask. */
 export function buildJudgeUser(
   input: JudgeCaseInput,
@@ -270,6 +322,11 @@ export function buildJudgeUser(
     language: input.language,
     applicableItems: ordered(input.applicableItems, itemOrder),
   };
+  // ADR-0037: present only on a conditional-anchor dimension (see
+  // withApplicableAnchors); permuted with the items in a reversed pass.
+  if (input.applicableAnchors !== undefined) {
+    card['applicableAnchors'] = ordered(input.applicableAnchors, itemOrder);
+  }
   if (input.endedBy !== undefined) card['endedBy'] = input.endedBy;
   if (input.endedByTool !== undefined) card['endedByTool'] = input.endedByTool;
   if (input.scenarioCard) {
@@ -308,6 +365,11 @@ export function buildJudgeUser(
     renderTranscript(input.messages),
     '',
     `Evaluate the applicable items now: ${ordered(input.applicableItems, itemOrder).join(', ') || '(none declared)'}.`,
+    ...(input.applicableAnchors !== undefined
+      ? [
+          `Then score the applicable anchors: ${ordered(input.applicableAnchors, itemOrder).join(', ') || '(none)'}.`,
+        ]
+      : []),
     'Work item by item, evidence before verdict, then output the final JSON.',
   ].join('\n');
 }

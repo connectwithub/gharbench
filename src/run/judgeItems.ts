@@ -2,7 +2,9 @@
  * The machine-readable judge rubric (Master Plan §4.2), loaded and validated.
  *
  * Scenario configs declare binary-item applicability per dimension (D2/I4);
- * the anchored 0-3 scales are cross-family and apply by default. This module
+ * the anchored 0-3 scales are cross-family and apply by default, unless an
+ * anchor names `appliesWithItem` - then it is asked only where the scenario
+ * declares that binary item (ADR-0037). This module
  * is the single source the calibration labeler (Phase 4) and the judge
  * prompts (Phase 5) both read, so the human labels and the judge questions
  * can never drift apart.
@@ -26,50 +28,84 @@ const anchorSchema = z.strictObject({
   examples: z
     .strictObject({ 0: z.string(), 1: z.string(), 2: z.string(), 3: z.string() })
     .optional(),
+  /**
+   * Config-time applicability (Master Plan I4/D2, ADR-0037): when set, the
+   * anchor is asked only on conversations whose scenario declares this binary
+   * item for the same dimension. Never judge-decided. Absent = always asked.
+   */
+  appliesWithItem: z
+    .string()
+    .regex(/^[A-Z]{1,2}\d{1,2}$/)
+    .optional(),
 });
 
 const binaryMap = z.record(z.string().regex(/^[A-Z]{1,2}\d{1,2}$/), z.string().min(1));
 
-export const judgeItemsSchema = z.strictObject({
-  version: z.string().min(1),
-  source: z.string().min(1),
-  /**
-   * GharBench-authored clarifications of ambiguous items (ADR-0026), keyed by
-   * item id. Rendered to BOTH the human labeler UI and the judge system
-   * prompt from this one source - guidance one side sees and the other does
-   * not would skew G8 agreement.
-   */
-  interpretationNotes: z
-    .record(z.string().regex(/^[A-Z]{1,2}\d{1,2}$/), z.string().min(1))
-    .optional(),
-  dimensions: z.strictObject({
-    factuality: z.strictObject({
-      name: z.string(),
-      aggregation: z.string(),
-      binary: binaryMap,
-      anchor: anchorSchema,
-      hardFailBackstop: z.string(),
+export const judgeItemsSchema = z
+  .strictObject({
+    version: z.string().min(1),
+    source: z.string().min(1),
+    /**
+     * GharBench-authored clarifications of ambiguous items (ADR-0026), keyed by
+     * item id. Rendered to BOTH the human labeler UI and the judge system
+     * prompt from this one source - guidance one side sees and the other does
+     * not would skew G8 agreement.
+     */
+    interpretationNotes: z
+      .record(z.string().regex(/^[A-Z]{1,2}\d{1,2}$/), z.string().min(1))
+      .optional(),
+    dimensions: z.strictObject({
+      factuality: z.strictObject({
+        name: z.string(),
+        aggregation: z.string(),
+        binary: binaryMap,
+        anchor: anchorSchema,
+        hardFailBackstop: z.string(),
+      }),
+      compliance: z.strictObject({
+        name: z.string(),
+        aggregation: z.string(),
+        evidenceRule: z.string(),
+        binary: binaryMap,
+      }),
+      salesEffectiveness: z.strictObject({
+        name: z.string(),
+        aggregation: z.string(),
+        binary: binaryMap,
+        anchors: z.array(anchorSchema).min(1),
+      }),
+      conversationQuality: z.strictObject({
+        name: z.string(),
+        aggregation: z.string(),
+        binary: binaryMap,
+        anchor: anchorSchema,
+      }),
     }),
-    compliance: z.strictObject({
-      name: z.string(),
-      aggregation: z.string(),
-      evidenceRule: z.string(),
-      binary: binaryMap,
-    }),
-    salesEffectiveness: z.strictObject({
-      name: z.string(),
-      aggregation: z.string(),
-      binary: binaryMap,
-      anchors: z.array(anchorSchema).min(1),
-    }),
-    conversationQuality: z.strictObject({
-      name: z.string(),
-      aggregation: z.string(),
-      binary: binaryMap,
-      anchor: anchorSchema,
-    }),
-  }),
-});
+  })
+  .superRefine((items, ctx) => {
+    // ADR-0037: a conditional anchor must name a binary item of its OWN
+    // dimension. A typo or a cross-dimension id would otherwise never be
+    // declared on any scenario, silently dropping the anchor everywhere.
+    const d = items.dimensions;
+    const anchored = [
+      ['factuality', d.factuality.binary, [d.factuality.anchor]],
+      ['salesEffectiveness', d.salesEffectiveness.binary, d.salesEffectiveness.anchors],
+      ['conversationQuality', d.conversationQuality.binary, [d.conversationQuality.anchor]],
+    ] as const;
+    for (const [dimension, binary, anchors] of anchored) {
+      const own = Object.keys(binary);
+      for (const anchor of anchors) {
+        if (anchor.appliesWithItem === undefined || own.includes(anchor.appliesWithItem)) continue;
+        ctx.addIssue({
+          code: 'custom',
+          path: ['dimensions', dimension],
+          message:
+            `${dimension} anchor ${anchor.id}: appliesWithItem "${anchor.appliesWithItem}" ` +
+            `is not a ${dimension} binary item id (${own.join(', ')})`,
+        });
+      }
+    }
+  });
 
 export type JudgeItems = z.infer<typeof judgeItemsSchema>;
 export type JudgeDimension = keyof JudgeItems['dimensions'];

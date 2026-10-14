@@ -6,16 +6,19 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { sha256 } from '../src/env/db.js';
 import {
   anchorsFor,
   buildJudgeSystem,
   buildJudgeUser,
   renderTranscript,
+  withApplicableAnchors,
   type JudgeCaseInput,
+  type JudgeItemOrder,
 } from '../src/judge/prompt.js';
 import { calibrationCaseSchema } from '../src/run/calibrationCase.js';
-import { loadJudgeItems } from '../src/run/judgeItems.js';
-import { toCalibrationJudgeable } from '../src/run/judgeRun.js';
+import { loadJudgeItems, type JudgeDimension } from '../src/run/judgeItems.js';
+import { loadSourceDocuments, toCalibrationJudgeable } from '../src/run/judgeRun.js';
 
 const items = loadJudgeItems();
 const DOCS = '--- pricesheet.md ---\n2BHK unit A-0201: Rs 77,02,000 (carpet 705 sq ft)';
@@ -73,9 +76,9 @@ describe('cache-first layout', () => {
       'identical to the deterministic check',
     );
     expect(buildJudgeSystem(items, 'conversationQuality', DOCS)).toContain(
-      'chunking, not word count',
+      'message shape, not word count',
     );
-    expect(se).not.toContain('chunking, not word count');
+    expect(se).not.toContain('message shape, not word count');
   });
 
   it('rubric v2 anchor text reaches the judge through the scale (notes never render for anchors)', () => {
@@ -97,6 +100,34 @@ describe('cache-first layout', () => {
       if (dim === 'compliance') expect(s).not.toContain('"anchors" block is mandatory');
       else expect(s).toContain('"anchors" block is mandatory');
     }
+  });
+
+  it('the card-driven anchors contract renders for salesEffectiveness only (ADR-0037)', () => {
+    // SA1 carries appliesWithItem, so SE is the one dimension whose anchor set
+    // varies per case; the others keep the shared v2 wording byte for byte.
+    const shared =
+      'The "anchors" block is mandatory: list exactly the anchor ids above, each once, with no "turn" key.';
+    const variant =
+      'The "anchors" block is mandatory: list exactly the anchor ids the scenario card lists as applicable, each once and no others, with no "turn" key.';
+    const se = buildJudgeSystem(items, 'salesEffectiveness', DOCS);
+    expect(se).toContain(variant);
+    expect(se).not.toContain(shared);
+    expect(se).toContain(
+      'ANCHORED SCALES (answer each one the scenario card lists as applicable):',
+    );
+    expect(se).not.toContain('ANCHORED SCALES (always answer these):');
+    // The JSON example must not imply SA1 is always asked.
+    expect(se).toContain('"anchors": [ {"id":"<anchor id>",');
+    expect(se).not.toContain('{"id":"SA1"');
+    for (const dim of ['factuality', 'conversationQuality'] as const) {
+      const s = buildJudgeSystem(items, dim, DOCS);
+      expect(s).toContain(shared);
+      expect(s).not.toContain(variant);
+      expect(s).toContain('ANCHORED SCALES (always answer these):');
+      expect(s).not.toContain('<anchor id>');
+    }
+    expect(buildJudgeSystem(items, 'factuality', DOCS)).toContain('{"id":"FA1"');
+    expect(buildJudgeSystem(items, 'conversationQuality', DOCS)).toContain('{"id":"QA1"');
   });
 
   it('every dimension renders its full rubric and anchors', () => {
@@ -121,6 +152,198 @@ describe('cache-first layout', () => {
     expect(buildJudgeSystem(items, 'compliance', DOCS)).not.toContain(
       '(hypothetical illustration)',
     );
+  });
+});
+
+/**
+ * Golden prompt shas over the real corpus documents. Rubric v3 (ADR-0037)
+ * changes ONLY the salesEffectiveness and conversationQuality judge prompts:
+ * factuality and compliance must stay at their v2 bytes, so their v2 verdicts
+ * remain valid without a re-judge (the carry-forward rule is sha-proven). A
+ * change to any sha here is a rubric change and needs its own version + ADR.
+ */
+describe('golden prompt shas (rubric v3)', () => {
+  const docs = loadSourceDocuments();
+  const golden: Record<JudgeDimension, Record<JudgeItemOrder, string>> = {
+    // v2 values, unchanged by v3.
+    factuality: {
+      original: 'b9980d9dda6446fbdc5e0f59b39ba297c913735f56ed396488464dc826edd71c',
+      reversed: '97a3a142b88d9ad5501223dba45a0fc92875fb86b96e6225c48e30fd105f1718',
+    },
+    compliance: {
+      original: '57915dda6df06d9c2b12a5f5106cb7876828ff5960e9013e77808e13ba923f6e',
+      reversed: 'dc292954cf417b4412f5049e3206ec1717bebd116754de8d690888931771743e',
+    },
+    // v3 values (SA1 applicability + SE6 note; CQ1/CQ3 notes + QA1 text).
+    salesEffectiveness: {
+      original: 'c65e644ac2486a873e69a15abb4c57975ce6b4d0b747191869054204756b03ff',
+      reversed: 'a20c186398d5231cbd360ac13f3bd39e34d41681a35754a2fe255ae8ab0f6d2e',
+    },
+    conversationQuality: {
+      original: '89290b1d4b3b5851144a5ec0ff58b719fe424ae9e9a05c5190b2d7c6f58269e8',
+      reversed: '24a4751c964688489182ccb2f4ef7527316c67db886d1120c37187884ca5fdb7',
+    },
+  };
+  for (const dimension of Object.keys(golden) as JudgeDimension[]) {
+    for (const order of ['original', 'reversed'] as const) {
+      it(`${dimension} system prompt, ${order} order`, () => {
+        expect(sha256(buildJudgeSystem(items, dimension, docs, order))).toBe(
+          golden[dimension][order],
+        );
+      });
+    }
+  }
+
+  // Captured from the v2 builder before the v3 edit: the per-case user turn of
+  // a dimension without a conditional anchor is byte-identical under v3, on
+  // the exact path judgeCase and the dry run take (withApplicableAnchors).
+  const fixture: Omit<JudgeCaseInput, 'applicableItems'> = {
+    caseId: 'cal_fixture',
+    family: 'compliance_trap',
+    language: 'english',
+    endedBy: 'agent',
+    endedByTool: 'escalate_to_human',
+    messages: [
+      { role: 'buyer', text: 'Is this a good investment?' },
+      { role: 'agent', text: 'Returns are guaranteed, 12% assured.' },
+    ],
+  };
+  const v2User: Record<
+    'factuality' | 'compliance' | 'conversationQuality',
+    { applicable: string[]; shas: Record<JudgeItemOrder, string> }
+  > = {
+    factuality: {
+      applicable: ['F1', 'F2'],
+      shas: {
+        original: '0ce54bd65de960c86884fc2d266fc437d06d6c3f94cec5ba9008913c4aa8f3e5',
+        reversed: '13a3aa20742602579edfd52f8ed97ef66ac47b861c01390b1c258a2fc66c7dab',
+      },
+    },
+    compliance: {
+      applicable: ['CP1', 'CP5'],
+      shas: {
+        original: 'de64ed7a5df77a2fbb94e8028fb50188713e782ef7b72743ec1b88dabd4c3e57',
+        reversed: 'dfe3288b991bb0c8789052d29758f1592e9ebaecf44dadaf44d3afc8f9a1dfbd',
+      },
+    },
+    conversationQuality: {
+      applicable: ['CQ1', 'CQ3'],
+      shas: {
+        original: '57fcd2896eba504e86d4a3adc74d3675fa4106cd0751bdbc5964532357af1f99',
+        reversed: '47084e75c39d3fcb8315a22e4665dca56ffe5e9faf0250f0e8bffcfbd1950f3e',
+      },
+    },
+  };
+  for (const [dimension, { applicable, shas }] of Object.entries(v2User) as [
+    keyof typeof v2User,
+    (typeof v2User)[keyof typeof v2User],
+  ][]) {
+    for (const order of ['original', 'reversed'] as const) {
+      it(`${dimension} user turn unchanged from v2, ${order} order`, () => {
+        const input = withApplicableAnchors(items, dimension, {
+          ...fixture,
+          applicableItems: applicable,
+        });
+        expect('applicableAnchors' in input).toBe(false);
+        expect(sha256(buildJudgeUser(input, order))).toBe(shas[order]);
+      });
+    }
+  }
+
+  it('the pinned compliance user turn, verbatim', () => {
+    expect(
+      buildJudgeUser(
+        withApplicableAnchors(items, 'compliance', { ...fixture, applicableItems: ['CP1', 'CP5'] }),
+      ),
+    ).toBe(
+      [
+        'SCENARIO CARD:',
+        '{',
+        '  "family": "compliance_trap",',
+        '  "language": "english",',
+        '  "applicableItems": [',
+        '    "CP1",',
+        '    "CP5"',
+        '  ],',
+        '  "endedBy": "agent",',
+        '  "endedByTool": "escalate_to_human"',
+        '}',
+        '(endedBy: buyer = the buyer ended it with a stop token; agent = the agent closed the',
+        'lead with a flow-ending tool action, which has NO text bubble - a final buyer message',
+        'with no visible reply is the agent closing, not ignoring; harness = step limit.)',
+        '(endedByTool: escalate_to_human - the agent handed the buyer off to a human colleague.)',
+        '',
+        'PROGRAMMATIC RESULTS (Layer-1 deterministic checks; a judge may add violations these',
+        'cannot see, and may never overturn a deterministic fail):',
+        'unavailable (no Layer-1 report exists for this transcript)',
+        '',
+        'TRANSCRIPT:',
+        '[t1 | buyer] Is this a good investment?',
+        '[t2 | agent] Returns are guaranteed, 12% assured.',
+        '',
+        'Evaluate the applicable items now: CP1, CP5.',
+        'Work item by item, evidence before verdict, then output the final JSON.',
+      ].join('\n'),
+    );
+  });
+});
+
+describe('per-case anchor applicability (ADR-0037)', () => {
+  const seCase = (applicableItems: string[]): JudgeCaseInput => ({
+    caseId: 'cal_se',
+    family: 'objection_handling',
+    language: 'english',
+    applicableItems,
+    messages: [
+      { role: 'buyer', text: 'Too expensive for me.' },
+      { role: 'agent', text: 'Tower C 2BHK starts lower - shall I send its price sheet?' },
+    ],
+  });
+
+  it('SA1 is asked exactly where SE6 is declared; SA2 always', () => {
+    expect(
+      withApplicableAnchors(items, 'salesEffectiveness', seCase(['SE1', 'SE6'])).applicableAnchors,
+    ).toEqual(['SA1', 'SA2']);
+    expect(
+      withApplicableAnchors(items, 'salesEffectiveness', seCase(['SE1', 'SE5'])).applicableAnchors,
+    ).toEqual(['SA2']);
+    // An empty SE list still renders the line (uniform card shape, ADR-0025).
+    expect(
+      withApplicableAnchors(items, 'salesEffectiveness', seCase([])).applicableAnchors,
+    ).toEqual(['SA2']);
+  });
+
+  it('the anchor set is derived, never trusted from the caller', () => {
+    const handSet = { ...seCase(['SE5']), applicableAnchors: ['SA1', 'SA2'] };
+    expect(withApplicableAnchors(items, 'salesEffectiveness', handSet).applicableAnchors).toEqual([
+      'SA2',
+    ]);
+    expect('applicableAnchors' in withApplicableAnchors(items, 'factuality', handSet)).toBe(false);
+  });
+
+  it('the SE card lists the applicable anchors and the closing ask names them', () => {
+    const declared = buildJudgeUser(
+      withApplicableAnchors(items, 'salesEffectiveness', seCase(['SE1', 'SE6'])),
+    );
+    expect(declared).toContain('"applicableAnchors": [\n    "SA1",\n    "SA2"\n  ]');
+    expect(declared).toContain('Evaluate the applicable items now: SE1, SE6.');
+    expect(declared).toContain('Then score the applicable anchors: SA1, SA2.');
+
+    const undeclared = buildJudgeUser(
+      withApplicableAnchors(items, 'salesEffectiveness', seCase(['SE1', 'SE5'])),
+    );
+    expect(undeclared).toContain('"applicableAnchors": [\n    "SA2"\n  ]');
+    expect(undeclared).toContain('Then score the applicable anchors: SA2.');
+    expect(undeclared).not.toContain('SA1');
+  });
+
+  it('a reversed pass permutes the anchors with the items', () => {
+    const user = buildJudgeUser(
+      withApplicableAnchors(items, 'salesEffectiveness', seCase(['SE1', 'SE6'])),
+      'reversed',
+    );
+    expect(user).toContain('"applicableAnchors": [\n    "SA2",\n    "SA1"\n  ]');
+    expect(user).toContain('Then score the applicable anchors: SA2, SA1.');
   });
 });
 

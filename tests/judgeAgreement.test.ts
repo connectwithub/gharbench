@@ -11,11 +11,20 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { sha256 } from '../src/env/db.js';
+import { buildJudgeSystem } from '../src/judge/prompt.js';
+import { loadJudgeItems } from '../src/run/judgeItems.js';
 import {
   adjudicatedReference,
   assembleUnits,
+  agreementPaths,
   binaryAgreement,
+  carryForwardGuard,
   compliancePrf,
+  computeAgreement,
+  parseAgreementArgs,
+  perItemAgreement,
+  withinItemPermutationNull,
   itemsVersionsOf,
   listRaters,
   loadJudgments,
@@ -23,6 +32,7 @@ import {
   retestAgreement,
   versionWarnings,
   versionsFromLabels,
+  type BinaryUnit,
   type BridgeFn,
 } from '../src/run/judgeAgreement.js';
 import type { StoredJudgment } from '../src/run/judgeRun.js';
@@ -379,6 +389,240 @@ describe('listRaters', () => {
       for (const d of ['self', 'rater_b', 'archived-purged'])
         mkdirSync(join(base, 'labels', d), { recursive: true });
       expect(listRaters(base)).toEqual(['rater_b', 'self']);
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
+});
+
+// ------------------------------------------------- v3 reporting additions --
+
+describe('agreementPaths', () => {
+  it('defaults to the live calibration layout, guard on', () => {
+    const p = agreementPaths();
+    expect(p.historical).toBe(false);
+    expect(p.judgmentsDir.endsWith(join('calibration', 'judgments'))).toBe(true);
+    expect(p.outFile.endsWith(join('calibration', 'agreement.json'))).toBe(true);
+  });
+
+  it('threads one base dir through every path, out defaulting under it', () => {
+    const p = agreementPaths('/x/arch');
+    expect(p).toMatchObject({
+      casesDir: '/x/arch/cases',
+      judgmentsDir: '/x/arch/judgments',
+      reversedDir: '/x/arch/judgments-reversed',
+      retestDir: '/x/arch/judgments-retest',
+      sliceFile: '/x/arch/slice-50.json',
+      expectedDir: '/x/arch/expected',
+      outFile: '/x/arch/agreement.json',
+      historical: true,
+    });
+    expect(agreementPaths('/x/arch', '/y/o.json').outFile).toBe('/y/o.json');
+  });
+
+  it('parses the CLI flags and rejects strangers', () => {
+    expect(
+      parseAgreementArgs(['--base-dir=a', '--out=b', '--declared-only', '--permutations=5']),
+    ).toEqual({
+      baseDir: 'a',
+      outFile: 'b',
+      declaredOnly: true,
+      permutations: 5,
+    });
+    expect(() => parseAgreementArgs(['--nope'])).toThrow(/unknown argument/);
+  });
+});
+
+describe('computeAgreement --base-dir', () => {
+  function fakeBridge(): BridgeFn {
+    return () => ({
+      krippendorff_alpha: 0.5,
+      cohen_kappa: 0.25,
+      weighted_kappa: 0.25,
+      spearman: 0.25,
+      pearson: 0.25,
+    });
+  }
+
+  it('reads only the fixture snapshot and writes nowhere itself', () => {
+    const base = mkdtempSync(join(tmpdir(), 'gb-agree-'));
+    try {
+      const c = makeCase('cal_1', 'borderline', ['CP5']);
+      mkdirSync(join(base, 'cases'), { recursive: true });
+      writeFileSync(join(base, 'cases', 'cal_1.json'), JSON.stringify(c));
+      for (const d of ['a', 'b', 'c']) {
+        mkdirSync(join(base, 'judgments', d), { recursive: true });
+        const j = {
+          ...sj(`j/${d}`, 'cal_1', 'factuality', { F1: 'met' }, { FA1: 2 }),
+          itemsVersion: '9.9.9',
+          promptSha: 'snap',
+        };
+        writeFileSync(join(base, 'judgments', d, 'cal_1.factuality.json'), JSON.stringify(j));
+      }
+      mkdirSync(join(base, 'labels', 'self'), { recursive: true });
+      writeFileSync(
+        join(base, 'labels', 'self', 'cal_1.json'),
+        JSON.stringify({
+          caseId: 'cal_1',
+          rater: 'self',
+          labeledAt: '2026-01-01',
+          binary: { F1: 'met' },
+          anchors: { FA1: 2 },
+          itemsVersion: '9.9.9',
+        }),
+      );
+      // 9.9.9 is not the live rubric and 'snap' is not the live sha: a live read
+      // would throw; a --base-dir snapshot must not.
+      const report = computeAgreement(fakeBridge(), { baseDir: base, permutations: 0 });
+      expect(report.counts).toMatchObject({ cases: 1, judgments: 3, selfLabeledCases: 1 });
+      expect(report.versions.judgments).toEqual(['9.9.9']);
+      expect(report.options).toMatchObject({ historical: true, declaredOnly: false });
+      expect(report.perDimension['factuality']?.g8a?.units).toBe(1);
+      expect(report.perDimension['factuality']?.permutationNullG8a).toBeNull();
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('declaredOnly anchors', () => {
+  const items = loadJudgeItems();
+  const withSe6 = makeCase('cal_1', 'borderline', []);
+  withSe6.judgeApplicability.salesEffectiveness = ['SE1', 'SE6'];
+  const without = makeCase('cal_2', 'borderline', []);
+  without.judgeApplicability.salesEffectiveness = ['SE1'];
+  const judgments = ['cal_1', 'cal_2'].flatMap((id) =>
+    JUDGES.map((j) => sj(j, id, 'salesEffectiveness', { SE1: 'met' }, { SA1: 2, SA2: 1 })),
+  );
+
+  it('default stays verdict-driven: SA1 units for every case that has a score', () => {
+    const { anchors } = assembleUnits([withSe6, without], judgments, JUDGES, { items });
+    expect(anchors.filter((a) => a.anchorId === 'SA1').map((a) => a.caseId)).toEqual([
+      'cal_1',
+      'cal_2',
+    ]);
+  });
+
+  it('--declared-only keeps SA1 only where SE6 is declared, SA2 everywhere', () => {
+    const { anchors } = assembleUnits([withSe6, without], judgments, JUDGES, {
+      declaredOnly: true,
+      items,
+    });
+    expect(anchors.filter((a) => a.anchorId === 'SA1').map((a) => a.caseId)).toEqual(['cal_1']);
+    expect(anchors.filter((a) => a.anchorId === 'SA2')).toHaveLength(2);
+  });
+});
+
+describe('per-item kappa and the within-item permutation null', () => {
+  const unit = (caseId: string, itemId: string, pass: boolean): BinaryUnit => ({
+    caseId,
+    dimension: 'factuality',
+    itemId,
+    perJudgePass: [pass],
+    panelPass: pass,
+  });
+  const units = ['c1', 'c2', 'c3', 'c4'].flatMap((c, i) => [
+    unit(c, 'F1', i < 3),
+    unit(c, 'F2', i % 2 === 0),
+  ]);
+  const ref = new Map<string, boolean>(
+    ['c1', 'c2', 'c3', 'c4'].flatMap((c, i) => [
+      [`${c}|F1`, i !== 1] as [string, boolean],
+      [`${c}|F2`, i < 2] as [string, boolean],
+    ]),
+  );
+  // Deterministic stand-in: kappa = fraction of agreeing pairs.
+  const bridge: BridgeFn = (raters) => {
+    const h = raters['human'] ?? [];
+    const p = raters['panel'] ?? [];
+    const k = h.filter((v, i) => v === p[i]).length / h.length;
+    return { krippendorff_alpha: k, cohen_kappa: k, weighted_kappa: k, spearman: k, pearson: k };
+  };
+
+  it('reports one agreement per item and skips the bridge on constant columns', () => {
+    const per = perItemAgreement(units, ref, bridge);
+    expect(Object.keys(per)).toEqual(['F1', 'F2']);
+    expect(per['F1']?.units).toBe(4);
+    const throwing: BridgeFn = () => {
+      throw new Error('bridge must not be called');
+    };
+    const constant = ['c1', 'c2'].map((c) => unit(c, 'F9', true));
+    const out = perItemAgreement(
+      constant,
+      new Map([
+        ['c1|F9', true],
+        ['c2|F9', true],
+      ]),
+      throwing,
+    );
+    expect(out['F9']).toMatchObject({ kappa: null, rawAgreementPct: 100 });
+  });
+
+  it('is deterministic for a seed, differs across seeds, preserves per-item rates', () => {
+    const a = withinItemPermutationNull(units, ref, bridge, 50, 7);
+    const b = withinItemPermutationNull(units, ref, bridge, 50, 7);
+    expect(a).toEqual(b);
+    expect(a.nullMeanKappa).not.toBeNull();
+    expect(a.permutations).toBe(50);
+    const seen: string[] = [];
+    const spy: BridgeFn = (raters, level) => {
+      seen.push(JSON.stringify(raters['panel']));
+      return bridge(raters, level);
+    };
+    withinItemPermutationNull(units, ref, spy, 20, 7);
+    // Item F1 occupies the first 4 slots: its pass count (3) survives every shuffle.
+    for (const panel of seen.slice(1)) {
+      const arr = JSON.parse(panel) as number[];
+      expect(arr.slice(0, 4).reduce((x, y) => x + y, 0)).toBe(3);
+    }
+    expect(new Set(seen).size).toBeGreaterThan(1);
+  });
+});
+
+describe('carryForwardGuard', () => {
+  const items = loadJudgeItems();
+  const docs = 'DOCS';
+  const stored = (over: Partial<StoredJudgment>): StoredJudgment => ({
+    ...sj('j/a', 'cal_1', 'compliance', { CP5: 'OK' }),
+    ...over,
+  });
+
+  it('accepts an older-version verdict whose promptSha is the current builder sha', () => {
+    const sha = sha256(buildJudgeSystem(items, 'compliance', docs, 'original'));
+    const guard = carryForwardGuard('original', items, docs);
+    expect(() => guard(stored({ itemsVersion: '0.0.1', promptSha: sha }))).not.toThrow();
+  });
+
+  it('rejects an older-version verdict with a different sha, naming everything', () => {
+    const guard = carryForwardGuard('original', items, docs);
+    expect(() => guard(stored({ itemsVersion: '0.0.1', promptSha: 'stale' }))).toThrow(
+      /judge j\/a, dimension compliance.*0\.0\.1.*stale.*current rubric/s,
+    );
+    expect(() => guard(stored({ promptSha: 'stale' }))).toThrow(/unversioned/);
+  });
+
+  it('is order-specific and ignores current-version verdicts', () => {
+    const orig = sha256(buildJudgeSystem(items, 'compliance', docs, 'original'));
+    const rev = carryForwardGuard('reversed', items, docs);
+    expect(() => rev(stored({ itemsVersion: '0.0.1', promptSha: orig }))).toThrow(/reversed/);
+    const guard = carryForwardGuard('original', items, docs);
+    expect(() =>
+      guard(stored({ itemsVersion: items.version, promptSha: 'anything' })),
+    ).not.toThrow();
+  });
+
+  it('is applied by loadJudgments only when a guard is passed', () => {
+    const base = mkdtempSync(join(tmpdir(), 'gb-guard-'));
+    try {
+      mkdirSync(join(base, 'a'), { recursive: true });
+      writeFileSync(
+        join(base, 'a', 'x.json'),
+        JSON.stringify(stored({ itemsVersion: '0.0.1', promptSha: 'stale' })),
+      );
+      expect(loadJudgments(base)).toHaveLength(1);
+      expect(() => loadJudgments(base, carryForwardGuard('original', items, docs))).toThrow(
+        /carry-forward guard/,
+      );
     } finally {
       rmSync(base, { recursive: true, force: true });
     }

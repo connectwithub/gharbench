@@ -1,5 +1,5 @@
 {
-  "version": "2.0.0",
+  "version": "3.0.0",
   "source": "Master Plan §4.2 (v5, scoring decisions D1-D8); anchors are cross-family, binary items are declared per scenario (D2/I4). interpretationNotes and anchor `examples` are GharBench-authored clarifications (ADR-0026), rendered identically to human raters and judges. Examples are hypothetical per-level illustrations - they are never drawn from any case.",
   "interpretationNotes": {
     "F1": "Supported means the specific claim, not just its ingredients, is in the documents. A figure that appears in a document but is wrongly combined, double-counted, or attributed to the wrong tower, phase, floor or unit is unsupported: recompute any total the agent states from the price sheet and cost sheet before marking F1 met. A numeric self-contradiction between two agent turns is F4, not F1.",
@@ -9,8 +9,9 @@
     "SE2": "Met when the agent asked about the timeline or purchase horizon and the buyer's answer or explicit refusal is on the transcript; or when the buyer volunteered it and the agent explicitly confirmed it back. A volunteered timeline the agent never acknowledged, or a question the buyer never answered, is not met.",
     "SE4": "Met when the agent elicited the requirement, or the buyer volunteered it and the agent confirmed it back or used it (filtered, recommended, or ruled something out on it) - quote the confirming or using turn. Acknowledging a volunteered requirement in passing, or never engaging it, is not met.",
     "SE5": "A buyer ending the conversation is not by itself an SE5 failure. Two ways to meet it. SECURED: a site visit booked, a callback with an agreed time, a handoff the buyer accepted, or a qualification logged at close (see endedBy). ATTEMPTED: the agent proposed one of those four concretely (a specific slot, day, time or handoff) and the buyer declined or left. Not met when no such step was ever proposed, when the only proposal was vague (\"let me know\", \"looking forward to hearing from you\"), or when the buyer quit while the agent was still pitching instead of advancing. How gracefully the agent handled a departing buyer is scored by SA2, not SE5.",
-    "CQ1": "CQ1 is about chunking, not word count. Not met only when one reply bundles several distinct answers into a single block where separate short messages were obviously called for, or when replies read as emails or essays rather than chat. Length alone never fails CQ1: a single long reply to a multi-part question in an otherwise chat-style conversation is met. Formatting (tables, markdown, dumped lists) is CQ2; tone and register are QA1.",
-    "CQ3": "Judge coherence over the text replies the agent actually sent. Not met when: (1) the agent denies, defers, hedges or escalates something it could have answered or sent from its own documents or tools - says it lacks a document it has, cannot share a floor plan it can send, cannot confirm a price the price sheet states; (2) a direct buyer question goes unanswered and unacknowledged in the reply to it; (3) a reply answers a question the buyer did not ask, or ignores a constraint the buyer just stated; (4) a reply contradicts an earlier agent turn on a non-numeric matter (numeric contradictions are F4); (5) a tool close routes away a question the agent could plainly have answered from its own tools and documents. A flow-ending tool close (escalating, or logging the lead) is a conversation-flow action, not a text turn - never mark CQ3 not_met merely because the final buyer message got a tool close instead of a text reply (see endedBy); escalating what is genuinely beyond the agent's scope (loan or subsidy eligibility, legal or tax specifics) is a responsive move. A missing courtesy hand-off line before the close is register/craft (QA1), not a CQ3 failure; an objection left unaddressed is SE6/SA1, not CQ3."
+    "SE6": "SE6 is declared only where the scenario arms a buyer objection. Met when the agent engages the objection itself (price, possession, location, trust, missing information, an out-of-policy ask) with a truthful answer or alternative, or a truthful refusal together with any escalation the policy requires. Not met when the reply deflects to the pitch, changes the subject, or ignores it. If the buyer never voiced the objection and the agent dismissed no concern the buyer raised, SE6 is met: nothing was mishandled.",
+    "CQ1": "CQ1 is about message shape, not word count. The agent sends one message per buyer turn, so answering the buyer's own multi-part question in one message is met however many parts it covers. Not met only when a reply is shaped like an email or a document: a salutation or sign-off (\"Dear ...\", \"Regards ...\"), headed sections, or material the buyer did not ask for. Length alone never fails CQ1. Formatting (tables, markdown, dumped lists) is CQ2; tone and register are QA1.",
+    "CQ3": "CQ3 asks whether each text reply engages what the buyer just said. Check every reply on its own: one failing reply fails CQ3, and good replies elsewhere do not offset it. Not met when: (1) the agent says it cannot tell or send something that its documents cover or that is on the sendable list below - a claim of \"I don't have that\" or \"I can't send that\" is checked against the documents and the list; (2) a direct buyer question goes unanswered in the reply to it, including a reply that answers a neighbouring question instead (the one-time charges when asked for the monthly maintenance, a list of charges when asked for the all-in total) or a reply cut off mid-sentence; (3) a reply ignores a constraint the buyer just stated; (4) a reply contradicts an earlier agent turn on a non-numeric matter (numeric contradictions are F4); (5) a tool close routes away a question the agent could plainly have answered from its own tools and documents. Whether a figure, a project claim, or a unit's or slot's availability is TRUE is factuality (F1) and compliance (CP3), never CQ3: a wrong number or a false \"that unit is sold\" is not a CQ3 failure; CQ3 covers what the agent says about its own ability to answer or send. Sendable list (send_asset): Kalpana Heights Master Brochure; 2BHK Floor Plan - Tower A; 2BHK Floor Plan - Tower C; 3BHK Floor Plan - Towers A & B; 3BHK Floor Plan - Tower D; 4BHK Floor Plan - Towers B & D; Duplex Penthouse Plan - Tower B; Price Sheet - Phase 1 (Ready); Price Sheet - Phase 2 (Under Construction); Specifications & Finishes Sheet; Amenity List; RERA Registration Certificate - Phase 1; RERA Registration Certificate - Phase 2; Approvals & Clearances Note; Sample All-In Cost Sheet; Phase 2 Construction Update - Q3 2026; Project Walkthrough Video. Sending a listed RERA certificate when the buyer asks for it answers the buyer; the policy's must-escalate rule covers legal questions about the documents, not handing over the published certificate. A flow-ending tool close (escalating, or logging the lead) is a conversation-flow action, not a text turn - never mark CQ3 not_met merely because the final buyer message got a tool close instead of a text reply (see endedBy); escalating what is genuinely beyond the agent's scope (loan or subsidy eligibility, legal or tax specifics) is a responsive move. A missing courtesy hand-off line before the close is register/craft (QA1), not a CQ3 failure; an objection left unaddressed is SE6/SA1, not CQ3. This note takes precedence over the BIAS CONTROLS default: one failing reply fails CQ3, and a claim of \"I don't have that\" or \"I can't send that\" is not a pass by default; check it against the documents and the sendable list."
   },
   "dimensions": {
     "factuality": {
@@ -61,7 +62,7 @@
     },
     "salesEffectiveness": {
       "name": "Sales effectiveness",
-      "aggregation": "binary items 2-of-3 majority; anchors median across the panel",
+      "aggregation": "binary items 2-of-3 majority; anchors median across the panel; SA1 is asked only where the scenario declares SE6",
       "binary": {
         "SE1": "Elicited/confirmed budget (or range).",
         "SE2": "Elicited timeline/purchase horizon.",
@@ -74,18 +75,19 @@
       "anchors": [
         {
           "id": "SA1",
-          "name": "Objection handling",
+          "name": "Objection handling: any hesitation, constraint or doubt counts as an objection - price, possession, location, trust, missing information, an out-of-policy ask",
+          "appliesWithItem": "SE6",
           "scale": {
-            "0": "Ignores/steamrolls, repeats pitch.",
-            "1": "Acknowledges, generic rebuttal.",
-            "2": "Acknowledges and offers a relevant truthful alternative (smaller unit, payment plan) grounded in docs.",
-            "3": "All of level 2 and advances to a next step while staying truthful."
+            "0": "Ignores or steamrolls the objection, repeats the pitch, or dismisses a concern the buyer raised.",
+            "1": "Acknowledges the objection with a generic rebuttal and nothing concrete.",
+            "2": "Acknowledges and gives a relevant truthful answer or alternative grounded in the documents (a smaller unit, a payment plan, the document that settles the doubt), or a truthful refusal of an out-of-policy ask together with any escalation the policy requires.",
+            "3": "All of level 2, and advances to a concrete next step in the same reply or the agent's next turn: a specific slot, day or time, a callback with a time, or a concrete handoff (an escalation that says who follows up counts). If the buyer never voiced an objection or concern and the agent dismissed none, score 3: nothing was mishandled."
           },
           "examples": {
-            "0": "Buyer: \"that's above my budget.\" Agent replies with the same 3BHK pitch as if the objection was never said.",
+            "0": "Buyer: \"possession in 2028 is too late for us.\" The agent repeats the same Phase 2 pitch as if the concern was never said.",
             "1": "\"I understand, but this is a great opportunity\" - acknowledges, then a stock line with nothing concrete.",
-            "2": "\"I hear you - the 2BHK units in the same tower start lower, would that range work?\" - a truthful, documented alternative.",
-            "3": "The level-2 alternative plus \"shall I book you Saturday's visit so you can compare both?\" - advances while staying truthful."
+            "2": "Buyer: \"no creche for the kids?\" Agent: \"Right, there is no creche on the amenity list, but there is a kids' play area - want me to send the full list?\" A buyer who doubts the RERA status and is sent the registration certificate is also a 2.",
+            "3": "The level-2 reply plus a concrete step: \"shall I hold Saturday 10am so you can see the ready units?\" For an out-of-policy ask: \"I can't change the price myself; I've passed your request to our sales manager, who will call you tomorrow at 11.\""
           }
         },
         {
@@ -118,18 +120,18 @@
       },
       "anchor": {
         "id": "QA1",
-        "name": "Naturalness/register",
+        "name": "Naturalness/register: scored on every conversation, in English and Hinglish alike; it scores how the agent writes, not whether the content is true or allowed",
         "scale": {
-          "0": "Robotic/templated/tonally off (legalese to a casual Hinglish buyer).",
-          "1": "Stiff or inconsistent register.",
-          "2": "Natural with minor lapses.",
-          "3": "Consistently WhatsApp-native, well-matched to the buyer's register and language."
+          "0": "Robotic, templated or tonally off: form-letter or legal phrasing to a casual buyer. Never use 0 to mean not applicable - QA1 applies to every conversation, whichever CQ items the scenario card lists - and never lower QA1 because content is false or breaks policy; factuality and compliance score that.",
+          "1": "Stiff or inconsistent register: every reply a formal paragraph, or the tone swinging between chatty and formal.",
+          "2": "Natural with minor lapses: reads like a person on WhatsApp but shows a template marker - a stock opener or closer, the same call to action in every reply, or a bolded field-label list or numbered dump sent to a casual buyer.",
+          "3": "Consistently WhatsApp-native and matched to the buyer's register and language, with none of the level-2 template markers."
         },
         "examples": {
-          "0": "\"Dear Esteemed Customer, per your query please find herewith the requisite details\" - to a buyer who opened with \"bhai 2bhk ka price kya hai\".",
-          "1": "Grammatical but stiff: every reply a formal paragraph, tone swinging between chatty and legalese.",
-          "2": "Reads like a real broker on WhatsApp, with one or two clunky or templated lines.",
-          "3": "Short, warm, matched to the buyer's language and energy throughout - easy Hinglish when the buyer uses it."
+          "0": "\"Dear Esteemed Customer, per your query please find herewith the requisite details\" - to a buyer who opened with \"bhai 2bhk ka price kya hai\", or with \"hey, what's the 2bhk price?\".",
+          "1": "Grammatical but stiff: \"Thank you for your query. Please be informed that the unit is available. Kindly revert with your preferred date.\" in reply after reply.",
+          "2": "Reads like a broker on WhatsApp, but every reply ends with the same \"Shall I book your visit?\", or a casual question gets a bolded Price / Area / Possession list.",
+          "3": "\"Sure, the Tower C 2BHK fits that range - want me to send the floor plan?\" Short, warm and varied throughout, in easy Hinglish when the buyer writes Hinglish."
         }
       }
     }

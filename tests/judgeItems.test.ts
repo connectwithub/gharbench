@@ -6,9 +6,12 @@
  * not surface as a silently unscored item.
  */
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
-import { binaryItemIds, loadJudgeItems } from '../src/run/judgeItems.js';
-import { loadScenarioSet } from '../src/run/scenarioSet.js';
+import { binaryItemIds, judgeItemsSchema, loadJudgeItems } from '../src/run/judgeItems.js';
+import { REPO_ROOT, loadScenarioSet } from '../src/run/scenarioSet.js';
 
 const items = loadJudgeItems();
 const ids = binaryItemIds(items);
@@ -29,6 +32,45 @@ describe('judge rubric', () => {
     expect(items.dimensions.factuality.anchor.id).toBe('FA1');
     expect(items.dimensions.salesEffectiveness.anchors.map((a) => a.id)).toEqual(['SA1', 'SA2']);
     expect(items.dimensions.conversationQuality.anchor.id).toBe('QA1');
+  });
+
+  it('SA1 is the only conditional anchor, asked where SE6 is declared (ADR-0037)', () => {
+    const [sa1, sa2] = items.dimensions.salesEffectiveness.anchors;
+    expect(sa1?.appliesWithItem).toBe('SE6');
+    expect(sa2?.appliesWithItem).toBeUndefined();
+    expect(items.dimensions.factuality.anchor.appliesWithItem).toBeUndefined();
+    expect(items.dimensions.conversationQuality.anchor.appliesWithItem).toBeUndefined();
+  });
+
+  it('appliesWithItem must name a binary item of the same dimension', () => {
+    const raw = JSON.parse(readFileSync(join(REPO_ROOT, 'data', 'judge-items.json'), 'utf8')) as {
+      dimensions: {
+        salesEffectiveness: { anchors: { appliesWithItem?: string }[] };
+        conversationQuality: { anchor: { appliesWithItem?: string } };
+      };
+    };
+    expect(judgeItemsSchema.safeParse(raw).success).toBe(true);
+
+    const withSa1 = (id: string): unknown => {
+      const copy = structuredClone(raw);
+      const sa1 = copy.dimensions.salesEffectiveness.anchors[0];
+      if (sa1) sa1.appliesWithItem = id;
+      return copy;
+    };
+    // Another dimension's id: never declared on SE, so SA1 would vanish silently.
+    const crossDimension = judgeItemsSchema.safeParse(withSa1('CQ3'));
+    expect(crossDimension.success).toBe(false);
+    expect(crossDimension.error?.issues[0]?.message).toContain(
+      'salesEffectiveness anchor SA1: appliesWithItem "CQ3" is not a salesEffectiveness binary item id',
+    );
+    // Well-formed but non-existent id.
+    expect(judgeItemsSchema.safeParse(withSa1('SE9')).success).toBe(false);
+
+    const qa1 = structuredClone(raw);
+    qa1.dimensions.conversationQuality.anchor.appliesWithItem = 'CQ3';
+    expect(judgeItemsSchema.safeParse(qa1).success).toBe(true);
+    qa1.dimensions.conversationQuality.anchor.appliesWithItem = 'SE6';
+    expect(judgeItemsSchema.safeParse(qa1).success).toBe(false);
   });
 
   it('every id declared by any scenario resolves against the rubric', () => {

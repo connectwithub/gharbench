@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import {
   V_WEIGHTS,
   WF_SWEEP_STEPS,
+  appliesAnchorRule,
   blendSubScore,
   compareV5,
   composite,
@@ -30,6 +31,21 @@ const sub = (over: Partial<SubScores> = {}): SubScores => ({
   sales: 0.8,
   qual: 0.85,
   ...over,
+});
+
+describe('ADR-0037 applicability rule version gate', () => {
+  it('applies only from rubric 3.0.0; earlier and malformed versions keep the old reading', () => {
+    expect(appliesAnchorRule(undefined)).toBe(false);
+    expect(appliesAnchorRule('1.3.0')).toBe(false);
+    expect(appliesAnchorRule('2.0.0')).toBe(false);
+    expect(appliesAnchorRule('2.99.99')).toBe(false);
+    expect(appliesAnchorRule('3.0.0')).toBe(true);
+    expect(appliesAnchorRule('3.0.1')).toBe(true);
+    expect(appliesAnchorRule('3.1.0')).toBe(true);
+    expect(appliesAnchorRule('10.0.0')).toBe(true);
+    expect(appliesAnchorRule('3.0')).toBe(false);
+    expect(appliesAnchorRule('v3.0.0')).toBe(false);
+  });
 });
 
 describe('D1 blend', () => {
