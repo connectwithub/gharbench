@@ -152,11 +152,11 @@ export const PRICES: Readonly<Record<string, ModelPrice>> = {
     confidence: 'verified',
   },
   'meta-llama/llama-4-maverick': {
-    inputPerMTok: 0.2,
-    outputPerMTok: 0.8,
+    inputPerMTok: 0.27,
+    outputPerMTok: 0.85,
     source:
-      'openrouter.ai/api/v1/models/meta-llama/llama-4-maverick/endpoints, DeepInfra host (fp8)',
-    lastVerified: '2026-09-20',
+      'openrouter.ai/api/v1/models/meta-llama/llama-4-maverick/endpoints, Novita host (fp8); DeepInfra delisted 2026-10-14',
+    lastVerified: '2026-10-14',
     confidence: 'verified',
   },
   // Direct xAI id, kept for a direct-key run; the OpenRouter figure above is

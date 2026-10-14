@@ -3,10 +3,11 @@
 Generated from `decisions.jsonl` — do not edit by hand.
 Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 
-32 decisions.
+33 decisions.
 
 ## By date
 
+- **ADR-0034** (2026-10-14) — [Maverick judge re-pinned from DeepInfra to Novita after DeepInfra was delisted; transport failures are no longer persisted as verdicts](ADR-0034-maverick-judge-repinned-to-novita.md)
 - **ADR-0033** (2026-09-21) — [Rubric v2: the judge items are revised after G8a fell below the floor on every dimension](ADR-0033-rubric-v2-calibration-revision.md)
 - **ADR-0032** (2026-09-20) — [Judge panel serving ids verified; all three judges route through OpenRouter, Mistral slot resolves to Medium 3.5](ADR-0032-judge-panel-openrouter-routing.md)
 - **ADR-0031** (2026-08-30) — [Operational profile: latency published as serving telemetry, never scored](ADR-0031-operational-profile.md)
@@ -157,6 +158,7 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 - ADR-0030 — [SISTER work order: judge-robustness machinery, clustered CIs, canary, release hygiene](ADR-0030-sister-workorder.md)
 - ADR-0032 — [Judge panel serving ids verified; all three judges route through OpenRouter, Mistral slot resolves to Medium 3.5](ADR-0032-judge-panel-openrouter-routing.md)
 - ADR-0033 — [Rubric v2: the judge items are revised after G8a fell below the floor on every dimension](ADR-0033-rubric-v2-calibration-revision.md)
+- ADR-0034 — [Maverick judge re-pinned from DeepInfra to Novita after DeepInfra was delisted; transport failures are no longer persisted as verdicts](ADR-0034-maverick-judge-repinned-to-novita.md)
 
 ### `judge-panel`
 
@@ -179,14 +181,17 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 
 - ADR-0032 — [Judge panel serving ids verified; all three judges route through OpenRouter, Mistral slot resolves to Medium 3.5](ADR-0032-judge-panel-openrouter-routing.md)
 - ADR-0033 — [Rubric v2: the judge items are revised after G8a fell below the floor on every dimension](ADR-0033-rubric-v2-calibration-revision.md)
+- ADR-0034 — [Maverick judge re-pinned from DeepInfra to Novita after DeepInfra was delisted; transport failures are no longer persisted as verdicts](ADR-0034-maverick-judge-repinned-to-novita.md)
 
 ### `pinning`
 
 - ADR-0032 — [Judge panel serving ids verified; all three judges route through OpenRouter, Mistral slot resolves to Medium 3.5](ADR-0032-judge-panel-openrouter-routing.md)
+- ADR-0034 — [Maverick judge re-pinned from DeepInfra to Novita after DeepInfra was delisted; transport failures are no longer persisted as verdicts](ADR-0034-maverick-judge-repinned-to-novita.md)
 
 ### `pricing`
 
 - ADR-0032 — [Judge panel serving ids verified; all three judges route through OpenRouter, Mistral slot resolves to Medium 3.5](ADR-0032-judge-panel-openrouter-routing.md)
+- ADR-0034 — [Maverick judge re-pinned from DeepInfra to Novita after DeepInfra was delisted; transport failures are no longer persisted as verdicts](ADR-0034-maverick-judge-repinned-to-novita.md)
 
 ### `process`
 
@@ -222,6 +227,7 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 
 - ADR-0016 — [OpenRouter routing is not behaviour-neutral: pin the host, use the chat surface](ADR-0016-openrouter-routing-is-not-behaviour-neutral.md)
 - ADR-0032 — [Judge panel serving ids verified; all three judges route through OpenRouter, Mistral slot resolves to Medium 3.5](ADR-0032-judge-panel-openrouter-routing.md)
+- ADR-0034 — [Maverick judge re-pinned from DeepInfra to Novita after DeepInfra was delisted; transport failures are no longer persisted as verdicts](ADR-0034-maverick-judge-repinned-to-novita.md)
 
 ### `release`
 
@@ -237,6 +243,7 @@ Run `node scripts/decisions-index.mjs docs/decisions` after appending an entry.
 - ADR-0009 — [Pin floating model aliases to dated snapshots](ADR-0009-pin-dated-model-snapshots.md)
 - ADR-0014 — [Personas are public; scenarios are persona-bound instance files split at authoring time](ADR-0014-personas-are-public-scenarios-are-persona-bound-instance-files.md)
 - ADR-0016 — [OpenRouter routing is not behaviour-neutral: pin the host, use the chat surface](ADR-0016-openrouter-routing-is-not-behaviour-neutral.md)
+- ADR-0034 — [Maverick judge re-pinned from DeepInfra to Novita after DeepInfra was delisted; transport failures are no longer persisted as verdicts](ADR-0034-maverick-judge-repinned-to-novita.md)
 
 ### `rubric`
 

@@ -349,6 +349,15 @@ function parseArgs(argv: string[]): CliOptions {
 
 const estTokens = (text: string): number => Math.ceil(text.length / 4);
 
+/**
+ * A transport failure (`call_failed`) says nothing about the judge's output,
+ * and a persisted file would make a resume skip it forever. Judge-format
+ * errors (`no_json`, `schema_violation`) are data (ADR-0019) and stay on disk.
+ */
+export function shouldPersistJudgment(outcome: JudgeCaseResult['outcome']): boolean {
+  return !(outcome.kind === 'error' && outcome.code === 'call_failed');
+}
+
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
   const items: JudgeItems = loadJudgeItems();
@@ -460,6 +469,7 @@ async function main(): Promise<void> {
   const callers = new Map(options.judges.map((ref) => [ref, modelJudgeCaller(ref, meter, ts)]));
   let done = 0;
   let errored = 0;
+  let callFailed = 0;
   let budgetStopped = false;
 
   await Promise.all(
@@ -479,6 +489,11 @@ async function main(): Promise<void> {
           sourceDocuments,
           itemOrder: options.itemOrder,
         });
+        if (!shouldPersistJudgment(result.outcome)) {
+          // Transport failure: no verdict file, so the next resume retries it.
+          callFailed += 1;
+          return;
+        }
         const stored: StoredJudgment = { ...result, judgeRef, ts, itemsVersion: items.version };
         mkdirSync(join(baseDir, judgeSlug(judgeRef)), { recursive: true });
         writeFileSync(
@@ -510,6 +525,7 @@ async function main(): Promise<void> {
         cases: judgeables.length,
         judged: done,
         errored,
+        callFailed,
         skippedExisting,
         budgetStopped,
         // The rubric the whole pass ran under. promptSha pins the exact bytes,
@@ -531,7 +547,7 @@ async function main(): Promise<void> {
   );
 
   console.log(
-    `judged ${done}/${work.length} (${errored} structured errors), ` +
+    `judged ${done}/${work.length} (${errored} structured errors, ${callFailed} call_failed not persisted), ` +
       `$${summary.totalUsd.toFixed(4)} across ${summary.calls} calls, ` +
       `cache hits ${summary.cacheHits}/${summary.calls}` +
       (summary.unpricedCalls > 0 ? `, UNPRICED calls: ${summary.unpricedCalls}` : '') +

@@ -73,6 +73,10 @@ DOI (ADR-0030) - every entry here is what a version DOI points at.
   and the Mistral slot resolved to Mistral Medium 3.5 under the Master Plan
   §6.4 I7 rule (Mistral Large 3 has no reachable endpoint; named reserve).
   Verified prices added for all three (`src/telemetry/prices.ts`).
+- Llama 4 Maverick judge re-pinned from DeepInfra to Novita (fp8, $0.27 /
+  $0.85 per MTok) after DeepInfra was delisted for the model on OpenRouter.
+  The whole Maverick v2 calibration pass was rerun on Novita, so every
+  Maverick verdict comes from one host (ADR-0034).
 
 ### Fixed
 
@@ -84,6 +88,10 @@ DOI (ADR-0030) - every entry here is what a version DOI points at.
   the fix, Maverick 47% to 30%, Mistral unchanged at 10%.
 - `listRaters` skips `archived-*` label folders; the Phase-5 gate had
   counted the ADR-0028 purge archive as a colleague rater.
+- The judge runner no longer writes a verdict file for a transport failure
+  (`call_failed`). The next resume retries it, and the meta pass counts it
+  separately as `callFailed`. Before, a provider outage left error verdicts
+  that every later resume skipped (ADR-0034).
 
 ## [0.1.0] - unreleased baseline (2026-08-28 state)
 

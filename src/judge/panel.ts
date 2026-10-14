@@ -24,7 +24,9 @@
  *     §6.4 I7 rule resolves the slot to Mistral Medium 3.5 (upstream
  *     `mistralai/mistral-medium-3.5-20260430`, $1.50/$7.50); Large 3 is the
  *     named reserve.
- *   - Llama 4 Maverick: DeepInfra fp8, $0.20/$0.80.
+ *   - Llama 4 Maverick: Novita fp8, $0.27/$0.85, no cache-read price (verified
+ *     2026-10-14). DeepInfra was delisted on OpenRouter by then, so every
+ *     DeepInfra-pinned call failed; re-pinned (ADR-0034).
  * Gateway ids are not MODEL_PINS candidates (ADR-0009): the upstream dated
  * names above are the pin evidence and live in the ADR, not in the registry.
  */
@@ -36,7 +38,7 @@ export interface PanelJudge {
 export const JUDGE_PANEL: readonly PanelJudge[] = [
   { ref: 'openrouter/x-ai/grok-4.3@xAI', family: 'xai' },
   { ref: 'openrouter/mistralai/mistral-medium-3-5@Mistral', family: 'mistral' },
-  { ref: 'openrouter/meta-llama/llama-4-maverick@DeepInfra', family: 'meta' },
+  { ref: 'openrouter/meta-llama/llama-4-maverick@Novita', family: 'meta' },
 ];
 
 /** Filesystem-safe slug for a judge ref (mirrors calibrationBuild's slug). */
